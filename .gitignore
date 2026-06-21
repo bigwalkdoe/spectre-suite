@@ -1,0 +1,66 @@
+# Logs
+*.log
+logs/
+*.log.*
+
+# Backup files
+/backups/*.sql
+/backups/*.tar.gz
+/backups/*.rdb
+/backups/*/
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Editor files
+.vscode/
+.idea/
+*.sublime-*
+*.sublime-project
+
+# Build artifacts
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Docker volumes (don't commit actual data)
+docker-volumes/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup directories (don't commit actual backups)
+backups/*
+!/backups/.gitkeep
