@@ -1,0 +1,31 @@
+[Unit]
+Description=Custom Backup Service
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/system-maintenance
+
+# Run the backup script
+ExecStart=/opt/system-maintenance/scripts/backups/backup-all.sh
+
+# Environment variables
+Environment="BACKUP_RETENTION_DAYS=7"
+Environment="BACKUP_COMPRESSION=true"
+Environment="BACKUP_ENCRYPTION=false"
+
+# Resource limits
+MemoryMax=2G
+CPUQuota=50%
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc
+ReadWritePaths=/backups /tmp
+
+[Install]
+WantedBy=multi-user.target

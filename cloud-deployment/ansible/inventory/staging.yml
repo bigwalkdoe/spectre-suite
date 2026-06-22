@@ -1,0 +1,28 @@
+---
+# Staging environment inventory (AWS)
+
+staging:
+  hosts:
+    staging-maintenance-1:
+      ansible_host: 3.85.123.45
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/staging_key.pem
+      cloud_deployment: true
+      monitoring_enabled: true
+      security_enabled: true
+      environment: staging
+      cloud_provider: aws
+    staging-maintenance-2:
+      ansible_host: 54.123.45.67
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/staging_key.pem
+      cloud_deployment: true
+      monitoring_enabled: true
+      security_enabled: true
+      environment: staging
+      cloud_provider: aws
+
+  vars:
+    project_name: system-maintenance
+    installation_dir: /opt/system-maintenance
+    backup_dir: /backups

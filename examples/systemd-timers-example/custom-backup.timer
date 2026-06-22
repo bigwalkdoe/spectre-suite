@@ -1,0 +1,20 @@
+[Unit]
+Description=Custom Backup Timer
+Documentation=man:systemd.timer
+
+# Trigger backup daily at 3:00 AM
+OnCalendar=*-*-* 03:00:00
+# Alternatively, trigger every 6 hours
+# OnCalendar=*:0/6
+
+# Randomize start time by up to 15 minutes to avoid load spikes
+RandomizedDelaySec=15m
+
+# Keep the timer active even if it was missed (e.g., system was off)
+Persistent=true
+
+# Unit to activate when timer triggers
+Unit=custom-backup.service
+
+[Install]
+WantedBy=timers.target

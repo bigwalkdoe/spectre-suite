@@ -1,0 +1,230 @@
+# Example Prometheus Alert Rules
+# Customized alerts for different scenarios
+
+groups:
+  - name: critical_alerts
+    interval: 30s
+    rules:
+      # Critical CPU alerts
+      - alert: CriticalCPUUsage
+        expr: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance)) > 95
+        for: 10m
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "Critical CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }} for more than 10 minutes"
+          runbook_url: "https://runbooks.example.com/high-cpu"
+      
+      # Critical memory alerts
+      - alert: CriticalMemoryUsage
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 95
+        for: 10m
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+      
+      # Critical disk alerts
+      - alert: CriticalDiskUsage
+        expr: 100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "Critical disk usage detected"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+      
+      # Service down alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "Service is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 5 minutes"
+  
+  - name: warning_alerts
+    interval: 30s
+    rules:
+      # High CPU alerts
+      - alert: HighCPUUsage
+        expr: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance)) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+      
+      # High memory alerts
+      - alert: HighMemoryUsage
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+      
+      # High disk alerts
+      - alert: HighDiskUsage
+        expr: 100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+      
+      # High network alerts
+      - alert: HighNetworkTraffic
+        expr: rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m]) > 100000000
+        for: 5m
+        labels:
+          severity: warning
+          team: network
+        annotations:
+          summary: "High network traffic detected"
+          description: "Network traffic is {{ $value }} bytes/sec on {{ $labels.instance }}"
+  
+  - name: security_alerts
+    interval: 30s
+    rules:
+      # Failed login alerts
+      - alert: HighFailedLoginRate
+        expr: rate(authd_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate of failed login attempts"
+          description: "{{ $value }} failed logins per second on {{ $labels.instance }}"
+      
+      # ML anomaly alerts
+      - alert: MLAnomalyDetected
+        expr: ml_anomaly_detections_total > 0
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "ML anomaly detection triggered"
+          description: "Anomaly detected with score {{ $value }}"
+      
+      # IDS alerts
+      - alert: IDSAlertTriggered
+        expr: ids_alerts_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "IDS alert triggered"
+          description: "{{ $value }} IDS alerts detected"
+  
+  - name: application_alerts
+    interval: 30s
+    rules:
+      # Database alerts
+      - alert: DatabaseSlowQueries
+        expr: pg_stat_statements_mean_exec_time_ms > 1000
+        for: 10m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query execution time is {{ $value }}ms"
+      
+      - alert: DatabaseConnectionPoolExhausted
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          team: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value }} of maximum connections used"
+      
+      # Redis alerts
+      - alert: RedisMemoryUsageHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis using {{ $value }} of maximum memory"
+      
+      # Container alerts
+      - alert: ContainerRestartsFrequent
+        expr: rate(container_restart_count[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ $labels.name }} restarting {{ $value }} times per minute"
+  
+  - name: backup_alerts
+    interval: 60s
+    rules:
+      # Backup failure alerts
+      - alert: BackupJobFailed
+        expr: backup_job_success == 0
+        for: 1h
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "Backup job failed"
+          description: "Backup job {{ $labels.backup_job }} has failed"
+      
+      # Backup age alerts
+      - alert: BackupTooOld
+        expr: time() - backup_last_success_timestamp > 86400
+        for: 1h
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "Backup is too old"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+  
+  - name: performance_alerts
+    interval: 60s
+    rules:
+      # Response time alerts
+      - alert: HighResponseTime
+        expr: http_request_duration_seconds_bucket{le="1"} < 0.95
+        for: 10m
+        labels:
+          severity: warning
+          team: application
+        annotations:
+          summary: "High response time detected"
+          description: "Less than 95% of requests complete in 1 second"
+      
+      # Error rate alerts
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: application
+        annotations:
+          summary: "High error rate detected"
+          description: "{{ $value | humanizePercentage }} of requests are returning errors"
