@@ -6,19 +6,33 @@ A comprehensive system maintenance and security automation suite for Linux works
 
 - **Automated Backups**: Daily database, Docker volume, configuration, and project backups with retention policies
 - **Performance Optimization**: System tuning, Docker resource limits, and performance monitoring
-- **Security Hardening**: Vulnerability scanning, Docker security, API protection, and automated security updates
+- **Security Hardening**: Vulnerability scanning, Docker security, API protection, automated security updates, IDS/IPS, and advanced threat detection
 - **Network Optimization**: DNS caching, network security hardening, and performance tuning
 - **Automated Maintenance**: Cleanup scripts, log rotation, health checks, and system maintenance scheduling
-- **Comprehensive Monitoring**: Alerts for disk space, performance, security, and system health
+- **Comprehensive Monitoring**: Real-time web dashboard, Grafana integration, and comprehensive alerting system
 
 ## 📋 Requirements
 
-- Linux system (tested on Fedora 44, should work on other distributions)
+### Local Installation
+- Linux system (Fedora 20+, Ubuntu 20.04+, Debian 10+, CentOS 7+, Arch Linux, and others)
 - Docker and Docker Compose
 - Systemd (for automated scheduling)
 - Bash shell
 - Root/sudo access for system-level configurations
 - 10GB+ free disk space for backups
+
+### Cloud Deployment
+- Terraform >= 1.0 (for infrastructure provisioning)
+- Ansible >= 2.9 (for configuration management)
+- Cloud provider account (AWS/Azure/GCP)
+- SSH access to cloud instances
+- Appropriate IAM permissions
+
+### Supported Distributions
+- **Primary**: Fedora, Ubuntu, Debian, CentOS, RHEL
+- **Secondary**: Arch Linux, Manjaro, openSUSE, Rocky Linux, AlmaLinux, Linux Mint, Pop!_OS
+
+*See [docs/MULTI_DISTRIBUTION_SUPPORT.md](docs/MULTI_DISTRIBUTION_SUPPORT.md) for detailed information.*
 
 ## 🔧 Installation
 
@@ -35,6 +49,33 @@ sudo ./install.sh
 # Verify installation
 ./scripts/verify-installation.sh
 ```
+
+### Cloud Deployment
+
+```bash
+# Automated cloud deployment (Terraform + Ansible)
+cd cloud-deployment
+
+# Deploy to AWS (2 instances, dev environment)
+./deploy.sh aws dev 2
+
+# Deploy to staging environment
+./deploy.sh aws staging 3
+
+# Deploy to production environment
+./deploy.sh aws production 5
+
+# Or use Terraform directly
+cd terraform
+terraform init
+terraform apply
+
+# Then configure with Ansible
+cd ../ansible
+ansible-playbook -i inventory/production.yml playbook.yml
+```
+
+*See [cloud-deployment/docs/CLOUD_DEPLOYMENT_GUIDE.md](cloud-deployment/docs/CLOUD_DEPLOYMENT_GUIDE.md) for detailed cloud deployment instructions.*
 
 ### Manual Installation
 
@@ -89,12 +130,40 @@ system-maintenance/
 
 ## 🔒 Security Features
 
+### Basic Security
 - **SSH Hardening**: Fail2Ban protection, key-based authentication enforcement
 - **Docker Security**: Security configurations, resource limits, vulnerability scanning
 - **Network Security**: SYN cookies, IP spoofing protection, ICMP controls
 - **Application Security**: Dependency vulnerability scanning, API rate limiting
 - **Automatic Updates**: Security-only package updates
 - **Attack Surface Reduction**: All sensitive services bound to localhost
+
+### Advanced Security
+- **Network IDS/IPS**: Suricata-based real-time intrusion detection and prevention
+- **Host-based IDS**: OSSEC and AIDE for file integrity monitoring and host intrusion detection
+- **Advanced Threat Detection**: Anomaly detection, behavioral analysis, and automated threat response
+- **Security Integration**: Unified security framework with comprehensive monitoring and alerting
+- **Automated Response**: Multi-level automated incident response capabilities
+
+### ML & AI
+- **Anomaly Detection**: Machine learning-based anomaly detection using multiple algorithms
+- **Ensemble Methods**: Combines Isolation Forest, One-Class SVM, and statistical analysis
+- **Real-time Monitoring**: Continuous ML-based monitoring of system metrics
+- **Automated Training**: Scheduled model retraining with fresh data
+- **Prometheus Integration**: ML metrics exported for monitoring and alerting
+
+### Testing & CI/CD
+- **Automated Testing**: Comprehensive test suite for all components
+- **CI/CD Pipeline**: GitHub Actions workflow for continuous integration
+- **Multi-environment Testing**: Tests across different Linux distributions
+- **Security Scanning**: Automated vulnerability scanning with Trivy
+- **Quality Gates**: Automated quality checks and validation
+
+*See [docs/TESTING_AND_CICD.md](docs/TESTING_AND_CICD.md) for detailed information.*
+
+*See [docs/ML_ANOMALY_DETECTION.md](docs/ML_ANOMALY_DETECTION.md) for detailed information.*
+
+*See [docs/ADVANCED_SECURITY_FEATURES.md](docs/ADVANCED_SECURITY_FEATURES.md) for detailed information.*
 
 ## 📊 Monitoring & Alerts
 
@@ -195,13 +264,28 @@ Edit security scripts to customize:
 
 ## 📈 Monitoring Dashboard
 
-The system includes integration with:
-- **Prometheus**: Metrics collection
-- **Grafana**: Visualization and dashboards
-- **Node Exporter**: System metrics
-- **Custom Exporters**: Application-specific metrics
+The system includes multiple monitoring interfaces:
+- **Custom Web Dashboard**: Real-time system metrics and quick actions at `http://localhost:8081`
+- **Grafana**: Advanced visualization and dashboards at `http://localhost:3002`
+- **Prometheus**: Metrics collection and querying at `http://localhost:9090`
+- **Node Exporter**: System metrics exporter
+- **Custom Exporters**: Application-specific metrics (Redis, PostgreSQL, Docker)
 
-Access Grafana at `http://localhost:3002` (default configuration).
+### Deploying the Monitoring Stack
+
+```bash
+# Deploy complete monitoring infrastructure
+./scripts/deploy-monitoring.sh
+
+# Or use Docker Compose directly
+docker-compose -f docker-compose.monitoring.yml up -d
+```
+
+### Access Points
+- **Web Dashboard**: http://localhost:8081
+- **Grafana**: http://localhost:3002 (admin/changeme - change password on first use)
+- **Prometheus**: http://localhost:9090
+- **Alertmanager**: http://localhost:9093
 
 ## 🐛 Troubleshooting
 
@@ -269,13 +353,14 @@ For issues, questions, or contributions:
 
 ## 🔮 Future Roadmap
 
-- [ ] Web dashboard for system monitoring
-- [ ] Support for additional Linux distributions
+- [x] Web dashboard for system monitoring ✅
+- [x] Support for additional Linux distributions ✅
 - [ ] Integration with additional monitoring tools
-- [ ] Advanced security features (IDS/IPS)
-- [ ] Cloud deployment support
+- [x] Advanced security features (IDS/IPS) ✅
+- [x] Cloud deployment support ✅
 - [ ] Multi-server management
-- [ ] Machine learning for anomaly detection
+- [x] Machine learning for anomaly detection ✅
+- [x] Comprehensive testing and CI/CD pipeline ✅
 
 ---
 

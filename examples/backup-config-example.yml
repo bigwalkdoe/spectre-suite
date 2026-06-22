@@ -1,0 +1,121 @@
+# Example Backup Configuration
+# Customize this configuration for your environment
+
+backup:
+  # Backup schedule (cron format)
+  schedule: "0 2 * * *"
+  
+  # Backup locations
+  destinations:
+    - type: local
+      path: /backups
+    - type: remote
+      host: backup.example.com
+      path: /remote-backups
+      user: backup-user
+  
+  # Backup types
+  types:
+    databases:
+      enabled: true
+      databases:
+        - name: app_database
+          type: postgresql
+          host: localhost
+          port: 5432
+          user: postgres
+          password_file: /etc/system-maintenance/db-passwords
+        - name: cache
+          type: redis
+          host: localhost
+          port: 6379
+    
+    docker_volumes:
+      enabled: true
+      volumes:
+        - container_name: postgres
+          volume_name: postgres_data
+        - container_name: redis
+          volume_name: redis_data
+    
+    configurations:
+      enabled: true
+      paths:
+        - /etc/nginx
+        - /etc/system-maintenance
+        - /opt/application/config
+    
+    projects:
+      enabled: true
+      paths:
+        - /var/www/applications
+        - /opt/projects
+  
+  # Retention policies
+  retention:
+    databases:
+      daily: 7
+      weekly: 4
+      monthly: 12
+    docker_volumes:
+      daily: 7
+      weekly: 4
+    configurations:
+      daily: 7
+      weekly: 4
+      monthly: 6
+    projects:
+      daily: 3
+      weekly: 2
+  
+  # Compression settings
+  compression:
+    enabled: true
+    algorithm: gzip
+    level: 6
+  
+  # Encryption settings
+  encryption:
+    enabled: false
+    method: gpg
+    recipient: backup@example.com
+  
+  # Notification settings
+  notifications:
+    email:
+      enabled: true
+      from: backup@example.com
+      to: admin@example.com
+      smtp_server: smtp.example.com
+      smtp_port: 587
+      smtp_user: backup@example.com
+      smtp_password_file: /etc/system-maintenance/smtp-password
+    
+    slack:
+      enabled: false
+      webhook_url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+      channel: "#backups"
+  
+  # Pre-backup commands
+  pre_commands:
+    - command: docker exec postgres pg_dumpall -U postgres > /tmp/pre-backup.sql
+      enabled: false
+  
+  # Post-backup commands
+  post_commands:
+    - command: rm -f /tmp/pre-backup.sql
+      enabled: false
+  
+  # Verification settings
+  verification:
+    enabled: true
+    methods:
+      - checksum
+      - size_check
+    threshold_mb: 100
+  
+  # Performance settings
+  performance:
+    parallel_jobs: 4
+    bandwidth_limit: 100M
+    io Nice: 19

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Maintenance Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1><i class="fas fa-server"></i> System Maintenance Dashboard</h1>
+                <div class="header-controls">
+                    <span class="status-indicator online">
+                        <span class="status-dot"></span>
+                        All Systems Operational
+                    </span>
+                    <button id="refreshBtn" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="timestamp" id="timestamp"></div>
+        </header>
+
+        <!-- Quick Stats -->
+        <section class="quick-stats">
+            <div class="stat-card cpu">
+                <div class="stat-icon">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">CPU Usage</div>
+                    <div class="stat-value" id="cpuUsage">--%</div>
+                    <div class="stat-change" id="cpuChange">--</div>
+                </div>
+            </div>
+            <div class="stat-card memory">
+                <div class="stat-icon">
+                    <i class="fas fa-memory"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">Memory Usage</div>
+                    <div class="stat-value" id="memoryUsage">--%</div>
+                    <div class="stat-change" id="memoryChange">--</div>
+                </div>
+            </div>
+            <div class="stat-card disk">
+                <div class="stat-icon">
+                    <i class="fas fa-hdd"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">Disk Usage</div>
+                    <div class="stat-value" id="diskUsage">--%</div>
+                    <div class="stat-change" id="diskChange">--</div>
+                </div>
+            </div>
+            <div class="stat-card network">
+                <div class="stat-icon">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-label">Network I/O</div>
+                    <div class="stat-value" id="networkIO">--</div>
+                    <div class="stat-change" id="networkChange">--</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Grid -->
+        <div class="dashboard-grid">
+            <!-- System Health -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-heartbeat"></i> System Health</h2>
+                    <span class="badge" id="healthStatus">Checking...</span>
+                </div>
+                <div class="card-body">
+                    <div class="health-checks">
+                        <div class="health-item">
+                            <span class="health-label">System Load</span>
+                            <span class="health-value" id="systemLoad">--</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-label">Uptime</span>
+                            <span class="health-value" id="uptime">--</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-label">Processes</span>
+                            <span class="health-value" id="processes">--</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-label">Temperature</span>
+                            <span class="health-value" id="temperature">--</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Active Alerts -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-bell"></i> Active Alerts</h2>
+                    <span class="badge badge-warning" id="alertCount">0</span>
+                </div>
+                <div class="card-body">
+                    <div class="alerts-list" id="alertsList">
+                        <div class="no-alerts">No active alerts</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Backup Status -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-database"></i> Backup Status</h2>
+                    <span class="badge badge-success" id="backupStatus">OK</span>
+                </div>
+                <div class="card-body">
+                    <div class="backup-info">
+                        <div class="backup-item">
+                            <span class="backup-label">Last Backup</span>
+                            <span class="backup-value" id="lastBackup">--</span>
+                        </div>
+                        <div class="backup-item">
+                            <span class="backup-label">Backup Size</span>
+                            <span class="backup-value" id="backupSize">--</span>
+                        </div>
+                        <div class="backup-item">
+                            <span class="backup-label">Retention</span>
+                            <span class="backup-value">7-30 days</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Container Status -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-cubes"></i> Container Status</h2>
+                    <span class="badge" id="containerStatus">Running</span>
+                </div>
+                <div class="card-body">
+                    <div class="containers-grid" id="containersGrid">
+                        <!-- Containers will be loaded here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Resource Trends -->
+            <section class="card full-width">
+                <div class="card-header">
+                    <h2><i class="fas fa-chart-line"></i> Resource Trends</h2>
+                    <div class="chart-controls">
+                        <button class="btn btn-sm active" data-range="1h">1H</button>
+                        <button class="btn btn-sm" data-range="6h">6H</button>
+                        <button class="btn btn-sm" data-range="24h">24H</button>
+                        <button class="btn btn-sm" data-range="7d">7D</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="resourceChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Security Status -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-shield-alt"></i> Security Status</h2>
+                    <span class="badge badge-success" id="securityStatus">Secure</span>
+                </div>
+                <div class="card-body">
+                    <div class="security-info">
+                        <div class="security-item">
+                            <span class="security-label">Firewall</span>
+                            <span class="security-value" id="firewallStatus">Active</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Fail2Ban</span>
+                            <span class="security-value" id="fail2banStatus">Active</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Last Security Scan</span>
+                            <span class="security-value" id="lastSecurityScan">--</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Vulnerabilities</span>
+                            <span class="security-value" id="vulnerabilities">0</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-tools"></i> Quick Actions</h2>
+                </div>
+                <div class="card-body">
+                    <div class="quick-actions">
+                        <button class="action-btn" onclick="runBackup()">
+                            <i class="fas fa-save"></i>
+                            <span>Run Backup</span>
+                        </button>
+                        <button class="action-btn" onclick="runMaintenance()">
+                            <i class="fas fa-broom"></i>
+                            <span>Run Maintenance</span>
+                        </button>
+                        <button class="action-btn" onclick="runSecurityScan()">
+                            <i class="fas fa-search"></i>
+                            <span>Security Scan</span>
+                        </button>
+                        <button class="action-btn" onclick="viewLogs()">
+                            <i class="fas fa-file-alt"></i>
+                            <span>View Logs</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer">
+            <div class="footer-content">
+                <span>System Maintenance Dashboard v1.0</span>
+                <span>|</span>
+                <span>Connected to Prometheus: <span id="prometheusStatus">Checking...</span></span>
+                <span>|</span>
+                <a href="http://localhost:3002" target="_blank">Open Grafana <i class="fas fa-external-link-alt"></i></a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

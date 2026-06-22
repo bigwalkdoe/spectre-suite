@@ -1,0 +1,42 @@
+---
+# Production environment inventory (AWS Multi-AZ)
+
+production:
+  hosts:
+    prod-maintenance-east-1:
+      ansible_host: 10.0.1.10
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/prod_key.pem
+      cloud_deployment: true
+      monitoring_enabled: true
+      security_enabled: true
+      environment: production
+      cloud_provider: aws
+      availability_zone: us-east-1a
+    prod-maintenance-east-2:
+      ansible_host: 10.0.2.10
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/prod_key.pem
+      cloud_deployment: true
+      monitoring_enabled: true
+      security_enabled: true
+      environment: production
+      cloud_provider: aws
+      availability_zone: us-east-1b
+    prod-maintenance-east-3:
+      ansible_host: 10.0.3.10
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/prod_key.pem
+      cloud_deployment: true
+      monitoring_enabled: true
+      security_enabled: true
+      environment: production
+      cloud_provider: aws
+      availability_zone: us-east-1c
+
+  vars:
+    project_name: system-maintenance
+    installation_dir: /opt/system-maintenance
+    backup_dir: /backups
+    database_backups_enabled: true
+    disaster_recovery_enabled: true
