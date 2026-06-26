@@ -24,7 +24,7 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 ## Quick Start
 
 ```bash
-git clone https://github.com/bigwalkdoe/system-maintenance.git
+git clone https://github.com/bigwalkdoe/linux-system-maintenance-suite.git
 cd system-maintenance
 
 # Full automated setup (recommended)
