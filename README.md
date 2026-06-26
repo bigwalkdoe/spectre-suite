@@ -1,367 +1,272 @@
 # Linux System Maintenance & Security Automation
 
-A comprehensive system maintenance and security automation suite for Linux workstations and servers. This project provides automated backups, performance optimization, security hardening, network configuration, and maintenance scheduling with minimal manual intervention required.
+A comprehensive system maintenance, security, monitoring, and disaster recovery automation suite for Linux workstations and servers. Features automated backups, centralized logging, enhanced monitoring with alertmanager integrations, secrets management, intrusion detection, automated security scanning, VPN, CI/CD, load testing, database optimization, audit logging, policy enforcement, and cost optimization.
 
-## 🚀 Features
+## Features
 
-- **Automated Backups**: Daily database, Docker volume, configuration, and project backups with retention policies
-- **Performance Optimization**: System tuning, Docker resource limits, and performance monitoring
-- **Security Hardening**: Vulnerability scanning, Docker security, API protection, automated security updates, IDS/IPS, and advanced threat detection
-- **Network Optimization**: DNS caching, network security hardening, and performance tuning
-- **Automated Maintenance**: Cleanup scripts, log rotation, health checks, and system maintenance scheduling
-- **Comprehensive Monitoring**: Real-time web dashboard, Grafana integration, and comprehensive alerting system
+| Category | Capabilities |
+|----------|-------------|
+| **Backups** | Automated database, Docker volume, config, project backups with cron scheduling, off-site replication (rsync/S3/B2), encryption |
+| **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter (HTTP/TCP/ICMP/DNS), business metrics, uptime monitoring, custom dashboards |
+| **Logging** | Centralized Loki stack, container log rotation, retention policies, log shipping to remote destinations |
+| **Security** | Fail2Ban brute force protection, AIDE file integrity, Wazuh HIDS, Trivy container scanning, SonarQube code analysis, OWASP ZAP web testing, OPA policy enforcement |
+| **Secrets** | Environment-based secret injection, HashiCorp Vault support, .env template with secure permissions |
+| **Network** | WireGuard VPN, network segmentation (internal/DMZ), DDoS protection, firewall hardening |
+| **CI/CD** | GitHub Actions workflows for syntax check, security scanning, DR test, load testing, multi-distro testing |
+| **DR** | RTO/RPO definitions, 10 incident runbooks, backup verification, DR testing schedule |
+| **Load Testing** | k6 and Locust scripts, performance regression testing, capacity planning |
+| **Database** | Automated vacuum/analyze, PgBouncer connection pooling, read replica setup |
+| **Audit** | auditd rules, centralized audit trail, compliance reports, sudo command logging, access reviews |
+| **Policy** | OPA policies for Docker security, backups, network, compliance; automated evaluation |
+| **Cost** | Cloud cost tracking, resource rightsizing, automated cleanup of unused resources |
+| **ML** | Anomaly detection using Isolation Forest, One-Class SVM, ensemble methods |
 
-## 📋 Requirements
-
-### Local Installation
-- Linux system (Fedora 20+, Ubuntu 20.04+, Debian 10+, CentOS 7+, Arch Linux, and others)
-- Docker and Docker Compose
-- Systemd (for automated scheduling)
-- Bash shell
-- Root/sudo access for system-level configurations
-- 10GB+ free disk space for backups
-
-### Cloud Deployment
-- Terraform >= 1.0 (for infrastructure provisioning)
-- Ansible >= 2.9 (for configuration management)
-- Cloud provider account (AWS/Azure/GCP)
-- SSH access to cloud instances
-- Appropriate IAM permissions
-
-### Supported Distributions
-- **Primary**: Fedora, Ubuntu, Debian, CentOS, RHEL
-- **Secondary**: Arch Linux, Manjaro, openSUSE, Rocky Linux, AlmaLinux, Linux Mint, Pop!_OS
-
-*See [docs/MULTI_DISTRIBUTION_SUPPORT.md](docs/MULTI_DISTRIBUTION_SUPPORT.md) for detailed information.*
-
-## 🔧 Installation
-
-### Quick Start
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/system-maintenance.git
+git clone https://github.com/bigwalkdoe/system-maintenance.git
 cd system-maintenance
 
-# Run the installation script
+# Full automated setup (recommended)
 sudo ./install.sh
 
-# Verify installation
-./scripts/verify-installation.sh
+# Or deploy all enhancements at once
+bash /home/deon/scripts/setup-all-enhancements.sh
 ```
 
-### Cloud Deployment
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    system-maintenance                        │
+├────────────┬──────────┬──────────┬──────────┬───────────────┤
+│ Monitoring │ Security │ Backups  │ Logging  │ Automation    │
+├────────────┼──────────┼──────────┼──────────┼───────────────┤
+│ Prometheus │ Fail2Ban │ Database │ Loki     │ Cron jobs     │
+│ Grafana    │ AIDE     │ Volumes  │ Promtail │ systemd timer │
+│ Alertmanag │ Wazuh    │ Configs  │ Logrotate│ CI/CD (GA)    │
+│ Blackbox   │ Trivy    │ Projects│ Shipping │ Ansible       │
+│ Node/PG/RE │ OPA      │ Off-site │          │ Terraform     │
+└────────────┴──────────┴──────────┴──────────┴───────────────┘
+```
+
+## Automated Schedule
+
+| Time | Task | Frequency |
+|------|------|-----------|
+| 01:00 | Database backup | Daily |
+| 02:00 | Full backup (Sat) / Docker volume backup | Daily/Weekly |
+| 02:30 | PostgreSQL vacuum & analyze | Daily |
+| 04:30 | Off-site backup replication | Daily |
+| 05:00 | AIDE file integrity check | Daily |
+| 06:00 | Trivy container scan | Weekly (Sun) |
+| 07:00 | OWASP ZAP scan | Weekly (Sun) |
+| 08:00 | Compliance report | Weekly (Mon) |
+| 09:00 | Access review | Weekly (Mon) |
+| 10:00 | OPA policy evaluation | Weekly (Mon) |
+| Every 4h | Resource rightsizing | Continuous |
+| Every 6h | Audit trail generation | Continuous |
+
+## Monitoring Stack
 
 ```bash
-# Automated cloud deployment (Terraform + Ansible)
-cd cloud-deployment
+docker-compose -f docker-compose.monitoring.yml up -d
 
-# Deploy to AWS (2 instances, dev environment)
-./deploy.sh aws dev 2
-
-# Deploy to staging environment
-./deploy.sh aws staging 3
-
-# Deploy to production environment
-./deploy.sh aws production 5
-
-# Or use Terraform directly
-cd terraform
-terraform init
-terraform apply
-
-# Then configure with Ansible
-cd ../ansible
-ansible-playbook -i inventory/production.yml playbook.yml
+# Access points:
+#   Grafana:      http://localhost:3002   (admin/changeme)
+#   Prometheus:   http://localhost:9090
+#   Alertmanager: http://localhost:9093
+#   Blackbox:     http://localhost:9115
+#   Dashboard:    http://localhost:8081
+#   Loki:         http://localhost:3100   (logging stack)
 ```
 
-*See [cloud-deployment/docs/CLOUD_DEPLOYMENT_GUIDE.md](cloud-deployment/docs/CLOUD_DEPLOYMENT_GUIDE.md) for detailed cloud deployment instructions.*
+### Alertmanager Integrations
+- **Slack**: Channels for critical, warning, info, watchdog alerts
+- **Email**: SMTP-based notifications with HTML templates
+- **PagerDuty**: Critical alert routing with severity mapping
+- **Webhook**: Custom endpoint integration
 
-### Manual Installation
+## Security Tools
 
 ```bash
-# Create required directories
-sudo mkdir -p /backups/{databases,docker-volumes,configurations,projects}
-sudo chown -R $USER:$USER /backups
-chmod -R 755 /backups
+# Intrusion Detection
+sudo systemctl start fail2ban          # Brute force protection
+/home/deon/scripts/security/check-file-integrity.sh  # AIDE check
 
-# Copy scripts to appropriate locations
-sudo cp scripts/*.sh /usr/local/bin/
-chmod +x /usr/local/bin/*.sh
+# Vulnerability Scanning
+/home/deon/scripts/security/run-trivy-scan.sh
 
-# Create systemd timers (requires sudo)
-sudo cp systemd/*.service /etc/systemd/system/
-sudo cp systemd/*.timer /etc/systemd/system/
-sudo systemctl daemon-reload
+# Code Analysis
+docker-compose -f security/sonarqube/docker-compose.yml up -d
+/home/deon/scripts/security/run-sonarqube-analysis.sh
 
-# Enable timers
-sudo systemctl enable backup.timer
-sudo systemctl enable maintenance.timer  
-sudo systemctl enable performance-check.timer
-sudo systemctl enable network-monitor.timer
-sudo systemctl enable disk-space-check.timer
-sudo systemctl enable security-scan.timer
+# Web App Testing
+docker-compose -f security/zap/docker-compose.yml up -d
+/home/deon/scripts/security/run-zap-scan.sh http://localhost:3000
 
-# Start timers
-sudo systemctl start backup.timer
-sudo systemctl start maintenance.timer
-sudo systemctl start performance-check.timer
-sudo systemctl start network-monitor.timer
-sudo systemctl start disk-space-check.timer
-sudo systemctl start security-scan.timer
+# Policy Enforcement
+/home/deon/scripts/security/opa/evaluate-policies.sh
 ```
 
-## 📁 Project Structure
+## Secrets Management
+
+```bash
+# Edit your secrets
+vim /home/deon/.secrets/environment
+
+# Source into environment
+source /home/deon/.secrets/environment
+
+# Inject into project files
+/home/deon/scripts/security/inject-secrets.sh
+
+# Or use Vault
+/home/deon/scripts/security/vault-secrets.sh store database/postgres password mypass
+/home/deon/scripts/security/vault-secrets.sh get database/postgres password
+```
+
+## VPN & Network
+
+```bash
+# Start WireGuard VPN
+sudo systemctl start wg-quick@wg0
+
+# Add a client
+/home/deon/scripts/network/add-vpn-client.sh my-laptop 10.0.0.2
+
+# Check DDoS status
+/home/deon/scripts/network/ddos-mitigation.sh
+```
+
+## Database Optimization
+
+```bash
+# Run vacuum manually
+/home/deon/scripts/performance/pg-vacuum.sh
+
+# Start PgBouncer connection pool
+docker-compose -f performance/pgbouncer/docker-compose.yml up -d
+# Connect: psql -h localhost -p 6432 -U postgres -d guardrail
+
+# Set up read replica
+/home/deon/scripts/performance/setup-read-replica.sh
+```
+
+## Load Testing
+
+```bash
+# k6 test (10 VUs, 30s)
+bash /home/deon/scripts/performance/load-testing/run-k6-test.sh http://localhost:3000 10 30s
+
+# Locust test
+bash /home/deon/scripts/performance/load-testing/run-locust-test.sh http://localhost:3000 10 1 60s
+
+# Performance regression
+bash /home/deon/scripts/performance/load-testing/run-performance-regression.sh
+
+# Capacity planning
+bash /home/deon/scripts/performance/load-testing/capacity-planning.sh
+```
+
+## Disaster Recovery
+
+- **RTO/RPO**: Database (1h/15min), Redis (30min/1h), Full system (4h/1d)
+- **Runbooks**: 10 incident-specific runbooks in `docs/RUNBOOKS.md`
+- **DR Plan**: Full recovery procedures in `docs/DISASTER_RECOVERY.md`
+- **Testing**: Weekly backup verification, monthly DB restore drill, bi-annual full DR
+
+## CI/CD Pipeline
+
+Three GitHub Actions workflows:
+- **ci-cd.yml**: Syntax check, tests, Trivy scan, Docker build, multi-distro test, deployment
+- **security-scanning.yml**: Weekly Trivy scan, OPA policy check, k6 load test
+- **disaster-recovery-test.yml**: Weekly backup verification, DR documentation check
+
+## Project Structure
 
 ```
 system-maintenance/
-├── scripts/
-│   ├── backups/           # Backup automation scripts
-│   ├── performance/       # Performance optimization scripts
-│   ├── maintenance/       # System maintenance scripts
-│   ├── network/           # Network configuration scripts
-│   └── security/          # Security hardening scripts
-├── systemd/              # Systemd service and timer definitions
-├── docs/                 # Documentation
-├── examples/             # Example configurations
-├── install.sh           # Installation script
-└── README.md             # This file
+├── .github/workflows/       # CI/CD pipelines
+├── cloud-deployment/        # Terraform + Ansible
+│   ├── terraform/           #    Infrastructure as code
+│   └── ansible/             #    Configuration management
+├── docs/                    # Documentation
+│   ├── DISASTER_RECOVERY.md #    RTO/RPO + runbooks
+│   └── RUNBOOKS.md          #    10 incident runbooks
+├── prometheus/              # Monitoring configs
+│   ├── alertmanager.yml     #    Slack/Email/PagerDuty
+│   ├── blackbox-exporter.yml#    External monitoring
+│   └── business-metrics*    #    Custom metrics
+├── grafana-*/               # Grafana dashboards
+├── scripts/                 # Enhancement scripts
+├── docker-compose.monitoring.yml
+└── install.sh
 ```
 
-## 🔒 Security Features
+/home/deon/scripts/
+├── backups/                 # Backup + off-site replication
+├── logging/                 # Loki stack + logrotate
+├── maintenance/             # Audit, cleanup, optimization
+├── network/                 # WireGuard, DDoS, segmentation
+├── performance/             # Load testing, vacuum, rightsizing
+│   └── load-testing/        # k6, Locust, regression
+└── security/                # IDS, scanning, OPA, secrets
+    ├── opa/policies/        # Rego policy files
+    ├── sonarqube/           # Code analysis
+    └── zap/                 # Web app testing
 
-### Basic Security
-- **SSH Hardening**: Fail2Ban protection, key-based authentication enforcement
-- **Docker Security**: Security configurations, resource limits, vulnerability scanning
-- **Network Security**: SYN cookies, IP spoofing protection, ICMP controls
-- **Application Security**: Dependency vulnerability scanning, API rate limiting
-- **Automatic Updates**: Security-only package updates
-- **Attack Surface Reduction**: All sensitive services bound to localhost
+## Requirements
 
-### Advanced Security
-- **Network IDS/IPS**: Suricata-based real-time intrusion detection and prevention
-- **Host-based IDS**: OSSEC and AIDE for file integrity monitoring and host intrusion detection
-- **Advanced Threat Detection**: Anomaly detection, behavioral analysis, and automated threat response
-- **Security Integration**: Unified security framework with comprehensive monitoring and alerting
-- **Automated Response**: Multi-level automated incident response capabilities
+- **OS**: Fedora, Ubuntu, Debian, RHEL, Arch (auto-detected)
+- **Docker** + Docker Compose
+- **Systemd** (for timers)
+- **Bash** 4+
+- Root/sudo access for system-level configs
 
-### ML & AI
-- **Anomaly Detection**: Machine learning-based anomaly detection using multiple algorithms
-- **Ensemble Methods**: Combines Isolation Forest, One-Class SVM, and statistical analysis
-- **Real-time Monitoring**: Continuous ML-based monitoring of system metrics
-- **Automated Training**: Scheduled model retraining with fresh data
-- **Prometheus Integration**: ML metrics exported for monitoring and alerting
-
-### Testing & CI/CD
-- **Automated Testing**: Comprehensive test suite for all components
-- **CI/CD Pipeline**: GitHub Actions workflow for continuous integration
-- **Multi-environment Testing**: Tests across different Linux distributions
-- **Security Scanning**: Automated vulnerability scanning with Trivy
-- **Quality Gates**: Automated quality checks and validation
-
-*See [docs/TESTING_AND_CICD.md](docs/TESTING_AND_CICD.md) for detailed information.*
-
-*See [docs/ML_ANOMALY_DETECTION.md](docs/ML_ANOMALY_DETECTION.md) for detailed information.*
-
-*See [docs/ADVANCED_SECURITY_FEATURES.md](docs/ADVANCED_SECURITY_FEATURES.md) for detailed information.*
-
-## 📊 Monitoring & Alerts
-
-- **Disk Space**: Alerts when usage exceeds 80%
-- **Performance**: CPU, memory, and performance alerts
-- **Security**: Vulnerability scan results and security events
-- **System Health**: Comprehensive health checks and reports
-- **Backup Status**: Backup completion and failure notifications
-- **Network**: Network connectivity and security monitoring
-
-## 📅 Automated Schedules
-
-| Timer | Schedule | Purpose |
-|-------|----------|---------|
-| backup.timer | Daily at 2 AM | Comprehensive system backups |
-| maintenance.timer | Weekly Sundays at 3 AM | System cleanup and maintenance |
-| performance-check.timer | Hourly | Performance monitoring |
-| network-monitor.timer | Hourly | Network monitoring |
-| disk-space-check.timer | Daily at midnight | Disk space monitoring |
-| security-scan.timer | Weekly Saturdays at 4 AM | Security vulnerability scanning |
-| dnf5-automatic.timer | Daily at 6:17 AM | Security updates |
-
-## 🛠️ Usage
-
-### Manual Backup
+## Quick Commands Reference
 
 ```bash
-# Run full system backup
-sudo /usr/local/bin/backup-all.sh
+# Backup
+/home/deon/scripts/backups/backup-all.sh                    # Full backup
+/home/deon/scripts/backups/replicate-to-remote.sh           # Off-site sync
 
-# Run specific backup type
-/usr/local/bin/backup-databases.sh
-/usr/local/bin/backup-docker-volumes.sh
-/usr/local/bin/backup-configurations.sh
-/usr/local/bin/backup-projects.sh
+# Security
+/home/deon/scripts/security/run-trivy-scan.sh               # Container scan
+/home/deon/scripts/security/check-file-integrity.sh          # AIDE check
+/home/deon/scripts/security/opa/evaluate-policies.sh         # Policy audit
+
+# Monitoring
+docker-compose -f docker-compose.monitoring.yml up -d        # Start stack
+/home/deon/dev/.../prometheus/business-metrics-exporter.sh   # Export metrics
+
+# Maintenance
+/home/deon/scripts/maintenance/audit-trail.sh                # Generate audit
+/home/deon/scripts/maintenance/compliance-report.sh          # Compliance check
+/home/deon/scripts/maintenance/cleanup-unused-resources.sh   # Cleanup
+
+# Database
+/home/deon/scripts/performance/pg-vacuum.sh                 # Vacuum DB
+/home/deon/scripts/performance/resource-rightsizing.sh      # Analyze usage
+
+# Load test
+bash /home/deon/scripts/performance/load-testing/run-k6-test.sh
 ```
 
-### Performance Optimization
+## Documentation
 
-```bash
-# Run system performance optimization
-sudo /usr/local/bin/optimize-system-performance.sh
+| Document | Description |
+|----------|-------------|
+| `docs/ADVANCED_SECURITY_FEATURES.md` | IDS/IPS, advanced threat detection |
+| `docs/ML_ANOMALY_DETECTION.md` | ML-based anomaly detection |
+| `docs/MULTI_DISTRIBUTION_SUPPORT.md` | Multi-distro support details |
+| `docs/TESTING_AND_CICD.md` | Test suite and CI/CD pipeline |
+| `docs/DISASTER_RECOVERY.md` | RTO/RPO, incident runbooks |
+| `docs/RUNBOOKS.md` | 10 common incident resolution guides |
+| `docs/CONFIGURATION_EXAMPLES.md` | Configuration examples |
+| `docs/TROUBLESHOOTING.md` | Troubleshooting guide |
+| `cloud-deployment/docs/CLOUD_DEPLOYMENT_GUIDE.md` | Cloud deployment |
 
-# Run Docker resource optimization
-/usr/local/bin/optimize-docker-resources.sh
-```
+## License
 
-### Security Scanning
-
-```bash
-# Run comprehensive security hardening
-/usr/local/bin/run-security-hardening.sh
-
-# Scan dependencies for vulnerabilities
-/usr/local/bin/scan-dependencies.sh
-
-# Scan Docker images
-/usr/local/bin/scan-docker-images.sh
-```
-
-### System Maintenance
-
-```bash
-# Run system cleanup and maintenance
-/usr/local/bin/run-maintenance.sh
-
-# Run specific maintenance task
-/usr/local/bin/cleanup-system.sh
-/usr/local/bin/cleanup-logs.sh
-/usr/local/bin/system-health-check.sh
-```
-
-## 🔧 Configuration
-
-### Backup Configuration
-
-Edit backup scripts to customize:
-- Backup directories
-- Retention policies
-- Backup destinations
-- Notification settings
-
-### Performance Configuration
-
-Edit performance scripts to customize:
-- Resource thresholds
-- Monitoring intervals
-- Alert thresholds
-- System tuning parameters
-
-### Security Configuration
-
-Edit security scripts to customize:
-- Vulnerability scanning tools
-- Security policies
-- API rate limiting rules
-- Monitoring alerts
-
-## 📈 Monitoring Dashboard
-
-The system includes multiple monitoring interfaces:
-- **Custom Web Dashboard**: Real-time system metrics and quick actions at `http://localhost:8081`
-- **Grafana**: Advanced visualization and dashboards at `http://localhost:3002`
-- **Prometheus**: Metrics collection and querying at `http://localhost:9090`
-- **Node Exporter**: System metrics exporter
-- **Custom Exporters**: Application-specific metrics (Redis, PostgreSQL, Docker)
-
-### Deploying the Monitoring Stack
-
-```bash
-# Deploy complete monitoring infrastructure
-./scripts/deploy-monitoring.sh
-
-# Or use Docker Compose directly
-docker-compose -f docker-compose.monitoring.yml up -d
-```
-
-### Access Points
-- **Web Dashboard**: http://localhost:8081
-- **Grafana**: http://localhost:3002 (admin/changeme - change password on first use)
-- **Prometheus**: http://localhost:9090
-- **Alertmanager**: http://localhost:9093
-
-## 🐛 Troubleshooting
-
-### Backup Failures
-
-```bash
-# Check backup logs
-cat /var/log/backup.log
-
-# Check disk space
-df -h /backups
-
-# Verify backup timer status
-sudo systemctl status backup.timer
-```
-
-### Performance Issues
-
-```bash
-# Check performance logs
-cat /var/log/performance.log
-
-# Check system resources
-free -h
-top -bn1
-
-# Verify performance timer status
-sudo systemctl status performance-check.timer
-```
-
-### Security Issues
-
-```bash
-# Check security logs
-sudo cat /var/log/security-hardening.log
-
-# Check Fail2Ban status
-sudo fail2ban-client status
-
-# Verify security scan timer
-sudo systemctl status security-scan.timer
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Inspired by best practices from Linux system administration
-- Security hardening based on CIS Benchmarks
-- Docker security recommendations from Docker documentation
-- Monitoring tools from Prometheus and Grafana communities
-
-## 📞 Support
-
-For issues, questions, or contributions:
-- Open an issue on GitHub
-- Check the documentation in the docs/ directory
-- Review troubleshooting section above
-
-## 🔮 Future Roadmap
-
-- [x] Web dashboard for system monitoring ✅
-- [x] Support for additional Linux distributions ✅
-- [ ] Integration with additional monitoring tools
-- [x] Advanced security features (IDS/IPS) ✅
-- [x] Cloud deployment support ✅
-- [ ] Multi-server management
-- [x] Machine learning for anomaly detection ✅
-- [x] Comprehensive testing and CI/CD pipeline ✅
-
----
-
-**Note**: This maintenance system is designed for production use but should be tested in a development environment first. Always verify that backups are working correctly before relying on them for production data recovery.
+MIT
