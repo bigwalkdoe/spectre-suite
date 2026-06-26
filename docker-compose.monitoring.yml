@@ -150,6 +150,20 @@ services:
     networks:
       - monitoring
 
+  # Blackbox Exporter - External endpoint monitoring
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./prometheus/blackbox-exporter.yml:/config/blackbox-exporter.yml
+    command:
+      - '--config.file=/config/blackbox-exporter.yml'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
   # Web Dashboard - Custom Interface
   web-dashboard:
     image: nginx:alpine

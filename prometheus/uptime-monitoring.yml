@@ -1,0 +1,96 @@
+# Uptime monitoring configuration for critical services
+# Add to prometheus.yml scrape_configs section
+
+scrape_configs:
+  # Blackbox exporter - External endpoint monitoring
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://api.github.com
+        - https://registry.npmjs.org
+        - https://hub.docker.com
+        - https://status.docker.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+        - 'localhost:22'    # SSH
+        - 'localhost:443'   # HTTPS
+        - 'localhost:80'    # HTTP
+        - 'localhost:5432'  # PostgreSQL
+        - 'localhost:6379'  # Redis
+        - 'localhost:9090'  # Prometheus
+        - 'localhost:3002'  # Grafana
+        - 'localhost:8081'  # Web Dashboard
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: 'blackbox-icmp'
+    metrics_path: /probe
+    params:
+      module: [icmp_check]
+    static_configs:
+      - targets:
+        - 8.8.8.8       # Google DNS
+        - 1.1.1.1       # Cloudflare DNS
+        - 208.67.222.222 # OpenDNS
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: 'blackbox-dns'
+    metrics_path: /probe
+    params:
+      module: [dns_query]
+    static_configs:
+      - targets:
+        - 8.8.8.8
+        - 1.1.1.1
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Uptime monitoring via probe success
+  - job_name: 'uptime-monitoring'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - http://localhost:3002   # Grafana
+        - http://localhost:9090   # Prometheus
+        - http://localhost:8081   # Web Dashboard
+        - http://localhost:3100   # Loki
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
