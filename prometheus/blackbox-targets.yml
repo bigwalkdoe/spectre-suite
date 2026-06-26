@@ -1,0 +1,28 @@
+# Blackbox exporter targets for external endpoint monitoring
+# Add your external endpoints here
+
+- targets:
+    # Critical external services
+    - https://api.github.com
+    - https://status.github.com
+    - https://registry.npmjs.org
+    - https://pypi.org
+  labels:
+    group: 'external-services'
+    env: 'production'
+
+- targets:
+    # Application health endpoints (local)
+    - http://host.docker.internal:8000/health
+    - http://host.docker.internal:3000/health
+  labels:
+    group: 'app-health'
+    env: 'production'
+
+- targets:
+    # DNS endpoints
+    - 8.8.8.8
+    - 1.1.1.1
+  labels:
+    group: 'dns-monitoring'
+    env: 'production'

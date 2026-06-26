@@ -1,0 +1,27 @@
+# Custom business metrics for application monitoring
+# Export custom metrics via a textfile collector or pushgateway
+
+# --- Business Metrics Exporter Script (runs alongside node_exporter) ---
+# Place custom metrics in /var/lib/node_exporter/textfile_collector/
+
+jobs:
+  - job_name: 'business-metrics'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['localhost:9100']
+    metrics_path: '/metrics'
+    params:
+      collect[]:
+        - textfile
+
+# Available business metric names (to be created by custom scripts):
+# - app_http_requests_total (counter)
+# - app_active_users (gauge)  
+# - app_error_rate (gauge)
+# - app_response_time_seconds (histogram)
+# - app_database_connections (gauge)
+# - app_queue_depth (gauge)
+# - backup_last_success_timestamp (gauge)
+# - backup_duration_seconds (gauge)
+# - security_vulnerabilities_total (gauge)
+# - maintenance_last_run_timestamp (gauge)
