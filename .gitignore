@@ -3,49 +3,11 @@
 logs/
 *.log.*
 
-# Backup files
-/backups/*.sql
-/backups/*.tar.gz
-/backups/*.rdb
-/backups/*/
+# Backup files — keep the dir, ignore contents
+backups/*
+!/backups/.gitkeep
 
-# System files
-.DS_Store
-Thumbs.db
-*.swp
-*~
-
-# Editor files
-.vscode/
-.idea/
-*.sublime-*
-*.sublime-project
-
-# Build artifacts
-node_modules/
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-dist/
-build/
-
-# Environment files
-.env
-.env.local
-.env.*.local
-*.env
-
-# Docker volumes (don't commit actual data)
-docker-volumes/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# OS specific
+# OS / filesystem junk
 .DS_Store
 .DS_Store?
 ._*
@@ -53,14 +15,76 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
 *.swp
 *.swo
 *~
 
-# Backup directories (don't commit actual backups)
-backups/*
-!/backups/.gitkeep
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-*
+*.sublime-project
+
+# Build artifacts (Python)
+__pycache__/
+*.pyc
+*.pyo
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+build/
+
+# Build artifacts (Node)
+node_modules/
+
+# Environment / secrets — never commit
+.env
+.env.local
+.env.*.local
+*.env
+.secrets/
+**/secrets/
+
+# Docker — data volumes, not config
+docker-volumes/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Terraform — state and overrides contain infrastructure secrets
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Security scan artifacts
+trivy-reports/
+zap-reports/
+sonar-scanner/
+
+# Load testing output
+k6-output/
+locust-*.html
+*.report.html
+
+# GPG / encryption keys
+*.gpg
+*.asc
+*.p12
+*.pfx
+
+# AIDE database snapshots
+aide.db*
+*.db.new.gz
+
+# Generated reports
+reports/
