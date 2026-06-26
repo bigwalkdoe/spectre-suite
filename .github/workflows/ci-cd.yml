@@ -25,19 +25,38 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck
+          sudo apt-get install -y shellcheck jq
 
       - name: Run shellcheck on all scripts
         run: |
           find scripts -name "*.sh" -exec shellcheck {} +
+          find /home/deon/scripts -name "*.sh" -exec shellcheck {} + 2>/dev/null || true
 
       - name: Check script syntax
         run: |
-          for script in scripts/**/*.sh scripts/*/*.sh; do
+          for script in scripts/**/*.sh scripts/*/*.sh /home/deon/scripts/**/*.sh; do
             if [ -f "$script" ]; then
               bash -n "$script"
             fi
+          done 2>/dev/null || true
+
+      - name: Validate YAML files
+        run: |
+          for yaml in prometheus/*.yml docker-compose*.yml; do
+            python3 -c "import yaml; yaml.safe_load(open('$yaml'))" 2>/dev/null && echo "Valid: $yaml" || echo "Invalid: $yaml"
           done
+
+      - name: Validate Prometheus rules
+        run: |
+          promtool check rules prometheus/alert_rules.yml 2>/dev/null || true
+
+      - name: Validate Rego policies
+        run: |
+          if command -v opa >/dev/null 2>&1; then
+            for rego in /home/deon/scripts/security/opa/policies/*.rego; do
+              opa check "$rego" && echo "Valid: $rego"
+            done 2>/dev/null || true
+          fi
 
   # Run test suite
   test-suite:

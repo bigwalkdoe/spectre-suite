@@ -55,6 +55,75 @@ scrape_configs:
       - targets: ['alertmanager:9093']
     scrape_interval: 15s
 
+  # Blackbox Exporter - HTTP checks
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://api.github.com
+        - https://hub.docker.com
+        - https://registry.npmjs.org
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+    scrape_interval: 60s
+
+  # Blackbox Exporter - TCP connectivity checks
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+        - 'localhost:22'
+        - 'localhost:443'
+        - 'localhost:5432'
+        - 'localhost:6379'
+        - 'localhost:9090'
+        - 'localhost:3002'
+        - 'localhost:8081'
+        - 'localhost:3100'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+    scrape_interval: 60s
+
+  # Blackbox Exporter - ICMP ping checks
+  - job_name: 'blackbox-icmp'
+    metrics_path: /probe
+    params:
+      module: [icmp_check]
+    static_configs:
+      - targets:
+        - 8.8.8.8
+        - 1.1.1.1
+        - 208.67.222.222
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+    scrape_interval: 60s
+
+  # Business metrics via textfile collector
+  - job_name: 'business-metrics'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['node-exporter:9100']
+    metrics_path: /metrics
+
   # Docker daemon metrics (optional)
   - job_name: 'docker'
     static_configs:

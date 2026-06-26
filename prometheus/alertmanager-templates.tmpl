@@ -1,0 +1,36 @@
+{{/* Alertmanager notification templates */}}
+
+{{ define "slack.critical.title" }}:rotating_light: CRITICAL: {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}{{ end }}
+
+{{ define "slack.warning.title" }}:warning: WARNING: {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}{{ end }}
+
+{{ define "slack.default.text" }}
+{{ range .Alerts }}
+*Description:* {{ .Annotations.description }}
+*Summary:* {{ .Annotations.summary }}
+*Severity:* `{{ .Labels.severity }}`
+*Instance:* {{ .Labels.instance }}
+*Graph:* {{ .GeneratorURL }}
+{{ end }}
+{{ end }}
+
+{{ define "email.critical.html" }}
+<h2 style="color:red;">CRITICAL ALERT</h2>
+<h3>{{ .GroupLabels.alertname }}</h3>
+<table border="1" cellpadding="5">
+<tr><th>Label</th><th>Value</th></tr>
+{{ range .GroupLabels }}
+<tr><td>{{ .Name }}</td><td>{{ .Value }}</td></tr>
+{{ end }}
+</table>
+{{ range .Alerts }}
+<p><strong>Description:</strong> {{ .Annotations.description }}</p>
+<p><strong>Started:</strong> {{ .StartsAt }}</p>
+<p><strong>Graph:</strong> <a href="{{ .GeneratorURL }}">View</a></p>
+{{ end }}
+{{ end }}
+
+{{ define "pagerduty.default" }}
+{{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}
+{{ range .Alerts }}{{ .Annotations.description }} {{ end }}
+{{ end }}

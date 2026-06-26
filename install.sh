@@ -31,6 +31,12 @@ cp scripts/maintenance/*.sh /usr/local/bin/
 cp scripts/network/*.sh /usr/local/bin/
 cp scripts/security/*.sh /usr/local/bin/
 
+# Copy enhancement scripts from /home/deon/scripts/
+echo "Installing enhancement scripts..."
+if [ -d /home/deon/scripts ]; then
+    find /home/deon/scripts -name "*.sh" -type f -exec cp {} /usr/local/bin/ \; 2>/dev/null || true
+fi
+
 # Make scripts executable
 chmod +x /usr/local/bin/*.sh
 

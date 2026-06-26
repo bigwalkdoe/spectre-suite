@@ -115,6 +115,54 @@ groups:
           summary: "Guardrail API is down"
           description: "Guardrail API has been down for more than 5 minutes"
 
+  - name: uptime_alerts
+    interval: 30s
+    rules:
+      - alert: UptimeCheckFailed
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Uptime check failed"
+          description: "Endpoint {{ $labels.instance }} is unreachable (module: {{ $labels.module }})"
+
+      - alert: HighEndpointLatency
+        expr: probe_duration_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High endpoint latency"
+          description: "Endpoint {{ $labels.instance }} has latency of {{ $value }}s"
+
+      - alert: DNSCheckFailed
+        expr: probe_dns_lookup_time_seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow DNS resolution"
+          description: "DNS lookup for {{ $labels.instance }} took {{ $value }}s"
+
+      - alert: BackupStale
+        expr: time() - backup_last_success_timestamp > 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup metric is stale"
+          description: "Last successful backup was over 24 hours ago"
+
+      - alert: BlackboxExporterDown
+        expr: up{job="blackbox-http"} == 0 or up{job="blackbox-tcp"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Blackbox exporter is down"
+          description: "Blackbox exporter has been down for more than 5 minutes"
+
   - name: database_alerts
     interval: 30s
     rules:

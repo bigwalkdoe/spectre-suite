@@ -1,0 +1,43 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200, 201, 204]
+      method: GET
+      headers:
+        User-Agent: "Blackbox-Exporter/1.0"
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+
+  http_post_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: POST
+      headers:
+        Content-Type: application/json
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+
+  icmp_check:
+    prober: icmp
+    timeout: 30s
+    icmp:
+      preferred_ip_protocol: ip4
+
+  dns_query:
+    prober: dns
+    timeout: 10s
+    dns:
+      query_name: "google.com"
+      query_type: A
+      valid_rcodes:
+        - NOERROR
+      preferred_ip_protocol: ip4
