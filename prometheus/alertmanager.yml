@@ -3,54 +3,116 @@ global:
   # Email notification configuration
   smtp_smarthost: 'smtp.gmail.com:587'
   smtp_from: 'alertmanager@example.com'
-  smtp_auth_username: 'your-email@gmail.com'
-  smtp_auth_password: 'your-app-password'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  # PagerDuty configuration
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  # Slack configuration
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
 
-# Email notification routes
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Notification routes
 route:
   receiver: 'default-receiver'
-  group_by: ['alertname', 'severity']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 12h
+  group_by: ['alertname', 'severity', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
   routes:
     - match:
         severity: critical
       receiver: 'critical-receiver'
       continue: true
+      repeat_interval: 1h
     - match:
         severity: warning
       receiver: 'warning-receiver'
+      repeat_interval: 6h
+    - match:
+        severity: info
+      receiver: 'info-receiver'
+      repeat_interval: 24h
+    - match:
+        alertname: 'Watchdog'
+      receiver: 'watchdog-receiver'
+      repeat_interval: 24h
 
 # Notification receivers
 receivers:
   - name: 'default-receiver'
     email_configs:
-      - to: 'admin@example.com'
+      - to: '${ALERT_EMAIL_TO}'
+        send_resolved: true
         headers:
           Subject: '[ALERT] {{ .GroupLabels.alertname }}'
+        html: '<h2>{{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
 
   - name: 'critical-receiver'
     email_configs:
-      - to: 'admin@example.com'
+      - to: '${ALERT_EMAIL_TO}'
+        send_resolved: true
         headers:
-          Subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+          Subject: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
+        html: '<h2 style="color:red;">CRITICAL: {{ .GroupLabels.alertname }}</h2><p><strong>Instance:</strong> {{ .GroupLabels.instance }}</p><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p><p><strong>Graph:</strong> <a href="{{ .ExternalURL }}">View in Prometheus</a></p>'
     slack_configs:
-      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
-        channel: '#alerts'
-        title: 'Critical Alert: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        username: 'Alertmanager'
+        icon_emoji: ':rotating_light:'
+        title: '[CRITICAL] {{ .GroupLabels.alertname }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n*Graph:* {{ .GeneratorURL }}\n{{ end }}"
+        send_resolved: true
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY}'
+        service_key: '${PAGERDUTY_SERVICE_KEY}'
+        client: 'System-Maintenance'
+        client_url: 'http://localhost:9093'
+        description: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
+        severity: 'critical'
+        send_resolved: true
+        images:
+          - src: 'https://img.icons8.com/color/48/high-priority.png'
+            alt: 'Critical Alert'
+            href: '{{ .ExternalURL }}'
+    webhook_configs:
+      - url: 'http://localhost:8081/webhook/alert'
+        send_resolved: true
 
   - name: 'warning-receiver'
     email_configs:
-      - to: 'admin@example.com'
+      - to: '${ALERT_EMAIL_TO}'
+        send_resolved: true
         headers:
           Subject: '[WARNING] {{ .GroupLabels.alertname }}'
+        html: '<h2 style="color:orange;">WARNING: {{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
     slack_configs:
-      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
-        channel: '#alerts'
-        title: 'Warning Alert: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-warning'
+        username: 'Alertmanager'
+        icon_emoji: ':warning:'
+        title: '[WARNING] {{ .GroupLabels.alertname }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n{{ end }}"
+        send_resolved: true
+
+  - name: 'info-receiver'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-info'
+        username: 'Alertmanager'
+        icon_emoji: ':information_source:'
+        title: '[INFO] {{ .GroupLabels.alertname }}'
+        text: "{{ range .Alerts }}*Description:* {{ .Annotations.description }}\n{{ end }}"
+
+  - name: 'watchdog-receiver'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-watchdog'
+        username: 'Alertmanager'
+        icon_emoji: ':dog:'
+        title: 'Watchdog Alive'
+        text: 'Alertmanager is running and sending notifications'
 
 # Inhibition rules
 inhibit_rules:
@@ -58,4 +120,14 @@ inhibit_rules:
       severity: 'critical'
     target_match:
       severity: 'warning'
-    equal: ['alertname', 'instance']
+    equal: ['alertname', 'instance', 'job']
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'instance', 'job']
+  - source_match:
+      alertname: 'InstanceDown'
+    target_match:
+      alertname: 'InstanceHealthcheck'
+    equal: ['instance']

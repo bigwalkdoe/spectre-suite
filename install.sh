@@ -31,6 +31,12 @@ cp scripts/maintenance/*.sh /usr/local/bin/
 cp scripts/network/*.sh /usr/local/bin/
 cp scripts/security/*.sh /usr/local/bin/
 
+# Copy enhancement scripts from ~//scripts/
+echo "Installing enhancement scripts..."
+if [ -d ~//scripts ]; then
+    find ~//scripts -name "*.sh" -type f -exec cp {} /usr/local/bin/ \; 2>/dev/null || true
+fi
+
 # Make scripts executable
 chmod +x /usr/local/bin/*.sh
 
