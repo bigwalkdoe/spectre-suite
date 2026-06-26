@@ -1,0 +1,54 @@
+{
+  "title": "Resource Monitoring & Cost",
+  "uid": "resource-monitoring",
+  "version": 1,
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Cost by Provider",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(aws_cost_estimated) by (service)",
+          "legendFormat": "{{service}}"
+        }
+      ]
+    },
+    {
+      "title": "Container Resource Usage",
+      "type": "table",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "container_memory_usage_bytes{container!=\"\"}",
+          "legendFormat": "{{container}}"
+        }
+      ]
+    },
+    {
+      "title": "Disk Usage Trend",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100)",
+          "legendFormat": "Disk used %"
+        }
+      ]
+    },
+    {
+      "title": "Unused Resources",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "count(container_last_seen > (time() - 86400)) by (container_name)",
+          "legendFormat": "Active containers"
+        }
+      ]
+    }
+  ],
+  "tags": ["resource", "cost", "monitoring"],
+  "schemaVersion": 27
+}
