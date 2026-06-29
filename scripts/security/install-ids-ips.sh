@@ -293,7 +293,7 @@ EOF'
 create_suricata_service() {
     echo "Creating Suricata systemd service..."
     
-    sudo bash -c 'cat > /etc/systemd/system/suricata.service << "EOF"
+    cat > /tmp/suricata.service << 'SERVICEEOF'
 [Unit]
 Description=Suricata IDS/IPS
 After=network.target
@@ -307,7 +307,8 @@ RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-EOF'
+SERVICEEOF
+    sudo mv /tmp/suricata.service /etc/systemd/system/suricata.service
     
     sudo systemctl daemon-reload
     sudo systemctl enable suricata
@@ -320,7 +321,7 @@ create_ids_monitoring() {
     # Create log monitoring script
     sudo mkdir -p /usr/local/bin
     
-    cat > /tmp/ids-log-monitor.sh << 'EOF'
+    cat > /tmp/ids-log-monitor.sh << 'IDSSCRIPT'
 #!/bin/bash
 # IDS Log Monitor Script
 
@@ -331,15 +332,15 @@ PROMETHEUS_TEXTFILE="/var/lib/node_exporter/textfile_collector/ids_alerts.prom"
 if [ -f "$LOG_FILE" ]; then
     ALERT_COUNT=$(tail -100 "$LOG_FILE" | grep -c " \[**\] " || echo 0)
     
-    cat > "$PROMETHEUS_TEXTFILE.$$" << EOF
+    cat > "$PROMETHEUS_TEXTFILE.$$" << EOFPROM
 # HELP ids_alerts_total Total number of IDS alerts
 # TYPE ids_alerts_total counter
 ids_alerts_total ${ALERT_COUNT}
-EOF
+EOFPROM
     
     mv "$PROMETHEUS_TEXTFILE.$$" "$PROMETHEUS_TEXTFILE"
 fi
-EOF
+IDSSCRIPT
     
     sudo mv /tmp/ids-log-monitor.sh /usr/local/bin/ids-log-monitor.sh
     sudo chmod +x /usr/local/bin/ids-log-monitor.sh

@@ -69,7 +69,7 @@ test_security_scripts_syntax() {
         if [ -f "$script" ]; then
             if ! bash -n "$script"; then
                 echo "❌ Syntax error in $script"
-                ((syntax_errors++))
+                ((syntax_errors+=1))
             fi
         fi
     done
@@ -124,11 +124,11 @@ run_all_tests() {
     local passed=0
     local failed=0
     
-    test_security_scripts_exist && ((passed++)) || ((failed++))
-    test_security_scripts_executable && ((passed++)) || ((failed++))
-    test_security_scripts_syntax && ((passed++)) || ((failed++))
-    test_security_configurations && ((passed++)) || ((failed++))
-    test_ids_ips_script && ((passed++)) || ((failed++))
+    test_security_scripts_exist && ((passed+=1)) || ((failed+=1))
+    test_security_scripts_executable && ((passed+=1)) || ((failed+=1))
+    test_security_scripts_syntax && ((passed+=1)) || ((failed+=1))
+    test_security_configurations && ((passed+=1)) || ((failed+=1))
+    test_ids_ips_script && ((passed+=1)) || ((failed+=1))
     
     echo ""
     echo "Security Script Tests Summary:"
