@@ -33,16 +33,16 @@ run_test_suite() {
     if [ -x "$test_script" ]; then
         if "$test_script"; then
             echo -e "${GREEN}✅ $test_name: PASSED${NC}"
-            ((PASSED_TESTS++))
+            ((PASSED_TESTS+=1))
         else
             echo -e "${RED}❌ $test_name: FAILED${NC}"
-            ((FAILED_TESTS++))
+            ((FAILED_TESTS+=1))
         fi
     else
         echo -e "${YELLOW}⚠️  $test_name: SKIPPED (not executable)${NC}"
     fi
     
-    ((TOTAL_TESTS++))
+    ((TOTAL_TESTS+=1))
     echo ""
 }
 
@@ -56,23 +56,23 @@ check_script_syntax() {
     
     for script in "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/*/*.sh; do
         if [ -f "$script" ]; then
-            ((script_count++))
+            ((script_count+=1))
             if ! bash -n "$script"; then
                 echo -e "${RED}❌ Syntax error in $script${NC}"
-                ((syntax_errors++))
+                ((syntax_errors+=1))
             fi
         fi
     done
     
     if [ $syntax_errors -eq 0 ]; then
         echo -e "${GREEN}✅ All $script_count scripts have correct syntax${NC}"
-        ((PASSED_TESTS++))
+        ((PASSED_TESTS+=1))
     else
         echo -e "${RED}❌ Found syntax errors in $syntax_errors scripts${NC}"
-        ((FAILED_TESTS++))
+        ((FAILED_TESTS+=1))
     fi
     
-    ((TOTAL_TESTS++))
+    ((TOTAL_TESTS+=1))
     echo ""
 }
 
@@ -93,19 +93,19 @@ check_required_files() {
     for file in "${required_files[@]}"; do
         if [ ! -f "$PROJECT_ROOT/$file" ]; then
             echo -e "${RED}❌ Missing required file: $file${NC}"
-            ((missing_files++))
+            ((missing_files+=1))
         fi
     done
     
     if [ $missing_files -eq 0 ]; then
         echo -e "${GREEN}✅ All required files present${NC}"
-        ((PASSED_TESTS++))
+        ((PASSED_TESTS+=1))
     else
         echo -e "${RED}❌ Missing $missing_files required files${NC}"
-        ((FAILED_TESTS++))
+        ((FAILED_TESTS+=1))
     fi
     
-    ((TOTAL_TESTS++))
+    ((TOTAL_TESTS+=1))
     echo ""
 }
 
@@ -138,19 +138,19 @@ check_directory_structure() {
     for dir in "${required_dirs[@]}"; do
         if [ ! -d "$PROJECT_ROOT/$dir" ]; then
             echo -e "${RED}❌ Missing required directory: $dir${NC}"
-            ((missing_dirs++))
+            ((missing_dirs+=1))
         fi
     done
     
     if [ $missing_dirs -eq 0 ]; then
         echo -e "${GREEN}✅ All required directories present${NC}"
-        ((PASSED_TESTS++))
+        ((PASSED_TESTS+=1))
     else
         echo -e "${RED}❌ Missing $missing_dirs required directories${NC}"
-        ((FAILED_TESTS++))
+        ((FAILED_TESTS+=1))
     fi
     
-    ((TOTAL_TESTS++))
+    ((TOTAL_TESTS+=1))
     echo ""
 }
 
@@ -165,20 +165,20 @@ check_executable_permissions() {
         if [ -f "$script" ]; then
             if [ ! -x "$script" ]; then
                 echo -e "${YELLOW}⚠️  Script not executable: $script${NC}"
-                ((permission_errors++))
+                ((permission_errors+=1))
             fi
         fi
     done
     
     if [ $permission_errors -eq 0 ]; then
         echo -e "${GREEN}✅ All scripts have executable permissions${NC}"
-        ((PASSED_TESTS++))
+        ((PASSED_TESTS+=1))
     else
         echo -e "${YELLOW}⚠️  $permission_errors scripts lack executable permissions${NC}"
-        ((FAILED_TESTS++))
+        ((FAILED_TESTS+=1))
     fi
     
-    ((TOTAL_TESTS++))
+    ((TOTAL_TESTS+=1))
     echo ""
 }
 
@@ -199,19 +199,19 @@ check_configuration_files() {
     for config in "${config_files[@]}"; do
         if [ ! -f "$PROJECT_ROOT/$config" ]; then
             echo -e "${RED}❌ Missing configuration file: $config${NC}"
-            ((missing_configs++))
+            ((missing_configs+=1))
         fi
     done
     
     if [ $missing_configs -eq 0 ]; then
         echo -e "${GREEN}✅ All configuration files present${NC}"
-        ((PASSED_TESTS++))
+        ((PASSED_TESTS+=1))
     else
         echo -e "${RED}❌ Missing $missing_configs configuration files${NC}"
-        ((FAILED_TESTS++))
+        ((FAILED_TESTS+=1))
     fi
     
-    ((TOTAL_TESTS++))
+    ((TOTAL_TESTS+=1))
     echo ""
 }
 
