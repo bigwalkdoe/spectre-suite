@@ -1,0 +1,9 @@
+[Unit]
+Description=Performance Monitoring Timer
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
