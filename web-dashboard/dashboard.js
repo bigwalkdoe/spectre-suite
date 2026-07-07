@@ -3,6 +3,7 @@ const PROMETHEUS_URL = 'http://localhost:9090';
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
 let chart = null;
+let chartRequestToken = 0; // Monotonic token to discard stale updateChart responses
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
@@ -39,32 +40,18 @@ function updateTimestamp() {
 async function queryPrometheus(query) {
     try {
         const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
-        const data = await response.json();
-        if (data.status === 'success' && data.data.result.length > 0) {
-            return parseFloat(data.data.result[0].value[1]);
+        if (!response.ok) {
+            console.error(`Prometheus query HTTP ${response.status} for: ${query}`);
+            return null;
         }
-        return null;
+        const data = await response.json();
+        if (data.status !== 'success' || !Array.isArray(data.data?.result) || data.data.result.length === 0) {
+            return null;
+        }
+        return parseFloat(data.data.result[0].value[1]);
     } catch (error) {
         console.error('Error querying Prometheus:', error);
         return null;
-    }
-}
-
-// Range query for charts
-async function queryPrometheusRange(query, range = '1h') {
-    try {
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query_range?query=${encodeURIComponent(query)}&start=${Date.now()/1000 - 3600}&end=${Date.now()/1000}&step=60`);
-        const data = await response.json();
-        if (data.status === 'success' && data.data.result.length > 0) {
-            return data.data.result[0].values.map(v => ({
-                timestamp: v[0] * 1000,
-                value: parseFloat(v[1])
-            }));
-        }
-        return [];
-    } catch (error) {
-        console.error('Error querying Prometheus range:', error);
-        return [];
     }
 }
 
@@ -237,8 +224,12 @@ async function updateContainerStatus() {
 async function checkAlerts() {
     try {
         const response = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        
+        if (data.status !== 'success' || !Array.isArray(data.data?.alerts)) {
+            throw new Error('Invalid alerts response');
+        }
+
         const activeAlerts = data.data.alerts.filter(alert => alert.state === 'firing');
         document.getElementById('alertCount').textContent = activeAlerts.length;
 
@@ -246,13 +237,22 @@ async function checkAlerts() {
         if (activeAlerts.length === 0) {
             alertsList.innerHTML = '<div class="no-alerts">No active alerts</div>';
         } else {
-            alertsList.innerHTML = activeAlerts.map(alert => `
-                <div class="alert-item ${alert.labels.severity}">
-                    <div class="alert-title">${alert.labels.alertname}</div>
-                    <div class="alert-description">${alert.annotations.description}</div>
+            alertsList.innerHTML = activeAlerts.map(alert => {
+                const severity = alert.labels?.severity || 'info';
+                const name = alert.labels?.alertname || 'Unnamed alert';
+                const description = alert.annotations?.description || '';
+                const safeName = document.createElement('span');
+                safeName.textContent = name;
+                const safeDesc = document.createElement('span');
+                safeDesc.textContent = description;
+                return `
+                <div class="alert-item ${severity}">
+                    <div class="alert-title">${safeName.innerHTML}</div>
+                    <div class="alert-description">${safeDesc.innerHTML}</div>
                     <div class="alert-time">${new Date(alert.startsAt * 1000).toLocaleString()}</div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
     } catch (error) {
         console.error('Error checking alerts:', error);
@@ -281,20 +281,129 @@ async function checkPrometheusConnection() {
 // Initialize Chart
 function initializeChart() {
     const ctx = document.getElementById('resourceChart').getContext('2d');
-    
-    // Simple chart implementation (would use Chart.js in production)
-    // For demo, we'll create a placeholder
-    chart = {
-        update: function(data) {
-            // Chart update logic
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'CPU Usage (%)',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Memory Usage (%)',
+                    data: [],
+                    borderColor: '#f5576c',
+                    backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Disk Usage (%)',
+                    data: [],
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { maxTicksLimit: 10 }
+                },
+                y: {
+                    min: 0,
+                    max: 100,
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                }
+            },
+            plugins: {
+                legend: { position: 'bottom' }
+            }
         }
-    };
+    });
 }
 
 async function updateChart(range) {
-    // Fetch range data and update chart
-    const cpuData = await queryPrometheusRange('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))', range);
-    // Update chart with data
+    const secondsMap = { '1h': 3600, '6h': 21600, '24h': 86400, '7d': 604800 };
+    const seconds = secondsMap[range] || 3600;
+    const step = range === '7d' ? 3600 : 60;
+    const spansMultipleDays = seconds > 86400;
+
+    const now = Math.floor(Date.now() / 1000);
+    const start = now - seconds;
+
+    const queries = [
+        '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))',
+        '100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))',
+        '100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'
+    ];
+
+    // Bump the in-flight token; any in-progress fetch is now stale.
+    const myToken = ++chartRequestToken;
+
+    try {
+        const responses = await Promise.all(queries.map(q =>
+            fetch(`${PROMETHEUS_URL}/api/v1/query_range?query=${encodeURIComponent(q)}&start=${start}&end=${now}&step=${step}`)
+        ));
+
+        if (myToken !== chartRequestToken) return; // a newer update has superseded us
+
+        if (responses.some(r => !r.ok)) {
+            console.error('Chart range query failed:',
+                responses.map((r, i) => `${i}: HTTP ${r.status}`).join(', '));
+            return;
+        }
+
+        const results = await Promise.all(responses.map(r => r.json()));
+
+        if (myToken !== chartRequestToken) return; // recheck after the second await
+
+        if (results.some(d => d.status !== 'success')) {
+            console.error('Chart range query returned non-success status');
+            return;
+        }
+
+        const firstSeries = results[0]?.data?.result?.[0]?.values;
+        if (!Array.isArray(firstSeries) || firstSeries.length === 0) {
+            chart.data.labels = [];
+            chart.data.datasets.forEach(d => { d.data = []; });
+            chart.update();
+            return;
+        }
+
+        const timestamps = firstSeries.map(v => {
+            const d = new Date(v[0] * 1000);
+            // Include the date component for ranges that cross day boundaries
+            // so the x-axis remains interpretable past 24h.
+            return spansMultipleDays
+                ? d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : d.toLocaleTimeString();
+        });
+
+        chart.data.labels = timestamps;
+        chart.data.datasets.forEach((dataset, i) => {
+            dataset.data = results[i]?.data?.result?.[0]?.values?.map(v => parseFloat(v[1])) || [];
+        });
+        chart.update();
+    } catch (e) {
+        if (myToken === chartRequestToken) {
+            console.error('Error updating chart:', e);
+        }
+    }
 }
 
 // Quick Actions
