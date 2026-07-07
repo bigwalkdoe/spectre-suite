@@ -1,0 +1,8 @@
+[Unit]
+Description=System Maintenance Service
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/run-maintenance.sh
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

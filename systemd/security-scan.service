@@ -1,0 +1,8 @@
+[Unit]
+Description=Security Vulnerability Scanner
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/run-security-hardening.sh
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
