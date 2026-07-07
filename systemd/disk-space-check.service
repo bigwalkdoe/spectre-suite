@@ -1,0 +1,6 @@
+[Unit]
+Description=Disk Space Monitoring Service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/check-disk-space.sh
