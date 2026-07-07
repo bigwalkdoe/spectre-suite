@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # System Maintenance Installation Script
 
 echo "==================================="
@@ -6,22 +7,37 @@ echo "System Maintenance Installation"
 echo "==================================="
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
    echo "Please run with sudo privileges"
    exit 1
+fi
+
+# Determine user home directory and the unprivileged account services should run as.
+# When run under `sudo`, SUDO_USER is the invoking account. Otherwise we fall back
+# to root so this script also works when executed directly as root.
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_NAME="$SUDO_USER"
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -z "$USER_HOME" ]; then
+        echo "Could not determine home directory for $SUDO_USER" >&2
+        exit 1
+    fi
+else
+    USER_NAME="root"
+    USER_HOME="$HOME"
 fi
 
 # Create directories
 echo "Creating directories..."
 mkdir -p /backups/{databases,docker-volumes,configurations,projects}
 mkdir -p /var/log
-mkdir -p /home/deon/.local/share
+mkdir -p "$USER_HOME/.local/share"
 
 # Set permissions
 echo "Setting permissions..."
-chown -R $SUDO_USER:$SUDO_USER /backups
+chown -R "$USER_NAME:$USER_NAME" /backups
 chmod -R 755 /backups
-chmod -R 755 /home/deon/.local/share
+chmod -R 755 "$USER_HOME/.local/share"
 
 # Copy scripts to /usr/local/bin
 echo "Installing scripts..."
@@ -31,10 +47,10 @@ cp scripts/maintenance/*.sh /usr/local/bin/
 cp scripts/network/*.sh /usr/local/bin/
 cp scripts/security/*.sh /usr/local/bin/
 
-# Copy enhancement scripts from /home/deon/scripts/
+# Copy enhancement scripts from user's scripts directory
 echo "Installing enhancement scripts..."
-if [ -d /home/deon/scripts ]; then
-    find /home/deon/scripts -name "*.sh" -type f -exec cp {} /usr/local/bin/ \; 2>/dev/null || true
+if [ -d "$USER_HOME/scripts" ]; then
+    find "$USER_HOME/scripts" -name "*.sh" -type f -exec cp {} /usr/local/bin/ \; 2>/dev/null || true
 fi
 
 # Make scripts executable
@@ -55,9 +71,9 @@ After=network.target docker.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/backup-all.sh
-User=$SUDO_USER
-Group=$SUDO_USER
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+User=$USER_NAME
+Group=$USER_NAME
 EOF
 
 # Backup timer (daily at 2 AM)
@@ -83,9 +99,9 @@ After=network.target docker.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/run-maintenance.sh
-User=$SUDO_USER
-Group=$SUDO_USER
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+User=$USER_NAME
+Group=$USER_NAME
 EOF
 
 # Maintenance timer (weekly Sundays at 3 AM)
@@ -110,7 +126,8 @@ Description=Performance Monitoring Service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/check-performance.sh
-User=$SUDO_USER
+User=$USER_NAME
+Group=$USER_NAME
 EOF
 
 # Performance check timer (hourly)
@@ -134,7 +151,8 @@ Description=Network Monitoring Service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/network-monitor.sh
-User=$SUDO_USER
+User=$USER_NAME
+Group=$USER_NAME
 EOF
 
 # Network monitor timer (hourly)
@@ -158,7 +176,8 @@ Description=Disk Space Monitoring Service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/check-disk-space.sh
-User=$SUDO_USER
+User=$USER_NAME
+Group=$USER_NAME
 EOF
 
 # Disk space check timer (daily at midnight)
@@ -183,8 +202,8 @@ After=network.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/run-security-hardening.sh
-User=$SUDO_USER
-Group=$SUDO_USER
+User=$USER_NAME
+Group=$USER_NAME
 EOF
 
 # Security scan timer (weekly Saturdays at 4 AM)
