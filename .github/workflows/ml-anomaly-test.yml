@@ -1,0 +1,153 @@
+name: ML Anomaly Detection Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  ml-unit-tests:
+    name: ML Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install numpy pandas scikit-learn scipy requests
+
+      - name: Run ML unit tests
+        run: |
+          cd tests
+          python3 -m unittest test_ml.py -v
+
+  ml-detection:
+    name: ML Detection (no LLM)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install numpy pandas scikit-learn scipy requests
+
+      - name: Generate synthetic training data
+        run: |
+          python3 - <<'PY'
+          import json, os, random
+          from datetime import datetime, timedelta
+          d = "metrics"
+          os.makedirs(d, exist_ok=True)
+          base = datetime.now() - timedelta(minutes=20)
+          random.seed(1)
+          for i in range(20):
+              t = base + timedelta(minutes=i)
+              m = {
+                "cpu_usage_percent": random.uniform(10, 40),
+                "cpu_count": 8,
+                "load_1min": random.uniform(0.2, 1.5),
+                "load_5min": random.uniform(0.2, 1.2),
+                "load_15min": random.uniform(0.2, 1.0),
+                "memory_usage_percent": random.uniform(40, 65),
+                "memory_available_gb": random.uniform(8, 16),
+                "memory_used_gb": random.uniform(4, 8),
+                "memory_total_gb": 32.0,
+                "disk_usage_percent": random.uniform(30, 50),
+                "disk_used_gb": random.uniform(20, 40),
+                "disk_free_gb": random.uniform(40, 60),
+                "disk_total_gb": 100.0,
+                "network_bytes_sent": random.uniform(1e6, 5e6),
+                "network_bytes_recv": random.uniform(1e6, 5e6),
+                "network_packets_sent": int(random.uniform(1000, 5000)),
+                "network_packets_recv": int(random.uniform(1000, 5000)),
+                "total_processes": int(random.uniform(150, 250)),
+                "high_cpu_processes": int(random.uniform(0, 5)),
+                "high_mem_processes": int(random.uniform(0, 3)),
+                "timestamp": t.isoformat(),
+              }
+              if i == 19:
+                  m["memory_usage_percent"] = 97.0
+                  m["high_mem_processes"] = 14
+              with open(f"{d}/metrics_{i:03d}.json", "w") as f:
+                  json.dump(m, f)
+          print("created 20 synthetic metric files")
+          PY
+
+      - name: Run anomaly detection (detect mode)
+        run: |
+          export ML_DATA_DIR="$PWD" ML_LOG_DIR="$PWD/ml-log"
+          python3 scripts/ml-anomaly/anomaly_detector.py \
+            --mode detect --training-samples 20 --output "$PWD/ml-log/latest_detection.json"
+          echo "--- report ---"
+          python3 -c "import json; d=json.load(open('$PWD/ml-log/latest_detection.json')); print('is_anomaly:', d['is_anomaly']); print('votes:', d['anomaly_votes'], '/', d['total_detectors'])"
+
+  ml-remediation:
+    name: ML Remediation (Ollama dry-run)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install numpy pandas scikit-learn scipy requests
+
+      - name: Pull a small free model
+        run: |
+          sleep 5
+          ollama pull tinyllama
+
+      - name: Run fix engine dry-run
+        run: |
+          export ML_DATA_DIR="$PWD" ML_LOG_DIR="$PWD/ml-log" \
+                 ML_FIX_MODEL=tinyllama OLLAMA_HOST=http://localhost:11434
+          # Reuse synthetic data so a detection report exists
+          python3 - <<'PY'
+          import json, os, random
+          from datetime import datetime, timedelta
+          d = "metrics"
+          os.makedirs(d, exist_ok=True)
+          base = datetime.now() - timedelta(minutes=20)
+          random.seed(1)
+          for i in range(20):
+              t = base + timedelta(minutes=i)
+              m = {"cpu_usage_percent": random.uniform(10,40),
+                   "memory_usage_percent": 97.0 if i==19 else random.uniform(40,65),
+                   "disk_usage_percent": random.uniform(30,50),
+                   "network_bytes_sent": random.uniform(1e6,5e6),
+                   "total_processes": int(random.uniform(150,250)),
+                   "high_mem_processes": 14 if i==19 else int(random.uniform(0,3))}
+              with open(f"{d}/metrics_{i:03d}.json","w") as f: json.dump(m,f)
+          PY
+          python3 scripts/ml-anomaly/anomaly_detector.py \
+            --mode detect --training-samples 20 --output "$PWD/ml-log/latest_detection.json"
+          python3 scripts/ml-anomaly/ml_fix_engine.py \
+            --anomaly-report "$PWD/ml-log/latest_detection.json" --mode dry-run
