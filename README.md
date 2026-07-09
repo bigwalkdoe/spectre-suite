@@ -31,7 +31,7 @@ cd system-maintenance
 sudo ./install.sh
 
 # Or deploy all enhancements at once
-bash /home/deon/scripts/setup-all-enhancements.sh
+bash scripts/setup-all-enhancements.sh
 ```
 
 ## System Architecture
@@ -92,21 +92,21 @@ docker-compose -f docker-compose.monitoring.yml up -d
 ```bash
 # Intrusion Detection
 sudo systemctl start fail2ban          # Brute force protection
-/home/deon/scripts/security/check-file-integrity.sh  # AIDE check
+scripts/security/check-file-integrity.sh  # AIDE check
 
 # Vulnerability Scanning
-/home/deon/scripts/security/run-trivy-scan.sh
+scripts/security/run-trivy-scan.sh
 
 # Code Analysis
 docker-compose -f security/sonarqube/docker-compose.yml up -d
-/home/deon/scripts/security/run-sonarqube-analysis.sh
+scripts/security/run-sonarqube-analysis.sh
 
 # Web App Testing
 docker-compose -f security/zap/docker-compose.yml up -d
-/home/deon/scripts/security/run-zap-scan.sh http://localhost:3000
+scripts/security/run-zap-scan.sh http://localhost:3000
 
 # Policy Enforcement
-/home/deon/scripts/security/opa/evaluate-policies.sh
+scripts/security/opa/evaluate-policies.sh
 ```
 
 ## Secrets Management
@@ -119,11 +119,11 @@ vim /home/deon/.secrets/environment
 source /home/deon/.secrets/environment
 
 # Inject into project files
-/home/deon/scripts/security/inject-secrets.sh
+scripts/security/inject-secrets.sh
 
 # Or use Vault
-/home/deon/scripts/security/vault-secrets.sh store database/postgres password mypass
-/home/deon/scripts/security/vault-secrets.sh get database/postgres password
+scripts/security/vault-secrets.sh store database/postgres password mypass
+scripts/security/vault-secrets.sh get database/postgres password
 ```
 
 ## VPN & Network
@@ -133,40 +133,40 @@ source /home/deon/.secrets/environment
 sudo systemctl start wg-quick@wg0
 
 # Add a client
-/home/deon/scripts/network/add-vpn-client.sh my-laptop 10.0.0.2
+scripts/network/add-vpn-client.sh my-laptop 10.0.0.2
 
 # Check DDoS status
-/home/deon/scripts/network/ddos-mitigation.sh
+scripts/network/ddos-mitigation.sh
 ```
 
 ## Database Optimization
 
 ```bash
 # Run vacuum manually
-/home/deon/scripts/performance/pg-vacuum.sh
+scripts/performance/pg-vacuum.sh
 
 # Start PgBouncer connection pool
 docker-compose -f performance/pgbouncer/docker-compose.yml up -d
 # Connect: psql -h localhost -p 6432 -U postgres -d guardrail
 
 # Set up read replica
-/home/deon/scripts/performance/setup-read-replica.sh
+scripts/performance/setup-read-replica.sh
 ```
 
 ## Load Testing
 
 ```bash
 # k6 test (10 VUs, 30s)
-bash /home/deon/scripts/performance/load-testing/run-k6-test.sh http://localhost:3000 10 30s
+bash scripts/performance/load-testing/run-k6-test.sh http://localhost:3000 10 30s
 
 # Locust test
-bash /home/deon/scripts/performance/load-testing/run-locust-test.sh http://localhost:3000 10 1 60s
+bash scripts/performance/load-testing/run-locust-test.sh http://localhost:3000 10 1 60s
 
 # Performance regression
-bash /home/deon/scripts/performance/load-testing/run-performance-regression.sh
+bash scripts/performance/load-testing/run-performance-regression.sh
 
 # Capacity planning
-bash /home/deon/scripts/performance/load-testing/capacity-planning.sh
+bash scripts/performance/load-testing/capacity-planning.sh
 ```
 
 ## Disaster Recovery
@@ -204,15 +204,30 @@ system-maintenance/
 └── install.sh
 ```
 
-/home/deon/scripts/
-├── backups/                 # Backup + off-site replication
+scripts/
+├── backups/                 # Backup + off-site replication + restore
+│   ├── backup-*.sh          #   Database, volume, config, project backups
+│   ├── restore-*.sh         #   Database, volume, remote restore scripts
+│   ├── backup-encryption.sh #   AES-256-CBC backup encryption
+│   └── backup-verification.sh # Backup integrity verification
 ├── logging/                 # Loki stack + logrotate
 ├── maintenance/             # Audit, cleanup, optimization
+│   ├── audit-trail.sh       #   Centralized audit logging
+│   ├── compliance-report.sh #   Compliance reporting
+│   ├── check-performance.sh #   Performance monitoring
+│   ├── network-monitor.sh   #   Network connectivity monitoring
+│   ├── check-disk-space.sh  #   Disk usage monitoring
+│   ├── network-security-hardening.sh # Network security hardening
+│   └── cleanup-*.sh         #   System + log cleanup
 ├── network/                 # WireGuard, DDoS, segmentation
 ├── performance/             # Load testing, vacuum, rightsizing
 │   └── load-testing/        # k6, Locust, regression
 └── security/                # IDS, scanning, OPA, secrets
-    ├── opa/policies/        # Rego policy files
+    ├── opa/policies/        #   Rego policy files (firewall, audit, docker,
+    │                        #   network, backups, intrusion_detection,
+    │                        #   compliance, encryption)
+    ├── run-trivy-scan.sh    #   Trivy container scanning
+    └── check-file-integrity.sh # AIDE file integrity check
     ├── sonarqube/           # Code analysis
     └── zap/                 # Web app testing
 
@@ -228,29 +243,29 @@ system-maintenance/
 
 ```bash
 # Backup
-/home/deon/scripts/backups/backup-all.sh                    # Full backup
-/home/deon/scripts/backups/replicate-to-remote.sh           # Off-site sync
+scripts/backups/backup-all.sh                    # Full backup
+scripts/backups/replicate-to-remote.sh           # Off-site sync
 
 # Security
-/home/deon/scripts/security/run-trivy-scan.sh               # Container scan
-/home/deon/scripts/security/check-file-integrity.sh          # AIDE check
-/home/deon/scripts/security/opa/evaluate-policies.sh         # Policy audit
+scripts/security/run-trivy-scan.sh               # Container scan
+scripts/security/check-file-integrity.sh          # AIDE check
+scripts/security/opa/evaluate-policies.sh         # Policy audit
 
 # Monitoring
 docker-compose -f docker-compose.monitoring.yml up -d        # Start stack
-/home/deon/dev/.../prometheus/business-metrics-exporter.sh   # Export metrics
+system-maintenance/prometheus/business-metrics-exporter.sh   # Export metrics
 
 # Maintenance
-/home/deon/scripts/maintenance/audit-trail.sh                # Generate audit
-/home/deon/scripts/maintenance/compliance-report.sh          # Compliance check
-/home/deon/scripts/maintenance/cleanup-unused-resources.sh   # Cleanup
+scripts/maintenance/audit-trail.sh                # Generate audit
+scripts/maintenance/compliance-report.sh          # Compliance check
+scripts/maintenance/cleanup-unused-resources.sh   # Cleanup
 
 # Database
-/home/deon/scripts/performance/pg-vacuum.sh                 # Vacuum DB
-/home/deon/scripts/performance/resource-rightsizing.sh      # Analyze usage
+scripts/performance/pg-vacuum.sh                 # Vacuum DB
+scripts/performance/resource-rightsizing.sh      # Analyze usage
 
 # Load test
-bash /home/deon/scripts/performance/load-testing/run-k6-test.sh
+bash scripts/performance/load-testing/run-k6-test.sh
 ```
 
 ## Documentation
