@@ -370,7 +370,7 @@ Anything not explicitly allowed is dropped and flagged `needs human review`.
 |------|----------|
 | `report` (default) | Write `remediation_<ts>.json`, optionally POST to Alertmanager. No commands run. |
 | `dry-run` | Print the plan and the exact commands that *would* run. |
-| `apply` | Execute only the allow-listed, low-risk commands automatically. |
+| `apply` | Execute only the allow-listed, low-risk commands automatically. **Requires an approval file** (`--approval FILE` or `ML_FIX_APPROVAL_FILE`) — refuses to run without explicit authorization, and every applied command is written to the audit trail. |
 
 ### Setup
 
@@ -399,6 +399,8 @@ ML_FIX_MODE=apply    bash scripts/ml-anomaly/run_ml_pipeline.sh
 
 > Safety: `apply` mode only runs commands on the allow-list. Review the
 > generated `remediation_*.json` reports before enabling `apply` in production.
+> `apply` requires a written approval artifact (e.g. `ML_FIX_APPROVAL_FILE=/path/to/approved.txt`)
+> and logs every executed command to the audit trail (`/var/log/audit/audit.log`).
 
 ## Future Enhancements
 

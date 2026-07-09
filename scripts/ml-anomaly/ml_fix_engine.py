@@ -54,6 +54,33 @@ logger = logging.getLogger(__name__)
 REPORT_DIR = os.path.join(LOG_DIR, "remediation")
 LATEST_ANOMALY = os.path.join(LOG_DIR, "latest_detection.json")
 
+# Audit trail destination (mirrors audit-trail.sh resolution).
+AUDIT_LOG_DIR = os.environ.get("AUDIT_LOG_DIR", "/var/log/audit")
+try:
+    os.makedirs(AUDIT_LOG_DIR, exist_ok=True)
+except OSError:
+    AUDIT_LOG_DIR = os.path.join("/tmp", "audit")
+    os.makedirs(AUDIT_LOG_DIR, exist_ok=True)
+AUDIT_LOG = os.path.join(AUDIT_LOG_DIR, "audit.log")
+
+
+def log_to_audit(message):
+    """Record an auto-applied remediation action to the audit trail."""
+    try:
+        with open(AUDIT_LOG, "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] ML-FIX: {message}\n")
+    except OSError:
+        pass
+    at_script = os.path.join(os.path.dirname(__file__), "..", "maintenance", "audit-trail.sh")
+    if os.path.exists(at_script):
+        try:
+            subprocess.run(
+                [at_script, "log-process", "ml-fix-engine", message],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
+            )
+        except Exception:
+            pass
+
 # Services/daemons that may be safely restarted by the fix engine.
 ALLOWED_SERVICES = {
     "prometheus", "grafana", "alertmanager", "node-exporter", "cadvisor",
@@ -260,6 +287,8 @@ def main():
     parser = argparse.ArgumentParser(description="ML fix engine: diagnose and remediate anomalies with a free local LLM")
     parser.add_argument("--anomaly-report", help="Path to anomaly JSON (defaults to latest)")
     parser.add_argument("--mode", choices=["report", "apply", "dry-run"], default="report")
+    parser.add_argument("--approval", default=os.environ.get("ML_FIX_APPROVAL_FILE"),
+                        help="Path to an approval file required for --mode apply (safety gate)")
     parser.add_argument("--alertmanager-webhook", default=os.environ.get("ML_FIX_WEBHOOK", ""))
     args = parser.parse_args()
 
@@ -271,6 +300,22 @@ def main():
     if not report.get("is_anomaly"):
         logger.info("No anomaly detected — fix engine has nothing to do.")
         sys.exit(0)
+
+    # Fail fast for apply mode if no authorization is present (before any LLM call).
+    if args.mode == "apply":
+        approval = args.approval or os.environ.get("ML_FIX_APPROVAL_FILE")
+        if not approval or not os.path.isfile(approval):
+            logger.error(
+                "apply mode requires an explicit approval file (--approval FILE or "
+                "ML_FIX_APPROVAL_FILE). Refusing to auto-apply fixes without authorization."
+            )
+            sys.exit(5)
+        try:
+            with open(approval) as f:
+                approver = (f.read().strip() or "unknown").replace("\n", " ")
+        except OSError:
+            approver = "unknown"
+        logger.info(f"Apply authorized by approval file: {approval} (approver: {approver})")
 
     provider = providers.get_provider()
     if not provider:
@@ -300,13 +345,31 @@ def main():
         sys.exit(0)
 
     if args.mode == "apply":
+        approval = args.approval or os.environ.get("ML_FIX_APPROVAL_FILE")
+        if not approval or not os.path.isfile(approval):
+            logger.error(
+                "apply mode requires an explicit approval file (--approval FILE or "
+                "ML_FIX_APPROVAL_FILE). Refusing to auto-apply fixes without authorization."
+            )
+            sys.exit(5)
+        try:
+            with open(approval) as f:
+                approver = (f.read().strip() or "unknown").replace("\n", " ")
+        except OSError:
+            approver = "unknown"
+        logger.info(f"Apply authorized by approval file: {approval} (approver: {approver})")
         applied = 0
         for step in validated:
             if step.get("auto_applicable"):
+                logger.info(f"Applying approved fix: {step['command']}")
                 outcome = run_command(step["command"])
                 step["outcome"] = outcome
+                log_to_audit(
+                    f"APPLIED step='{step.get('title')}' cmd='{step['command']}' "
+                    f"rc={outcome.get('returncode')} approver='{approver}'"
+                )
                 applied += 1
-        logger.info(f"Applied {applied} safe remediation command(s).")
+        logger.info(f"Applied {applied} safe remediation command(s) (authorized by {approver}).")
         with open(report_path, "w") as f:
             json.dump(report_obj, f, indent=2)
 
