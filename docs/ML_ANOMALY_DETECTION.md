@@ -328,6 +328,78 @@ if result.get('is_anomaly'):
 - **Authentication**: Implement authentication for web interfaces
 - **Audit Logging**: Log all anomaly detection activities
 
+## Automated Remediation (Free Local LLM)
+
+Detection is only half the story. The suite can automatically diagnose an
+anomaly and propose (or safely apply) a remediation plan using a **free,
+open-weight model running locally via Ollama** — no API keys, no cost, no data
+leaving the host.
+
+### Architecture
+
+```
+anomaly_detector.py  --(latest_detection.json)-->  run_ml_pipeline.sh
+                                                    |
+                                                    v
+                                            ml_fix_engine.py
+                                                    |
+                                          +---------+---------+
+                                          |                   |
+                                     Ollama (local)     safety validator
+                                     llama3.2 / mistral       |
+                                                          v
+                                              report | apply | dry-run
+                                                  +----------> Alertmanager
+```
+
+`ml_fix_engine.py` sends the anomaly report plus recent metrics context to the
+LLM, which returns a JSON plan (`diagnosis`, `severity`, `remediation_steps`).
+Every `command` in the plan is validated before it can run:
+
+- **Deny-list**: `rm -rf /`, `mkfs`, `dd if=`, `chmod -R 777 /`, `curl|bash`,
+  `wget|bash`, `reboot`, `shutdown`, and similar destructive tokens.
+- **Allow-list**: only `systemctl restart/reload <known service>`,
+  `docker restart/start <known container>`, `logrotate`, `journalctl`, safe
+  `find /tmp` cleanup, `truncate -s 0`, etc.
+
+Anything not explicitly allowed is dropped and flagged `needs human review`.
+
+### Modes
+
+| Mode | Behavior |
+|------|----------|
+| `report` (default) | Write `remediation_<ts>.json`, optionally POST to Alertmanager. No commands run. |
+| `dry-run` | Print the plan and the exact commands that *would* run. |
+| `apply` | Execute only the allow-listed, low-risk commands automatically. |
+
+### Setup
+
+```bash
+# Install ML stack + pull a free local model
+bash scripts/ml-anomaly/setup_ml_anomaly.sh
+
+# Run the full pipeline once (detect -> diagnose -> report)
+sudo systemctl start ml-anomaly-fix
+
+# Or interactively
+ML_FIX_MODE=dry-run  bash scripts/ml-anomaly/run_ml_pipeline.sh
+ML_FIX_MODE=apply    bash scripts/ml-anomaly/run_ml_pipeline.sh
+```
+
+### Configuration (environment variables)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ML_FIX_PROVIDER` | `ollama` | `ollama` or `openai-compatible` |
+| `ML_FIX_MODEL` | `llama3.2` | Model name to use |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
+| `ML_FIX_API_BASE` | `http://localhost:8080/v1` | OpenAI-compatible endpoint |
+| `ML_FIX_WEBHOOK` | _(empty)_ | Alertmanager webhook URL |
+| `ML_FIX_MODE` | `report` | `report` \| `dry-run` \| `apply` |
+
+> Safety: `apply` mode only runs commands on the allow-list. Review the
+> generated `remediation_*.json` reports before enabling `apply` in production.
+
 ## Future Enhancements
 
 - [ ] Deep learning models (Autoencoders, LSTMs)

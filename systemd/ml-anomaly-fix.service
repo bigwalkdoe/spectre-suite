@@ -1,0 +1,11 @@
+[Unit]
+Description=ML Anomaly Detection + Free-LLM Remediation Pipeline
+After=network.target docker.service ml-anomaly-detection.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/system-maintenance/scripts/ml-anomaly
+Environment=PATH=/opt/system-maintenance/scripts/ml-anomaly/venv/bin
+Environment=ML_FIX_MODE=report
+ExecStart=/opt/system-maintenance/scripts/ml-anomaly/run_ml_pipeline.sh
