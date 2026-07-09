@@ -19,7 +19,7 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 | **Audit** | auditd rules, centralized audit trail, compliance reports, sudo command logging, access reviews |
 | **Policy** | OPA policies for Docker security, backups, network, compliance; automated evaluation |
 | **Cost** | Cloud cost tracking, resource rightsizing, automated cleanup of unused resources |
-| **ML** | Anomaly detection using Isolation Forest, One-Class SVM, ensemble methods |
+| **ML** | Anomaly detection (Isolation Forest, One-Class SVM, ensemble) + free local-LLM auto-remediation (Ollama) with safety-validated fixes |
 
 ## Quick Start
 

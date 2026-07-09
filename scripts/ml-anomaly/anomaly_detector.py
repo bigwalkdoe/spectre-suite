@@ -467,7 +467,9 @@ def main():
     parser.add_argument('--training-samples', type=int, default=100,
                        help='Number of training samples to use')
     parser.add_argument('--detector', choices=['isolation_forest', 'one_class_svm', 'statistical', 'ensemble'],
-                       default='ensemble', help='Anomaly detection method')
+                        default='ensemble', help='Anomaly detection method')
+    parser.add_argument('--output', default='/var/log/ml-anomaly/latest_detection.json',
+                        help='Path to write the anomaly report JSON')
     
     args = parser.parse_args()
     
@@ -534,6 +536,13 @@ def main():
         # Detect anomalies
         result = detector.detect_anomalies(current_metrics)
         
+        # Persist latest report for the fix engine / exporter
+        try:
+            with open(args.output, 'w') as f:
+                json.dump(result, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to persist detection report: {e}")
+        
         # Output results
         print(json.dumps(result, indent=2))
         
@@ -565,6 +574,13 @@ def main():
                 
                 # Detect anomalies
                 result = detector.detect_anomalies(current_metrics)
+                
+                # Persist latest report for the fix engine / exporter
+                try:
+                    with open('/var/log/ml-anomaly/latest_detection.json', 'w') as f:
+                        json.dump(result, f, indent=2)
+                except Exception as e:
+                    logger.error(f"Failed to persist detection report: {e}")
                 
                 # Log results
                 if result.get('is_anomaly'):
