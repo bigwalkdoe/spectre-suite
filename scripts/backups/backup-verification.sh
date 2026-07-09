@@ -9,11 +9,11 @@ LOG_FILE="/var/log/backup-verification.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 log() {
-    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE"
+    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" || true
 }
 
 error() {
-    echo "[$TIMESTAMP] ERROR: $1" | tee -a "$LOG_FILE" >&2
+    echo "[$TIMESTAMP] ERROR: $1" | tee -a "$LOG_FILE" || true >&2
 }
 
 # Verify file integrity using checksum

@@ -14,7 +14,17 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPORT="${ML_DETECT_REPORT:-/var/log/ml-anomaly/latest_detection.json}"
+
+# Resolve the report path to a writable location (mirrors the Python fallback).
+DEFAULT_REPORT="/var/log/ml-anomaly/latest_detection.json"
+if [ -w "$(dirname "$DEFAULT_REPORT" 2>/dev/null)" ]; then
+    REPORT="${ML_DETECT_REPORT:-$DEFAULT_REPORT}"
+    export ML_LOG_DIR="/var/log/ml-anomaly"
+else
+    REPORT="${ML_DETECT_REPORT:-/tmp/ml-anomaly/latest_detection.json}"
+    export ML_LOG_DIR="/tmp/ml-anomaly"
+fi
+
 MODE="${ML_FIX_MODE:-report}"
 WEBHOOK="${ML_FIX_WEBHOOK:-}"
 

@@ -4,7 +4,11 @@ set -euo pipefail
 # Audit Trail Script
 # Generates centralized audit logs for system activities
 
-LOG_DIR="/var/log/audit"
+if [ -w "$(dirname /var/log/audit 2>/dev/null)" ]; then
+    LOG_DIR="/var/log/audit"
+else
+    LOG_DIR="/tmp/audit"
+fi
 AUDIT_LOG="$LOG_DIR/audit.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 TIMESTAMP_ISO=$(date -Iseconds)

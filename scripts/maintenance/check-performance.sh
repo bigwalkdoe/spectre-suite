@@ -12,7 +12,7 @@ LOGICAL volumes="/var/log/performance-check.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 log() {
-    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE"
+    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" || true
 }
 
 # Get CPU usage
