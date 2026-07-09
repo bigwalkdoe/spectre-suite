@@ -54,6 +54,10 @@ jobs:
             opa check "$file"
           done
 
+      - name: Evaluate policies against live system state
+        run: |
+          bash scripts/maintenance/compliance-report.sh check-opa
+
       - name: Evaluate policies
         run: |
           opa eval --format pretty \
