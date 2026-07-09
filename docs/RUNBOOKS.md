@@ -125,7 +125,7 @@ journalctl -u backup.service --since "1 hour ago"
 **Resolution:**
 ```bash
 # Run backup manually
-/home/deon/scripts/backups/backup-databases.sh
+scripts/backups/backup-databases.sh
 
 # Check disk space
 df -h /backups
@@ -137,7 +137,7 @@ docker ps
 docker exec guardrail-ai-postgres-1 pg_isready
 
 # Fix and re-run
-/home/deon/scripts/backups/backup-all.sh
+scripts/backups/backup-all.sh
 ```
 
 ---
@@ -179,7 +179,7 @@ docker-compose restart nginx
 
 **Check:**
 ```bash
-cat /home/deon/scripts/security/reports/trivy_image_latest.json | jq '.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")'
+cat scripts/security/reports/trivy_image_latest.json | jq '.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")'
 ```
 
 **Resolution:**
@@ -191,10 +191,10 @@ docker pull <image>:latest
 docker-compose build --no-cache <service>
 
 # Run full scan
-/home/deon/scripts/security/run-trivy-scan.sh
+scripts/security/run-trivy-scan.sh
 
 # Update exception list if false positive
-echo "<CVE-ID> false-positive" >> /home/deon/scripts/security/.trivyignore
+echo "<CVE-ID> false-positive" >> scripts/security/.trivyignore
 ```
 
 ---
@@ -207,7 +207,7 @@ echo "<CVE-ID> false-positive" >> /home/deon/scripts/security/.trivyignore
 
 **Check:**
 ```bash
-/home/deon/scripts/network/network-monitor.sh
+scripts/network/network-monitor.sh
 ping -c 3 8.8.8.8
 curl -sf http://localhost:9090/-/healthy
 docker network ls
@@ -302,24 +302,24 @@ docker-compose -f docker-compose.monitoring.yml up -d prometheus
 
 **Check:**
 ```bash
-/home/deon/scripts/security/check-file-integrity.sh
+scripts/security/check-file-integrity.sh
 diff <(cat /etc/docker/daemon.json) <(echo '{"live-restore":true}')
 ```
 
 **Resolution:**
 ```bash
 # Restore from version control
-cd /home/deon/dev/github/system-maintenance
+cd system-maintenance
 git status
 git diff prometheus/prometheus.yml
 git checkout -- prometheus/prometheus.yml
 
 # Re-apply via Ansible
-cd /home/deon/dev/github/system-maintenance/cloud-deployment/ansible
+cd system-maintenance/cloud-deployment/ansible
 ansible-playbook -i inventory/production.yml playbook.yml --tags config
 
 # Re-run installation script
-sudo /home/deon/dev/github/system-maintenance/install.sh
+sudo system-maintenance/install.sh
 ```
 
 ---

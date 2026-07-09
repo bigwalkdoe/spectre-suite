@@ -41,19 +41,19 @@ docker exec guardrail-ai-postgres-1 psql -U postgres -d guardrail -c "SELECT cou
 
 ```bash
 # 1. Provision new instance via Terraform
-cd /home/deon/dev/github/system-maintenance/cloud-deployment/terraform
+cd system-maintenance/cloud-deployment/terraform
 terraform plan
 terraform apply
 
 # 2. Run Ansible to reconfigure
-cd /home/deon/dev/github/system-maintenance/cloud-deployment/ansible
+cd system-maintenance/cloud-deployment/ansible
 ansible-playbook -i inventory/production.yml playbook.yml
 
 # 3. Restore data from off-site backup
-/home/deon/scripts/backups/restore-from-remote.sh
+scripts/backups/restore-from-remote.sh
 
 # 4. Verify services
-/home/deon/scripts/healthcheck.sh
+scripts/healthcheck.sh
 ```
 
 ### 3. Docker Daemon Failure
@@ -68,10 +68,10 @@ tar -xzf /tmp/docker_configs_*.tar.gz -C /tmp/
 sudo cp /tmp/etc/docker/daemon.json /etc/docker/daemon.json
 
 # 3. Restart all containers
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml up -d
+docker-compose -f system-maintenance/docker-compose.monitoring.yml up -d
 
 # 4. Restore volumes from backup
-/home/deon/scripts/backups/restore-docker-volumes.sh
+scripts/backups/restore-docker-volumes.sh
 ```
 
 ### 4. Security Breach
@@ -82,19 +82,19 @@ sudo iptables -A INPUT -s <attacker_ip> -j DROP
 sudo fail2ban-client set sshd banip <attacker_ip>
 
 # 2. Run security scan
-/home/deon/scripts/security/run-trivy-scan.sh
-/home/deon/scripts/security/check-file-integrity.sh
+scripts/security/run-trivy-scan.sh
+scripts/security/check-file-integrity.sh
 
 # 3. Review logs
 sudo journalctl -u docker --since "24 hours ago" | grep -i error
 tail -100 /var/log/auth.log | grep -i "failed\|error\|unauthorized"
 
 # 4. Rotate credentials
-/home/deon/scripts/security/inject-secrets.sh
+scripts/security/inject-secrets.sh
 sudo systemctl restart all services
 
 # 5. Generate incident report
-/home/deon/scripts/security/generate-security-report.sh
+scripts/security/generate-security-report.sh
 ```
 
 ### 5. Disk Space Exhaustion
@@ -105,8 +105,8 @@ du -sh /* 2>/dev/null | sort -rh | head -10
 du -sh /var/log/* 2>/dev/null | sort -rh | head -10
 
 # 2. Clean up immediately
-/home/deon/scripts/maintenance/cleanup-system.sh
-/home/deon/scripts/maintenance/cleanup-logs.sh
+scripts/maintenance/cleanup-system.sh
+scripts/maintenance/cleanup-logs.sh
 
 # 3. Remove old Docker data
 docker system prune -af --volumes 2>/dev/null || true
@@ -126,21 +126,21 @@ fi
 
 ```bash
 # 1. Check container status
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml ps
+docker-compose -f system-maintenance/docker-compose.monitoring.yml ps
 
 # 2. Restart individual services
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml restart prometheus
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml restart grafana
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml restart alertmanager
+docker-compose -f system-maintenance/docker-compose.monitoring.yml restart prometheus
+docker-compose -f system-maintenance/docker-compose.monitoring.yml restart grafana
+docker-compose -f system-maintenance/docker-compose.monitoring.yml restart alertmanager
 
 # 3. If config is corrupted, restore from git
-cd /home/deon/dev/github/system-maintenance
+cd system-maintenance
 git checkout -- prometheus/prometheus.yml
 git checkout -- docker-compose.monitoring.yml
 
 # 4. Full restart
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml down
-docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monitoring.yml up -d
+docker-compose -f system-maintenance/docker-compose.monitoring.yml down
+docker-compose -f system-maintenance/docker-compose.monitoring.yml up -d
 ```
 
 ---
@@ -151,7 +151,7 @@ docker-compose -f /home/deon/dev/github/system-maintenance/docker-compose.monito
 
 ```bash
 # Step 1: Provision infrastructure
-cd /home/deon/dev/github/system-maintenance/cloud-deployment
+cd system-maintenance/cloud-deployment
 ./deploy.sh aws production 2
 
 # Step 2: Restore configuration
@@ -159,16 +159,16 @@ scp -r user@backup-server:/backups/configurations/latest/ /tmp/config-restore/
 sudo cp -r /tmp/config-restore/* /
 
 # Step 3: Restore databases
-/home/deon/scripts/backups/restore-databases.sh
+scripts/backups/restore-databases.sh
 
 # Step 4: Restore Docker volumes
-/home/deon/scripts/backups/restore-docker-volumes.sh
+scripts/backups/restore-docker-volumes.sh
 
 # Step 5: Start services
 docker-compose -f docker-compose.monitoring.yml up -d
 
 # Step 6: Verify
-/home/deon/scripts/healthcheck.sh
+scripts/healthcheck.sh
 ```
 
 ### Backup Verification Procedure
