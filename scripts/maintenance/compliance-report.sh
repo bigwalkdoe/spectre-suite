@@ -4,7 +4,11 @@ set -euo pipefail
 # Compliance Report Script
 # Generates compliance reports for security and operational standards
 
-REPORT_DIR="/var/log/compliance"
+if [ -w "$(dirname /var/log/compliance 2>/dev/null)" ]; then
+    REPORT_DIR="/var/log/compliance"
+else
+    REPORT_DIR="/tmp/compliance"
+fi
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 TIMESTAMP_ISO=$(date -Iseconds)
 

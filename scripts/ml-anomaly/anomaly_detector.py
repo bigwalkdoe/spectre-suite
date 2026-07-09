@@ -19,16 +19,49 @@ from scipy import stats
 import joblib
 import argparse
 
+
+def _resolve_dir(env_var, default):
+    """Return an existing/writable dir, falling back to a temp location."""
+    path = os.environ.get(env_var, default)
+    try:
+        os.makedirs(path, exist_ok=True)
+        return path
+    except OSError:
+        fallback = os.path.join("/tmp", "ml-anomaly")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+
+ML_LOG_DIR = _resolve_dir("ML_LOG_DIR", "/var/log/ml-anomaly")
+ML_DATA_DIR = _resolve_dir("ML_DATA_DIR", "/var/lib/ml-anomaly")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/var/log/ml-anomaly/anomaly_detection.log'),
+        logging.FileHandler(os.path.join(ML_LOG_DIR, 'anomaly_detection.log')),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+def sanitize(obj):
+    """Recursively convert numpy types to native Python types for JSON."""
+    if isinstance(obj, dict):
+        return {k: sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize(v) for v in obj]
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return sanitize(obj.tolist())
+    return obj
 
 
 class SystemMetricsCollector:
@@ -144,7 +177,7 @@ class AnomalyDetector:
         self.model = None
         self.scaler = StandardScaler()
         self.is_trained = False
-        self.model_dir = '/var/lib/ml-anomaly/models'
+        self.model_dir = os.path.join(ML_DATA_DIR, 'models')
         os.makedirs(self.model_dir, exist_ok=True)
     
     def prepare_data(self, metrics_list):
@@ -374,6 +407,20 @@ class EnsembleAnomalyDetector:
         ]
         self.metrics_history = []
         self.max_history = 1000
+
+    @property
+    def is_trained(self):
+        return all(d.is_trained for d in self.detectors)
+
+    def load_model(self):
+        loaded_any = False
+        for d in self.detectors:
+            try:
+                if d.load_model():
+                    loaded_any = True
+            except Exception as e:
+                logger.error(f"Error loading {d.model_name}: {e}")
+        return loaded_any
     
     def train_all(self, metrics_list):
         """Train all detectors"""
@@ -430,7 +477,7 @@ class MetricsStorage:
     """Handles storage and retrieval of metrics data"""
     
     def __init__(self):
-        self.storage_dir = '/var/lib/ml-anomaly/metrics'
+        self.storage_dir = os.path.join(ML_DATA_DIR, 'metrics')
         os.makedirs(self.storage_dir, exist_ok=True)
     
     def save_metrics(self, metrics):
@@ -468,7 +515,7 @@ def main():
                        help='Number of training samples to use')
     parser.add_argument('--detector', choices=['isolation_forest', 'one_class_svm', 'statistical', 'ensemble'],
                         default='ensemble', help='Anomaly detection method')
-    parser.add_argument('--output', default='/var/log/ml-anomaly/latest_detection.json',
+    parser.add_argument('--output', default=os.path.join(ML_LOG_DIR, 'latest_detection.json'),
                         help='Path to write the anomaly report JSON')
     
     args = parser.parse_args()
@@ -537,14 +584,20 @@ def main():
         result = detector.detect_anomalies(current_metrics)
         
         # Persist latest report for the fix engine / exporter
+        output_path = args.output
         try:
-            with open(args.output, 'w') as f:
-                json.dump(result, f, indent=2)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        except OSError:
+            output_path = os.path.join("/tmp", "ml-anomaly", "latest_detection.json")
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        try:
+            with open(output_path, 'w') as f:
+                json.dump(sanitize(result), f, indent=2)
         except Exception as e:
             logger.error(f"Failed to persist detection report: {e}")
         
         # Output results
-        print(json.dumps(result, indent=2))
+        print(json.dumps(sanitize(result), indent=2))
         
         # Log if anomaly detected
         if result.get('is_anomaly'):
@@ -578,7 +631,7 @@ def main():
                 # Persist latest report for the fix engine / exporter
                 try:
                     with open('/var/log/ml-anomaly/latest_detection.json', 'w') as f:
-                        json.dump(result, f, indent=2)
+                        json.dump(sanitize(result), f, indent=2)
                 except Exception as e:
                     logger.error(f"Failed to persist detection report: {e}")
                 

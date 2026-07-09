@@ -10,7 +10,7 @@ PING_TIMEOUT=3
 PING_COUNT=3
 
 log() {
-    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE"
+    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" || true
 }
 
 # Check internet connectivity
