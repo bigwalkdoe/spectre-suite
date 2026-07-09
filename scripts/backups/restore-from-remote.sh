@@ -12,11 +12,11 @@ LOG_FILE="/var/log/remote-restore.log"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE" || true
 }
 
 error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" | tee -a "$LOG_FILE" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" | tee -a "$LOG_FILE" || true >&2
 }
 
 # List available backups on remote server

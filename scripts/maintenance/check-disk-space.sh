@@ -11,7 +11,7 @@ LOG_FILE="/var/log/disk-space-check.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 log() {
-    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE"
+    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" || true
 }
 
 # Get disk usage for a mount point

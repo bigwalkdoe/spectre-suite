@@ -8,11 +8,11 @@ LOG_FILE="/var/log/network-security.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 log() {
-    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE"
+    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" || true
 }
 
 error() {
-    echo "[$TIMESTAMP] ERROR: $1" | tee -a "$LOG_FILE" >&2
+    echo "[$TIMESTAMP] ERROR: $1" | tee -a "$LOG_FILE" || true >&2
 }
 
 # Check if running as root
