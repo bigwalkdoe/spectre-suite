@@ -229,6 +229,7 @@ main() {
     # Run component tests
     run_test_suite "$SCRIPT_DIR/test_backup.sh" "Backup Script Tests"
     run_test_suite "$SCRIPT_DIR/test_security.sh" "Security Script Tests"
+    run_test_suite "$SCRIPT_DIR/test_ml.sh" "ML Anomaly + Fix Engine Tests"
     
     # Print summary
     echo "=========================================="
