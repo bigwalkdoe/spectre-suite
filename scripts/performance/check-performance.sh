@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Performance monitoring script
 
 THRESHOLD_CPU=80

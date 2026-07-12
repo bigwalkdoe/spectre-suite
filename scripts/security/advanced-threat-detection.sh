@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Advanced Threat Detection Script
 # Implements sophisticated threat detection and automated response
 

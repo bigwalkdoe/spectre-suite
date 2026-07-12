@@ -11,7 +11,7 @@
 #   OLLAMA_HOST=http://localhost:11434
 #   ML_FIX_WEBHOOK=http://localhost:9093/api/v1/alerts   (optional)
 
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
