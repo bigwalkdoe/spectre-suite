@@ -10,6 +10,10 @@ source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
 detect_distribution
+
+# Primary network interface for Suricata (override with SURICATA_INTERFACE)
+SURICATA_INTERFACE="${SURICATA_INTERFACE:-$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')}"
+SURICATA_INTERFACE="${SURICATA_INTERFACE:-eth0}"
 set_package_manager
 
 echo "Installing IDS/IPS for $DISTRO_NAME..."
@@ -222,6 +226,9 @@ suppress:
     sig_id: 2270010
 EOF'
     
+    # Replace the hardcoded eth0 with the detected primary interface
+    sudo sed -i "s/interface: eth0/interface: $SURICATA_INTERFACE/" "$config_file"
+    
     echo "Suricata configuration updated"
 }
 
@@ -310,6 +317,8 @@ RestartSec=10
 WantedBy=multi-user.target
 SERVICEEOF
     sudo mv /tmp/suricata.service /etc/systemd/system/suricata.service
+    # Replace the hardcoded eth0 with the detected primary interface
+    sudo sed -i "s/-i eth0/-i $SURICATA_INTERFACE/" /etc/systemd/system/suricata.service
     
     sudo systemctl daemon-reload
     sudo systemctl enable suricata
