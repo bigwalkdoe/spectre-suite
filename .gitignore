@@ -55,6 +55,9 @@ tmp/
 temp/
 *.tmp
 
+# Agent / tooling artifacts
+.qwen/
+
 # Terraform — state and overrides contain infrastructure secrets
 .terraform/
 *.tfstate

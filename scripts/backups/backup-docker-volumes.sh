@@ -1,8 +1,10 @@
 #!/bin/bash
+set -euo pipefail
+
 # Docker Volume Backup Script
 # Backs up critical Docker volumes
 
-BACKUP_DIR="/backups/docker-volumes"
+BACKUP_DIR="${BACKUP_DIR:-/backups/docker-volumes}"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
 
@@ -49,7 +51,7 @@ docker volume ls --format "{{.Name}}" | grep -E "(modelink|pharmaiq)" | while re
         -v "$volume":/volume_data \
         -v "$BACKUP_DIR":/backup \
         alpine tar czf "/backup/${volume_name}_$DATE.tar.gz" -C /volume_data .
-done
+done || true
 
 # Cleanup old backups
 echo "Cleaning up old volume backups (older than $RETENTION_DAYS days)..."

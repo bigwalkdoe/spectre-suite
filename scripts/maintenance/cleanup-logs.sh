@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Log Cleanup Script
 # Manages log rotation and cleanup
 

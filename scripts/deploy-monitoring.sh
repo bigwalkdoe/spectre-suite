@@ -3,7 +3,7 @@
 # System Maintenance Monitoring Stack Deployment Script
 # This script deploys Prometheus, Grafana, and related monitoring tools
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"

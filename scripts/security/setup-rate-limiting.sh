@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Setup API Rate Limiting with Docker
 
 echo "Setting up API rate limiting..."
