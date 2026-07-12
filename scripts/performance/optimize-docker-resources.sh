@@ -1,10 +1,14 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Docker Resource Optimization Script
 
 echo "Optimizing Docker container resource limits..."
 
 # Update docker-compose with resource limits for better performance
-cd /home/deon/projects/Guardrail-AI
+cd $PROJECTS_ROOT/Guardrail-AI
 
 # Check if current docker-compose has resource limits
 if ! grep -q "deploy:" docker-compose.yml; then

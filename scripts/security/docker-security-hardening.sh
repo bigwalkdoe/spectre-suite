@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Docker Container Security Hardening (Distribution-agnostic)
 
 # Source distribution detection
@@ -61,7 +62,7 @@ install_trivy() {
 
 # Create Docker security scan script
 create_docker_scan_script() {
-    local scan_dir="/home/deon/scripts/security"
+    local scan_dir="$SCRIPT_DIR/security"
     sudo mkdir -p "$scan_dir"
     
     cat > "$scan_dir/scan-docker-images.sh" << 'EOF'
@@ -101,7 +102,7 @@ echo "Creating Docker scan script..."
 create_docker_scan_script
 
 echo "Running Docker image vulnerability scan..."
-/home/deon/scripts/security/scan-docker-images.sh
+$SCRIPT_DIR/scan-docker-images.sh
 
 # Set up Docker security policies
 echo "Setting up Docker security policies..."

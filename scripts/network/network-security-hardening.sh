@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Network Security Hardening Script
 
 echo "Hardening network security..."

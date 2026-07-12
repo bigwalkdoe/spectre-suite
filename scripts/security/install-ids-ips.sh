@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # IDS/IPS Installation and Configuration Script
 # Supports Suricata (network IDS/IPS) and OSSEC (host-based IDS)
 

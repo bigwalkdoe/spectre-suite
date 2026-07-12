@@ -1,8 +1,12 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Multi-Server Management Script
 # Foundation for managing multiple servers from a central location
 
-SERVERS_FILE="/home/deon/github/system-maintenance/config/servers.conf"
+SERVERS_FILE="$REPO_ROOT/config/servers.conf"
 LOG_DIR="/var/log/multi-server"
 DATE=$(date +%Y%m%d_%H%M%S)
 
@@ -20,9 +24,9 @@ fi
 
 # Function to execute command on remote server
 execute_on_server() {
-    local server_name=$1
-    local ssh_user=$2
-    local ssh_host=$3
+    local server_name=${1:-}
+    local ssh_user=${2:-}
+    local ssh_host=${3:-}
     local ssh_port=$4
     local command=$5
     
@@ -32,9 +36,9 @@ execute_on_server() {
 
 # Function to check server health
 check_server_health() {
-    local server_name=$1
-    local ssh_user=$2
-    local ssh_host=$3
+    local server_name=${1:-}
+    local ssh_user=${2:-}
+    local ssh_host=${3:-}
     local ssh_port=$4
     
     echo "Checking health of $server_name..."
@@ -65,15 +69,15 @@ check_server_health() {
 
 # Function to deploy maintenance scripts to remote server
 deploy_maintenance_scripts() {
-    local server_name=$1
-    local ssh_user=$2
-    local ssh_host=$3
+    local server_name=${1:-}
+    local ssh_user=${2:-}
+    local ssh_host=${3:-}
     local ssh_port=$4
     
     echo "Deploying maintenance scripts to $server_name..."
     
     # Copy maintenance scripts directory
-    scp -P "$ssh_port" -r /home/deon/github/system-maintenance/scripts/ \
+    scp -P "$ssh_port" -r $REPO_ROOT/scripts/ \
         "$ssh_user@$ssh_host:/tmp/maintenance-scripts/"
     
     # Install scripts on remote server
@@ -110,9 +114,9 @@ check_all_servers() {
 
 # Function to sync backups from remote servers
 sync_remote_backups() {
-    local server_name=$1
-    local ssh_user=$2
-    local ssh_host=$3
+    local server_name=${1:-}
+    local ssh_user=${2:-}
+    local ssh_host=${3:-}
     local ssh_port=$4
     
     echo "Syncing backups from $server_name..."
@@ -125,14 +129,14 @@ sync_remote_backups() {
 }
 
 # Main menu
-case "$1" in
+case "${1:-}" in
     check-health)
-        if [ -n "$2" ]; then
+        if [ -n "${2:-}" ]; then
             # Check specific server
             while IFS=',' read -r name user host port; do
                 [[ "$name" =~ ^#.*$ ]] && continue
                 [[ -z "$name" ]] && continue
-                if [ "$name" = "$2" ]; then
+                if [ "$name" = "${2:-}" ]; then
                     check_server_health "$name" "$user" "$host" "$port"
                     break
                 fi
@@ -143,11 +147,11 @@ case "$1" in
         fi
         ;;
     deploy-scripts)
-        if [ -n "$2" ]; then
+        if [ -n "${2:-}" ]; then
             while IFS=',' read -r name user host port; do
                 [[ "$name" =~ ^#.*$ ]] && continue
                 [[ -z "$name" ]] && continue
-                if [ "$name" = "$2" ]; then
+                if [ "$name" = "${2:-}" ]; then
                     deploy_maintenance_scripts "$name" "$user" "$host" "$port"
                     break
                 fi
@@ -158,11 +162,11 @@ case "$1" in
         fi
         ;;
     sync-backups)
-        if [ -n "$2" ]; then
+        if [ -n "${2:-}" ]; then
             while IFS=',' read -r name user host port; do
                 [[ "$name" =~ ^#.*$ ]] && continue
                 [[ -z "$name" ]] && continue
-                if [ "$name" = "$2" ]; then
+                if [ "$name" = "${2:-}" ]; then
                     sync_remote_backups "$name" "$user" "$host" "$port"
                     break
                 fi
@@ -185,12 +189,12 @@ case "$1" in
         done < "$SERVERS_FILE"
         ;;
     add-server)
-        if [ -z "$4" ]; then
+        if [ -z "${4:-}" ]; then
             echo "Usage: $0 add-server <name> <user> <host> <port>"
             exit 1
         fi
-        echo "$1,$2,$3,$4" >> "$SERVERS_FILE"
-        echo "Server $1 added to configuration"
+        echo "${1:-},${2:-},${3:-},${4:-}" >> "$SERVERS_FILE"
+        echo "Server ${1:-} added to configuration"
         ;;
     *)
         echo "Multi-Server Management Script"

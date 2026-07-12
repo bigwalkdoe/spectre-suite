@@ -1,7 +1,11 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # PharmiQ Project Health Check Script
 
-PROJECT_DIR="/home/deon/projects/PharmiQ"
+PROJECT_DIR="$PROJECTS_ROOT/PharmiQ"
 HEALTH_LOG="/var/log/pharmiq-health.log"
 DATE=$(date +%Y%m%d_%H%M%S)
 

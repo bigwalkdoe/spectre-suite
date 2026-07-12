@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # System Cleanup Script
 # Performs regular system maintenance tasks (Distribution-agnostic)
 

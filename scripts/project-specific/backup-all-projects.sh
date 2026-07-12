@@ -1,4 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Multi-Project Backup Orchestration Script
 
 BACKUP_LOG="/var/log/project-backups.log"
@@ -10,18 +14,24 @@ echo "==========================================" >> "$BACKUP_LOG"
 
 # Run Guardrail-AI backup
 echo "Running Guardrail-AI backup..." >> "$BACKUP_LOG"
-/home/deon/github/system-maintenance/scripts/backups/backup-projects.sh >> "$BACKUP_LOG" 2>&1
+set +e
+$REPO_ROOT/scripts/backups/backup-projects.sh >> "$BACKUP_LOG" 2>&1
 GUARDRAIL_STATUS=$?
+set -e
 
 # Run Modelink backup
 echo "Running Modelink backup..." >> "$BACKUP_LOG"
-/home/deon/github/system-maintenance/scripts/project-specific/backup-modelink.sh >> "$BACKUP_LOG" 2>&1
+set +e
+$REPO_ROOT/scripts/project-specific/backup-modelink.sh >> "$BACKUP_LOG" 2>&1
 MODELINK_STATUS=$?
+set -e
 
 # Run PharmiQ backup  
 echo "Running PharmiQ backup..." >> "$BACKUP_LOG"
-/home/deon/github/system-maintenance/scripts/project-specific/backup-pharmiq.sh >> "$BACKUP_LOG" 2>&1
+set +e
+$REPO_ROOT/scripts/project-specific/backup-pharmiq.sh >> "$BACKUP_LOG" 2>&1
 PHARMIQ_STATUS=$?
+set -e
 
 # Generate summary
 echo "==========================================" >> "$BACKUP_LOG"

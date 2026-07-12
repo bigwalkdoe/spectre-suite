@@ -1,10 +1,14 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # API Security Hardening Script
 
 echo "Hardening API security configurations..."
 
 # Check Guardrail-AI API configuration
-GUARDRAIL_DIR="/home/deon/projects/Guardrail-AI"
+GUARDRAIL_DIR="$PROJECTS_ROOT/Guardrail-AI"
 
 if [ -d "$GUARDRAIL_DIR" ]; then
     echo "Configuring API security for Guardrail-AI..."
@@ -35,7 +39,7 @@ EOF
 fi
 
 # Create API rate limiting configuration for Docker services
-cat > /home/deon/scripts/security/setup-rate-limiting.sh << 'EOF'
+cat > $SCRIPT_DIR/setup-rate-limiting.sh << 'EOF'
 #!/bin/bash
 # Setup API Rate Limiting with Docker
 
@@ -62,19 +66,19 @@ fi
 echo "API rate limiting setup completed!"
 EOF
 
-chmod +x /home/deon/scripts/security/setup-rate-limiting.sh
+chmod +x $SCRIPT_DIR/setup-rate-limiting.sh
 
 # Run rate limiting setup
-/home/deon/scripts/security/setup-rate-limiting.sh
+$SCRIPT_DIR/setup-rate-limiting.sh
 
 # Create API monitoring script
-cat > /home/deon/scripts/security/monitor-api-security.sh << 'EOF'
+cat > $SCRIPT_DIR/monitor-api-security.sh << 'EOF'
 #!/bin/bash
 # API Security Monitoring Script
 
-SECURITY_LOG="/home/deon/.local/share/api-security.log"
+SECURITY_LOG="$HOME/.local/share/api-security.log"
 DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p /home/deon/.local/share
+mkdir -p $HOME/.local/share
 
 echo "==========================================" >> "$SECURITY_LOG"
 echo "API Security Monitor - $DATE" >> "$SECURITY_LOG"
@@ -95,7 +99,7 @@ sudo fail2ban-client status nginx-limit 2>/dev/null || echo "nginx-limit jail no
 echo "API security monitoring completed: $DATE" >> "$SECURITY_LOG"
 EOF
 
-chmod +x /home/deon/scripts/security/monitor-api-security.sh
+chmod +x $SCRIPT_DIR/monitor-api-security.sh
 
 echo "API security hardening completed!"
 logger -p user.info "API security hardening completed"

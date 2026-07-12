@@ -1,11 +1,15 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Modelink Project Backup Script
 # Custom backup configuration for Modelink project
 
 BACKUP_DIR="/backups/projects/modelink"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=14
-PROJECT_DIR="/home/deon/projects/Modelink"
+PROJECT_DIR="$PROJECTS_ROOT/Modelink"
 
 mkdir -p "$BACKUP_DIR"
 
@@ -46,7 +50,6 @@ fi
 echo "Backing up Modelink configuration files..."
 tar czf "$BACKUP_DIR/modelink-config_$DATE.tar.gz" \
     -C "$PROJECT_DIR" \
-    .env \
     docker-compose.yml \
     nginx.conf \
     k8s/ 2>/dev/null || true
