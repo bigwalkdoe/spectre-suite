@@ -1,4 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Grafana Dashboard Setup Script
 
 GRAFANA_URL="http://localhost:3002"
@@ -35,7 +39,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 # Import System Monitoring Dashboard
 echo "Importing System Monitoring Dashboard..."
-SYSTEM_DASHBOARD=$(cat /home/deon/github/system-maintenance/grafana-dashboards/system-monitoring.json)
+SYSTEM_DASHBOARD=$(cat $REPO_ROOT/grafana-dashboards/system-monitoring.json)
 curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"dashboard\":${SYSTEM_DASHBOARD},\"overwrite\":true,\"message\":\"Imported via script\"}" \
   "${GRAFANA_URL}/api/dashboards/db" \
@@ -43,7 +47,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 # Import PostgreSQL Monitoring Dashboard
 echo "Importing PostgreSQL Monitoring Dashboard..."
-POSTGRES_DASHBOARD=$(cat /home/deon/github/system-maintenance/grafana-dashboards/postgresql-monitoring.json)
+POSTGRES_DASHBOARD=$(cat $REPO_ROOT/grafana-dashboards/postgresql-monitoring.json)
 curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"dashboard\":${POSTGRES_DASHBOARD},\"overwrite\":true,\"message\":\"Imported via script\"}" \
   "${GRAFANA_URL}/api/dashboards/db" \
@@ -51,7 +55,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 # Import Redis Monitoring Dashboard
 echo "Importing Redis Monitoring Dashboard..."
-REDIS_DASHBOARD=$(cat /home/deon/github/system-maintenance/grafana-dashboards/redis-monitoring.json)
+REDIS_DASHBOARD=$(cat $REPO_ROOT/grafana-dashboards/redis-monitoring.json)
 curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"dashboard\":${REDIS_DASHBOARD},\"overwrite\":true,\"message\":\"Imported via script\"}" \
   "${GRAFANA_URL}/api/dashboards/db" \

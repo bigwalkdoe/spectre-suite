@@ -1,4 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Main Security Orchestration Script
 
 SECURITY_LOG="/var/log/security-hardening.log"
@@ -9,27 +13,35 @@ echo "Security Hardening - $DATE" >> "$SECURITY_LOG"
 echo "==========================================" >> "$SECURITY_LOG"
 
 # Make scripts executable
-chmod +x /home/deon/scripts/security/*.sh
+chmod +x $SCRIPT_DIR/*.sh
 
 # Run dependency vulnerability scanning
 echo "Running dependency vulnerability scanning..." >> "$SECURITY_LOG"
-/home/deon/scripts/security/scan-dependencies.sh >> "$SECURITY_LOG" 2>&1
+set +e
+$SCRIPT_DIR/scan-dependencies.sh >> "$SECURITY_LOG" 2>&1
 DEP_STATUS=$?
+set -e
 
 # Run Docker security hardening
 echo "Running Docker security hardening..." >> "$SECURITY_LOG"
-sudo /home/deon/scripts/security/docker-security-hardening.sh >> "$SECURITY_LOG" 2>&1
+set +e
+sudo $SCRIPT_DIR/docker-security-hardening.sh >> "$SECURITY_LOG" 2>&1
 DOCKER_STATUS=$?
+set -e
 
 # Run API security hardening
 echo "Running API security hardening..." >> "$SECURITY_LOG"
-/home/deon/scripts/security/api-security-hardening.sh >> "$SECURITY_LOG" 2>&1
+set +e
+$SCRIPT_DIR/api-security-hardening.sh >> "$SECURITY_LOG" 2>&1
 API_STATUS=$?
+set -e
 
 # Run API security monitoring
 echo "Running API security monitoring..." >> "$SECURITY_LOG"
-/home/deon/scripts/security/monitor-api-security.sh >> "$SECURITY_LOG" 2>&1
+set +e
+$SCRIPT_DIR/monitor-api-security.sh >> "$SECURITY_LOG" 2>&1
 MONITOR_STATUS=$?
+set -e
 
 # Generate summary
 echo "==========================================" >> "$SECURITY_LOG"

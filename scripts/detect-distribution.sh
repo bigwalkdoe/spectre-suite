@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Distribution Detection Script
 # Detects the Linux distribution and sets appropriate package manager and paths
 

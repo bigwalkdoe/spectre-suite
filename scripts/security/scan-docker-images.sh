@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Docker Image Vulnerability Scanner
 
 echo "Scanning Docker images for vulnerabilities..."

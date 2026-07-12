@@ -1,4 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Application Dependency Vulnerability Scanner
 
 echo "Scanning application dependencies for vulnerabilities..."
@@ -47,12 +51,12 @@ scan_project() {
 }
 
 # Scan Guardrail-AI project
-scan_project "/home/deon/projects/Guardrail-AI"
+scan_project "$PROJECTS_ROOT/Guardrail-AI"
 
 # Scan Modelink project
-scan_project "/home/deon/projects/Modelink"
+scan_project "$PROJECTS_ROOT/Modelink"
 
 # Scan PharmiQ project
-scan_project "/home/deon/projects/PharmiQ"
+scan_project "$PROJECTS_ROOT/PharmiQ"
 
 echo "Dependency scanning completed!"

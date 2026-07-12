@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # System Health Check Script
 # Performs comprehensive system health analysis
 

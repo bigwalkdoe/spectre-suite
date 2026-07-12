@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Setup script for ML-based anomaly detection + free-LLM remediation.
 
 # Source distribution detection

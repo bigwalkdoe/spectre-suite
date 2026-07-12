@@ -1,13 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
+PROMETHEUS_CONTAINER="${PROMETHEUS_CONTAINER:-$PROMETHEUS_CONTAINER}"
+ALERTMANAGER_CONTAINER="${ALERTMANAGER_CONTAINER:-$ALERTMANAGER_CONTAINER}"
 # Notification Channels Setup Script
 
 echo "Setting up notification channels..."
 
 # Copy Alertmanager configuration to container
-docker cp /home/deon/github/system-maintenance/prometheus/alertmanager.yml guardrail-alertmanager:/etc/alertmanager/alertmanager.yml
+docker cp $REPO_ROOT/prometheus/alertmanager.yml $ALERTMANAGER_CONTAINER:/etc/alertmanager/alertmanager.yml
 
 # Restart Alertmanager to apply configuration
-docker restart guardrail-alertmanager
+docker restart $ALERTMANAGER_CONTAINER
 
 # Wait for Alertmanager to start
 echo "Waiting for Alertmanager to restart..."
@@ -15,10 +21,10 @@ sleep 10
 
 # Update Prometheus to use Alertmanager
 echo "Configuring Prometheus to use Alertmanager..."
-docker exec guardrail-ai-prometheus-1 sed -i 's/alertmanagers:/alertmanagers:\n    - static_configs:\n        - targets:\n            - alertmanager:9093/' /etc/prometheus/prometheus.yml
+docker exec $PROMETHEUS_CONTAINER sed -i 's/alertmanagers:/alertmanagers:\n    - static_configs:\n        - targets:\n            - alertmanager:9093/' /etc/prometheus/prometheus.yml
 
 # Restart Prometheus to apply Alertmanager configuration
-docker restart guardrail-ai-prometheus-1
+docker restart $PROMETHEUS_CONTAINER
 
 # Wait for Prometheus to restart
 echo "Waiting for Prometheus to restart..."

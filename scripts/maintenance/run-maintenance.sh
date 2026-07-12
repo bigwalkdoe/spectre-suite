@@ -1,4 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Main Maintenance Orchestration Script
 # Runs all maintenance tasks and generates reports
 
@@ -10,22 +14,28 @@ echo "Starting System Maintenance: $DATE" >> "$MAINTENANCE_LOG"
 echo "==========================================" >> "$MAINTENANCE_LOG"
 
 # Make scripts executable
-chmod +x /home/deon/scripts/maintenance/*.sh
+chmod +x $SCRIPT_DIR/*.sh
 
 # Run system cleanup
 echo "Running system cleanup..." >> "$MAINTENANCE_LOG"
-/home/deon/scripts/maintenance/cleanup-system.sh >> "$MAINTENANCE_LOG" 2>&1
+set +e
+$SCRIPT_DIR/cleanup-system.sh >> "$MAINTENANCE_LOG" 2>&1
 CLEANUP_STATUS=$?
+set -e
 
 # Run log cleanup
 echo "Running log cleanup..." >> "$MAINTENANCE_LOG"
-sudo /home/deon/scripts/maintenance/cleanup-logs.sh >> "$MAINTENANCE_LOG" 2>&1
+set +e
+sudo $SCRIPT_DIR/cleanup-logs.sh >> "$MAINTENANCE_LOG" 2>&1
 LOG_STATUS=$?
+set -e
 
 # Run health check
 echo "Running system health check..." >> "$MAINTENANCE_LOG"
-/home/deon/scripts/maintenance/system-health-check.sh >> "$MAINTENANCE_LOG" 2>&1
+set +e
+$SCRIPT_DIR/system-health-check.sh >> "$MAINTENANCE_LOG" 2>&1
 HEALTH_STATUS=$?
+set -e
 
 # Generate summary
 echo "==========================================" >> "$MAINTENANCE_LOG"

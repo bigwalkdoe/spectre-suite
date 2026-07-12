@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Comprehensive Security Integration Script
 # Integrates all security features into a unified security framework
 

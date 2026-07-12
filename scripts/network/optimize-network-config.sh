@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Network Configuration Optimization Script (Distribution-agnostic)
 
 # Source distribution detection

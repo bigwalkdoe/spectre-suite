@@ -1,9 +1,13 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Network Monitoring Script
 
-NETWORK_LOG="/home/deon/.local/share/network-monitor.log"
+NETWORK_LOG="$HOME/.local/share/network-monitor.log"
 DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p /home/deon/.local/share
+mkdir -p $HOME/.local/share
 
 echo "==========================================" >> "$NETWORK_LOG"
 echo "Network Monitor - $DATE" >> "$NETWORK_LOG"
@@ -46,7 +50,7 @@ echo "" >> "$NETWORK_LOG"
 
 # Check for suspicious connections
 echo "External Connections:" >> "$NETWORK_LOG"
-ss -tun | grep ESTABLISHED | awk '{print $5}' | cut -d':' -f1 | sort -u >> "$NETWORK_LOG"
+ss -tun | grep ESTABLISHED | awk '{print $5}' | cut -d':' -f1 | sort -u >> "$NETWORK_LOG" || true
 echo "" >> "$NETWORK_LOG"
 
 echo "Network monitoring completed: $DATE" >> "$NETWORK_LOG"

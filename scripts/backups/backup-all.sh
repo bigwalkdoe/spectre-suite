@@ -1,63 +1,78 @@
 #!/bin/bash
+set -euo pipefail
+
 # Main Backup Orchestration Script
 # Runs all backup scripts and generates a summary report
 
-BACKUP_LOG="/var/log/backup.log"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -n "${BACKUP_LOG:-}" ]]; then
+    :
+elif [[ -w /var/log ]]; then
+    BACKUP_LOG="/var/log/backup.log"
+else
+    BACKUP_LOG="${TMPDIR:-/tmp}/backup.log"
+fi
 DATE=$(date +%Y%m%d_%H%M%S)
 
-echo "==========================================" >> "$BACKUP_LOG"
-echo "Starting comprehensive backup: $DATE" >> "$BACKUP_LOG"
-echo "==========================================" >> "$BACKUP_LOG"
+{
+    echo "=========================================="
+    echo "Starting comprehensive backup: $DATE"
+    echo "=========================================="
+} >> "$BACKUP_LOG"
 
 # Make scripts executable
-chmod +x /home/deon/scripts/backups/*.sh
+chmod +x "$SCRIPT_DIR"/*.sh
 
-# Run database backups
-echo "Running database backups..." >> "$BACKUP_LOG"
-/home/deon/scripts/backups/backup-databases.sh >> "$BACKUP_LOG" 2>&1
-DB_STATUS=$?
+run_step() {
+    local name="$1"
+    shift
+    echo "Running $name..." >> "$BACKUP_LOG"
+    set +e
+    "$@" >> "$BACKUP_LOG" 2>&1
+    local status=$?
+    set -e
+    echo "$name exit status: $status" >> "$BACKUP_LOG"
+    return $status
+}
 
-# Run Docker volume backups
-echo "Running Docker volume backups..." >> "$BACKUP_LOG"
-/home/deon/scripts/backups/backup-docker-volumes.sh >> "$BACKUP_LOG" 2>&1
-VOL_STATUS=$?
+DB_STATUS=0; VOL_STATUS=0; CONFIG_STATUS=0; PROJECT_STATUS=0
 
-# Run configuration backups
-echo "Running configuration backups..." >> "$BACKUP_LOG"
-/home/deon/scripts/backups/backup-configurations.sh >> "$BACKUP_LOG" 2>&1
-CONFIG_STATUS=$?
+run_step "database backups" "$SCRIPT_DIR/backup-databases.sh" || DB_STATUS=$?
+run_step "Docker volume backups" "$SCRIPT_DIR/backup-docker-volumes.sh" || VOL_STATUS=$?
+run_step "configuration backups" "$SCRIPT_DIR/backup-configurations.sh" || CONFIG_STATUS=$?
 
 # Run project backups (daily only)
 DAY_OF_WEEK=$(date +%u)
 if [ "$DAY_OF_WEEK" = "7" ]; then  # Sunday
-    echo "Running weekly project backups..." >> "$BACKUP_LOG"
-    /home/deon/scripts/backups/backup-projects.sh >> "$BACKUP_LOG" 2>&1
-    PROJECT_STATUS=$?
+    run_step "weekly project backups" "$SCRIPT_DIR/backup-projects.sh" || PROJECT_STATUS=$?
 else
     echo "Skipping project backups (weekly only)" >> "$BACKUP_LOG"
     PROJECT_STATUS=0
 fi
 
 # Generate summary
-echo "==========================================" >> "$BACKUP_LOG"
-echo "Backup Summary - $DATE" >> "$BACKUP_LOG"
-echo "Database backups: $([ $DB_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
-echo "Volume backups: $([ $VOL_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
-echo "Configuration backups: $([ $CONFIG_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
-echo "Project backups: $([ $PROJECT_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
-echo "Total disk usage:" >> "$BACKUP_LOG"
-du -sh /backups >> "$BACKUP_LOG"
-echo "==========================================" >> "$BACKUP_LOG"
+{
+    echo "=========================================="
+    echo "Backup Summary - $DATE"
+    echo "Database backups: $([ $DB_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
+    echo "Volume backups: $([ $VOL_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
+    echo "Configuration backups: $([ $CONFIG_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
+    echo "Project backups: $([ $PROJECT_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
+    echo "Total disk usage:"
+    du -sh "${BACKUP_DIR:-/backups}" 2>/dev/null || true
+    echo "=========================================="
+} >> "$BACKUP_LOG"
 
 # Send notification if any backup failed
 if [ $DB_STATUS -ne 0 ] || [ $VOL_STATUS -ne 0 ] || [ $CONFIG_STATUS -ne 0 ] || [ $PROJECT_STATUS -ne 0 ]; then
-    logger -p user.error "Backup completed with errors - check $BACKUP_LOG"
-    if [ -n "$DISPLAY" ]; then
+    logger -p user.error "Backup completed with errors - check $BACKUP_LOG" 2>/dev/null || true
+    if [ -n "${DISPLAY:-}" ]; then
         notify-send "Backup Error" "Some backups failed - check logs" -u critical
     fi
 else
-    logger -p user.info "All backups completed successfully"
-    if [ -n "$DISPLAY" ]; then
+    logger -p user.info "All backups completed successfully" 2>/dev/null || true
+    if [ -n "${DISPLAY:-}" ]; then
         notify-send "Backup Complete" "All backups completed successfully"
     fi
 fi

@@ -1,9 +1,13 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # API Security Monitoring Script
 
-SECURITY_LOG="/home/deon/.local/share/api-security.log"
+SECURITY_LOG="$HOME/.local/share/api-security.log"
 DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p /home/deon/.local/share
+mkdir -p $HOME/.local/share
 
 echo "==========================================" >> "$SECURITY_LOG"
 echo "API Security Monitor - $DATE" >> "$SECURITY_LOG"

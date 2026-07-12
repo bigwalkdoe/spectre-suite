@@ -1,11 +1,15 @@
 #!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # PharmiQ Project Backup Script
 # Custom backup configuration for PharmiQ project
 
 BACKUP_DIR="/backups/projects/pharmiq"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=14
-PROJECT_DIR="/home/deon/projects/PharmiQ"
+PROJECT_DIR="$PROJECTS_ROOT/PharmiQ"
 
 mkdir -p "$BACKUP_DIR"
 
@@ -55,7 +59,6 @@ fi
 echo "Backing up PharmiQ configuration files..."
 tar czf "$BACKUP_DIR/pharmiq-config_$DATE.tar.gz" \
     -C "$PROJECT_DIR" \
-    .env \
     docker-compose.yml \
     nginx/ \
     k8s/ \
