@@ -11,6 +11,10 @@ source "$PROJECT_ROOT/detect-distribution.sh"
 detect_distribution
 set_package_manager
 
+# Primary network interface (override with NET_IFACE if needed)
+NET_IFACE="${NET_IFACE:-$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')}"
+NET_IFACE="${NET_IFACE:-eth0}"
+
 echo "Optimizing network configuration for $DISTRO_NAME..."
 
 # Set up optimized DNS settings
@@ -129,8 +133,8 @@ EOF'
         echo "Generic DNS configuration for unknown distribution..."
         # Try to use resolvconf if available
         if command -v resolvconf >/dev/null 2>&1; then
-            echo "nameserver 8.8.8.8" | sudo resolvconf -a eth0
-            echo "nameserver 8.8.4.4" | sudo resolvconf -a eth0
+            echo "nameserver 8.8.8.8" | sudo resolvconf -a "$NET_IFACE"
+            echo "nameserver 8.8.4.4" | sudo resolvconf -a "$NET_IFACE"
         fi
         ;;
 esac
