@@ -49,6 +49,12 @@ install_security_tools() {
 configure_fail2ban() {
     echo "Configuring Fail2Ban..."
     
+    # SSH auth log path differs by distribution
+    case "$DISTRO" in
+        rhel) AUTH_LOG="/var/log/secure" ;;
+        *)    AUTH_LOG="/var/log/auth.log" ;;
+    esac
+    
     sudo bash -c 'cat > /etc/fail2ban/jail.local << "EOF"
 [DEFAULT]
 bantime = 3600
@@ -81,7 +87,10 @@ enabled = true
 port = smtp,ssmtp
 logpath = /var/log/mail.log
 maxretry = 3
-EOF'
+ EOF'
+    
+    # Substitute the distro-aware SSH auth log path
+    sudo sed -i "s#logpath = /var/log/auth.log#logpath = $AUTH_LOG#" /etc/fail2ban/jail.local
     
     sudo systemctl enable fail2ban
     sudo systemctl start fail2ban
