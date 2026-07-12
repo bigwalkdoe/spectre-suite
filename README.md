@@ -10,7 +10,7 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 | **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter (HTTP/TCP/ICMP/DNS), business metrics, uptime monitoring, custom dashboards |
 | **Logging** | Centralized Loki stack, container log rotation, retention policies, log shipping to remote destinations |
 | **Security** | Fail2Ban brute force protection, AIDE file integrity, Wazuh HIDS, Trivy container scanning, SonarQube code analysis, OWASP ZAP web testing, OPA policy enforcement |
-| **Secrets** | Environment-based secret injection, HashiCorp Vault support, .env template with secure permissions |
+| **Secrets** | Environment-based secret injection, HashiCorp Vault support, .env template with secure permissions; **`.env`/secret files are excluded from all backup paths** |
 | **Network** | WireGuard VPN, network segmentation (internal/DMZ), DDoS protection, firewall hardening |
 | **CI/CD** | GitHub Actions workflows for syntax check, security scanning, DR test, load testing, multi-distro testing |
 | **DR** | RTO/RPO definitions, 10 incident runbooks, backup verification, DR testing schedule |
@@ -125,6 +125,34 @@ scripts/security/inject-secrets.sh
 scripts/security/vault-secrets.sh store database/postgres password mypass
 scripts/security/vault-secrets.sh get database/postgres password
 ```
+
+## Configuration & Portability
+
+All scripts are portable and fail-loud: every script uses `set -euo pipefail`,
+resolves its own location via `SCRIPT_DIR` (no hard-coded user paths), and honours
+the following environment overrides:
+
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `PROJECTS_ROOT` | `$HOME/projects` | Project backups, health checks, dependency scanning |
+| `PROJECTS_DIR` | `/home/deon/projects` | `backup-configurations.sh` (project config backup) |
+| `BACKUP_DIR` | `/backups/<type>` | All backup/restore scripts |
+| `LOG_FILE` | `/var/log/...` (falls back to `$TMPDIR`/`/tmp` if unwritable) | `restore-databases.sh` |
+| `POSTGRES_CONTAINER` | `guardrail-ai-postgres-1` | `backup-databases.sh` |
+| `REDIS_CONTAINER` | `guardrail-ai-redis-1` | `backup-databases.sh` |
+| `NEO4J_CONTAINER` | `guardrail-ai-neo4j-1` | `backup-databases.sh` |
+| `PROMETHEUS_CONTAINER` | `guardrail-ai-prometheus-1` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
+| `ALERTMANAGER_CONTAINER` | `guardrail-alertmanager` | `setup-notification-channels.sh` |
+
+`REPO_ROOT` is derived automatically from the script location and should not
+normally need overriding. Orchestrator scripts (`run-maintenance.sh`,
+`run-security-hardening.sh`, `backup-all.sh`, `backup-all-projects.sh`) run every
+step and report per-step status rather than aborting on the first failure.
+
+**Secrets in backups:** `.env` files, `secrets/` directories, and other credential
+material are deliberately excluded from `backup-configurations.sh`,
+`backup-projects.sh`, and the project-specific backups (`backup-modelink.sh`,
+`backup-pharmiq.sh`). Store credentials via the Secrets Management flow above.
 
 ## VPN & Network
 
