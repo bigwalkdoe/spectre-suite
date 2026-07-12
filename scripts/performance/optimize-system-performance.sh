@@ -27,13 +27,20 @@ else
 fi
 
 # Optimize I/O scheduler
+# Detect the root disk (override with IO_DEVICE if needed). NVMe/SSD benefit
+# from the 'deadline'/'none' scheduler. Set at runtime only — persisting across
+# reboots requires a udev rule, not sysctl.conf (which rejects this path).
 echo "Optimizing I/O scheduler..."
-if [ -f /sys/block/nvme0n1/queue/scheduler ]; then
-    CURRENT_SCHEDULER=$(cat /sys/block/nvme0n1/queue/scheduler)
-    echo "Current I/O scheduler: $CURRENT_SCHEDULER"
-    # noop or deadline is good for SSD/NVMe
-    echo deadline | sudo tee /sys/block/nvme0n1/queue/scheduler
-    echo "nvme0n1/queue/scheduler = deadline" | sudo tee -a /etc/sysctl.conf
+IO_DEVICE="${IO_DEVICE:-}"
+if [ -z "$IO_DEVICE" ]; then
+    IO_DEVICE=$(lsblk -ndo PKNAME "$(findmnt -n -o SOURCE / 2>/dev/null)" 2>/dev/null | xargs -r basename) || true
+fi
+if [ -n "$IO_DEVICE" ] && [ -f "/sys/block/$IO_DEVICE/queue/scheduler" ]; then
+    CURRENT_SCHEDULER=$(cat "/sys/block/$IO_DEVICE/queue/scheduler")
+    echo "Current I/O scheduler ($IO_DEVICE): $CURRENT_SCHEDULER"
+    echo deadline | sudo tee "/sys/block/$IO_DEVICE/queue/scheduler" || true
+else
+    echo "Could not determine a block device with a tunable scheduler; skipping I/O scheduler tuning"
 fi
 
 # Optimize network settings
@@ -43,11 +50,11 @@ sudo sysctl net.core.wmem_max=16777216
 sudo sysctl net.ipv4.tcp_rmem='4096 87380 16777216'
 sudo sysctl net.ipv4.tcp_wmem='4096 65536 16777216'
 
-echo "Network optimizations:
+echo "Network optimizations applied (via sysctl):
 - rmem_max: 16MB
 - wmem_max: 16MB
 - tcp_rmem: 4KB 85KB 16MB
-- tcp_wmem: 4KB 64KB 16MB" | sudo tee -a /etc/sysctl.conf
+- tcp_wmem: 4KB 64KB 16MB"
 
 # Increase file descriptor limits
 echo "Optimizing file descriptor limits..."
