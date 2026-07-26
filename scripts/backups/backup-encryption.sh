@@ -5,7 +5,7 @@ set -euo pipefail
 # Encrypts backup files before storage
 
 BACKUP_DIR="/backups"
-ENCRYPTION_KEY_FILE="${ENCRYPTION_KEY_FILE:-/etc/system-maintenance/backup-key}"
+ENCRYPTION_KEY_FILE="${ENCRYPTION_KEY_FILE:-/etc/spectre-system-maintenance/backup-key}"
 ENCRYPTION_ALGORITHM="${ENCRYPTION_ALGORITHM:-aes-256-cbc}"
 LOG_FILE="/var/log/backup-encryption.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')

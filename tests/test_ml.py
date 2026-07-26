@@ -65,7 +65,7 @@ class TestValidatePlan(unittest.TestCase):
     def test_allows_docker_restart_and_logrotate(self):
         plan = {"remediation_steps": [
             {"title": "docker", "command": "docker restart prometheus", "risk": "safe"},
-            {"title": "logrotate", "command": "logrotate /etc/logrotate.d/system-maintenance", "risk": "low"},
+            {"title": "logrotate", "command": "logrotate /etc/logrotate.d/spectre-system-maintenance", "risk": "low"},
         ]}
         out = ml_fix_engine.validate_plan(plan)
         self.assertTrue(all(s["auto_applicable"] for s in out))

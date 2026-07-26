@@ -5,10 +5,10 @@ After=network.target docker.service
 [Service]
 Type=oneshot
 User=root
-WorkingDirectory=/opt/system-maintenance
+WorkingDirectory=/opt/spectre-system-maintenance
 
 # Run the backup script
-ExecStart=/opt/system-maintenance/scripts/backups/backup-all.sh
+ExecStart=/opt/spectre-system-maintenance/scripts/backups/backup-all.sh
 
 # Environment variables
 Environment="BACKUP_RETENTION_DAYS=7"

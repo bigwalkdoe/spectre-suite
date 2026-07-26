@@ -44,8 +44,8 @@ pip3 install ansible
 # Clone system maintenance repository
 echo "Cloning system maintenance repository..."
 cd /opt
-git clone https://github.com/YOUR_USERNAME/system-maintenance.git
-cd system-maintenance
+git clone https://github.com/YOUR_USERNAME/spectre-system-maintenance.git
+cd spectre-system-maintenance
 
 # Run installation script
 echo "Running system maintenance installation..."
@@ -112,7 +112,7 @@ systemctl start security-scan.timer
 
 # Create cloud-specific configuration
 echo "Creating cloud-specific configuration..."
-cat > /etc/system-maintenance/cloud-config.yml << EOF
+cat > /etc/spectre-system-maintenance/cloud-config.yml << EOF
 cloud_deployment: true
 environment: $ENVIRONMENT
 provider: aws
@@ -123,8 +123,8 @@ EOF
 
 # Set up log rotation for cloud instances
 echo "Configuring log rotation..."
-cat > /etc/logrotate.d/system-maintenance << EOF
-/var/log/system-maintenance/*.log {
+cat > /etc/logrotate.d/spectre-system-maintenance << EOF
+/var/log/spectre-system-maintenance/*.log {
     daily
     rotate 7
     compress
@@ -144,7 +144,7 @@ if command -v aws >/dev/null 2>&1; then
     # Create backup script with S3 support
     cat > /usr/local/bin/backup-to-s3.sh << 'EOF'
 #!/bin/bash
-S3_BUCKET="s3://system-maintenance-backups-$(hostname)"
+S3_BUCKET="s3://spectre-system-maintenance-backups-$(hostname)"
 BACKUP_DIR="/backups"
 
 # Sync backups to S3
@@ -162,7 +162,7 @@ cat > /var/www/html/health.html << EOF
     <title>System Maintenance Health Check</title>
 </head>
 <body>
-    <h1>System Maintenance Suite - Health Check</h1>
+    <h1>Spectre System Maintenance Suite - Health Check</h1>
     <p>Status: <strong>OK</strong></p>
     <p>Environment: $ENVIRONMENT</p>
     <p>Instance: $(hostname)</p>
@@ -180,9 +180,9 @@ systemctl start nginx
 echo "Setting up cloud cron jobs..."
 cat > /etc/cron.d/cloud-maintenance << EOF
 # Cloud maintenance tasks
-0 2 * * * ubuntu /opt/system-maintenance/scripts/backups/backup-all.sh
-0 3 * * 0 ubuntu /opt/system-maintenance/scripts/maintenance/run-maintenance.sh
-0 4 * * 6 ubuntu /opt/system-maintenance/scripts/security/run-security-hardening.sh
+0 2 * * * ubuntu /opt/spectre-system-maintenance/scripts/backups/backup-all.sh
+0 3 * * 0 ubuntu /opt/spectre-system-maintenance/scripts/maintenance/run-maintenance.sh
+0 4 * * 6 ubuntu /opt/spectre-system-maintenance/scripts/security/run-security-hardening.sh
 0 5 * * * ubuntu /usr/local/bin/backup-to-s3.sh
 EOF
 
@@ -203,21 +203,21 @@ if command -v aws >/dev/null 2>&1; then
     INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
     
     aws cloudwatch put-metric-data \
-        --namespace SystemMaintenance \
+        --namespace SpectreSystemMaintenance \
         --metric-name CPUUsage \
         --value $CPU_USAGE \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
     
     aws cloudwatch put-metric-data \
-        --namespace SystemMaintenance \
+        --namespace SpectreSystemMaintenance \
         --metric-name MemoryUsage \
         --value $MEMORY_USAGE \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
     
     aws cloudwatch put-metric-data \
-        --namespace SystemMaintenance \
+        --namespace SpectreSystemMaintenance \
         --metric-name DiskUsage \
         --value $DISK_USAGE \
         --dimensions InstanceId=$INSTANCE_ID \
@@ -234,7 +234,7 @@ echo "*/5 * * * * ubuntu /usr/local/bin/cloud-monitor.sh" >> /etc/cron.d/cloud-m
 
 # Finalize
 echo "Initialization completed successfully!"
-echo "System Maintenance Suite is ready for use in $ENVIRONMENT environment."
+echo "Spectre System Maintenance Suite is ready for use in $ENVIRONMENT environment."
 echo ""
 echo "Access Points:"
 echo "  - Web Dashboard: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8081"

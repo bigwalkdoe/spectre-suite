@@ -80,7 +80,7 @@ variable "instance_count" {
 
 # Local variables
 locals {
-  project_name = "system-maintenance"
+  project_name = "spectre-system-maintenance"
   common_tags = {
     Project     = local.project_name
     Environment = var.environment
