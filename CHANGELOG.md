@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the system-maintenance project will be documented in this file.
+All notable changes to the spectre-system-maintenance project will be documented in this file.
 
 ## [1.0.0] - 2026-06-21
 

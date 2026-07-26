@@ -24,7 +24,7 @@ backup:
           host: localhost
           port: 5432
           user: postgres
-          password_file: /etc/system-maintenance/db-passwords
+          password_file: /etc/spectre-system-maintenance/db-passwords
         - name: cache
           type: redis
           host: localhost
@@ -42,7 +42,7 @@ backup:
       enabled: true
       paths:
         - /etc/nginx
-        - /etc/system-maintenance
+        - /etc/spectre-system-maintenance
         - /opt/application/config
     
     projects:
@@ -89,7 +89,7 @@ backup:
       smtp_server: smtp.example.com
       smtp_port: 587
       smtp_user: backup@example.com
-      smtp_password_file: /etc/system-maintenance/smtp-password
+      smtp_password_file: /etc/spectre-system-maintenance/smtp-password
     
     slack:
       enabled: false

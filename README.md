@@ -24,8 +24,8 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 ## Quick Start
 
 ```bash
-git clone https://github.com/bigwalkdoe/linux-system-maintenance-suite.git
-cd system-maintenance
+git clone https://github.com/bigwalkdoe/spectre-system-maintenance-suite.git
+cd spectre-system-maintenance
 
 # Full automated setup (recommended)
 sudo ./install.sh
@@ -38,7 +38,7 @@ bash scripts/setup-all-enhancements.sh
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    system-maintenance                        │
+│                spectre-system-maintenance                    │
 ├────────────┬──────────┬──────────┬──────────┬───────────────┤
 │ Monitoring │ Security │ Backups  │ Logging  │ Automation    │
 ├────────────┼──────────┼──────────┼──────────┼───────────────┤
@@ -214,7 +214,7 @@ Three GitHub Actions workflows:
 ## Project Structure
 
 ```
-system-maintenance/
+spectre-system-maintenance/
 ├── .github/workflows/       # CI/CD pipelines
 ├── cloud-deployment/        # Terraform + Ansible
 │   ├── terraform/           #    Infrastructure as code
@@ -281,7 +281,7 @@ scripts/security/opa/evaluate-policies.sh         # Policy audit
 
 # Monitoring
 docker-compose -f docker-compose.monitoring.yml up -d        # Start stack
-system-maintenance/prometheus/business-metrics-exporter.sh   # Export metrics
+spectre-system-maintenance/prometheus/business-metrics-exporter.sh   # Export metrics
 
 # Maintenance
 scripts/maintenance/audit-trail.sh                # Generate audit

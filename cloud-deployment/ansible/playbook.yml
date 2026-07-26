@@ -6,7 +6,7 @@
   hosts: all
   become: yes
   vars:
-    project_name: "system-maintenance"
+    project_name: "spectre-system-maintenance"
     installation_dir: "/opt/{{ project_name }}"
     backup_dir: "/backups"
     monitoring_enabled: true
@@ -192,14 +192,14 @@
     - name: Create cloud configuration
       template:
         src: templates/cloud-config.j2
-        dest: /etc/system-maintenance/cloud-config.yml
+        dest: /etc/spectre-system-maintenance/cloud-config.yml
         mode: '0644'
       when: cloud_deployment
 
     - name: Configure log rotation
       copy:
         content: |
-          /var/log/system-maintenance/*.log {
+          /var/log/spectre-system-maintenance/*.log {
               daily
               rotate 7
               compress
@@ -208,7 +208,7 @@
               notifempty
               create 0640 {{ ansible_user }} {{ ansible_user }}
           }
-        dest: /etc/logrotate.d/system-maintenance
+        dest: /etc/logrotate.d/spectre-system-maintenance
         mode: '0644'
 
     - name: Create health check script
@@ -321,7 +321,7 @@
           cloud_deployment: {{ cloud_deployment }}
           ansible_hostname: {{ ansible_hostname }}
           ansible_os_family: {{ ansible_os_family }}
-        dest: /etc/system-maintenance/deployment-status.yml
+        dest: /etc/spectre-system-maintenance/deployment-status.yml
         mode: '0644'
 
     - name: Display deployment summary

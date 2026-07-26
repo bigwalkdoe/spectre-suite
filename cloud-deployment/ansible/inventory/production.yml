@@ -35,8 +35,8 @@ production:
       availability_zone: us-east-1c
 
   vars:
-    project_name: system-maintenance
-    installation_dir: /opt/system-maintenance
+    project_name: spectre-system-maintenance
+    installation_dir: /opt/spectre-system-maintenance
     backup_dir: /backups
     database_backups_enabled: true
     disaster_recovery_enabled: true

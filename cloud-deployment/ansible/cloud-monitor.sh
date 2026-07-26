@@ -3,8 +3,8 @@
 # Collects and sends metrics to cloud provider monitoring services
 
 # Source configuration if available
-if [ -f /etc/system-maintenance/cloud-config.yml ]; then
-    eval $(yaml-to-bash /etc/system-maintenance/cloud-config.yml)
+if [ -f /etc/spectre-system-maintenance/cloud-config.yml ]; then
+    eval $(yaml-to-bash /etc/spectre-system-maintenance/cloud-config.yml)
 fi
 
 CLOUD_PROVIDER="${cloud_provider:-aws}"

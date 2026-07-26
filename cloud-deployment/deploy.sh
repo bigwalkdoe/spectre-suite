@@ -165,8 +165,8 @@ ${ENVIRONMENT}:
       environment: ${ENVIRONMENT}
       cloud_provider: ${DEPLOYMENT_TARGET}
   vars:
-    project_name: system-maintenance
-    installation_dir: /opt/system-maintenance
+    project_name: spectre-system-maintenance
+    installation_dir: /opt/spectre-system-maintenance
     backup_dir: /backups
 EOF
             fi
