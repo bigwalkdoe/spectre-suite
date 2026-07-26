@@ -3,7 +3,7 @@ set -euo pipefail
 # System Maintenance Installation Script
 
 echo "==================================="
-echo "System Maintenance Installation"
+echo "Spectre System Maintenance Installation"
 echo "==================================="
 
 # Check if running as root
