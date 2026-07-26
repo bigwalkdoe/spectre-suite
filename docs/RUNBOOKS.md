@@ -61,7 +61,7 @@ docker system prune -af
 find /var/log -name "*.gz" -mtime +7 -delete
 
 # Check log rotation
-sudo logrotate -f /etc/logrotate.d/system-maintenance
+sudo logrotate -f /etc/logrotate.d/spectre-system-maintenance
 sudo logrotate -f /etc/logrotate.d/docker-containers
 
 # Archive old backups
@@ -309,17 +309,17 @@ diff <(cat /etc/docker/daemon.json) <(echo '{"live-restore":true}')
 **Resolution:**
 ```bash
 # Restore from version control
-cd system-maintenance
+cd spectre-system-maintenance
 git status
 git diff prometheus/prometheus.yml
 git checkout -- prometheus/prometheus.yml
 
 # Re-apply via Ansible
-cd system-maintenance/cloud-deployment/ansible
+cd spectre-system-maintenance/cloud-deployment/ansible
 ansible-playbook -i inventory/production.yml playbook.yml --tags config
 
 # Re-run installation script
-sudo system-maintenance/install.sh
+sudo spectre-system-maintenance/install.sh
 ```
 
 ---

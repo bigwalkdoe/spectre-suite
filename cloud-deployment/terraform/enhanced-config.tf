@@ -201,7 +201,7 @@ resource "aws_wafv2_web_acl" "main" {
   count = var.deployment_target == "aws" ? 1 : 0
 
   name        = "${local.project_name}-waf"
-  description = "WAF for system-maintenance services"
+  description = "WAF for spectre-system-maintenance services"
   scope       = "REGIONAL"
 
   default_action {

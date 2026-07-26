@@ -23,6 +23,6 @@ staging:
       cloud_provider: aws
 
   vars:
-    project_name: system-maintenance
-    installation_dir: /opt/system-maintenance
+    project_name: spectre-system-maintenance
+    installation_dir: /opt/spectre-system-maintenance
     backup_dir: /backups
