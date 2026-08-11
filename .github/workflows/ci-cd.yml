@@ -92,6 +92,7 @@ jobs:
     needs: syntax-check
     permissions:
       security-events: write
+      contents: read  # Required for repository access
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
