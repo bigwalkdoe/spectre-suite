@@ -117,7 +117,7 @@ services:
     ports:
       - "9187:9187"
     environment:
-      - DATA_SOURCE_NAME=${POSTGRES_EXPORTER_DSN:postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable}
+      - DATA_SOURCE_NAME=${POSTGRES_EXPORTER_DSN:-postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable}
     restart: unless-stopped
     networks:
       - monitoring
