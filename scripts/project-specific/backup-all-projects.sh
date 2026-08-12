@@ -26,25 +26,17 @@ $REPO_ROOT/scripts/project-specific/backup-modelink.sh >> "$BACKUP_LOG" 2>&1
 MODELINK_STATUS=$?
 set -e
 
-# Run PharmiQ backup  
-echo "Running PharmiQ backup..." >> "$BACKUP_LOG"
-set +e
-$REPO_ROOT/scripts/project-specific/backup-pharmiq.sh >> "$BACKUP_LOG" 2>&1
-PHARMIQ_STATUS=$?
-set -e
-
 # Generate summary
 echo "==========================================" >> "$BACKUP_LOG"
 echo "Project Backup Summary - $DATE" >> "$BACKUP_LOG"
 echo "Guardrail-AI: $([ $GUARDRAIL_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
 echo "Modelink: $([ $MODELINK_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
-echo "PharmiQ: $([ $PHARMIQ_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$BACKUP_LOG"
 echo "Total disk usage:" >> "$BACKUP_LOG"
 du -sh /backups/projects >> "$BACKUP_LOG"
 echo "==========================================" >> "$BACKUP_LOG"
 
 # Send notification if any backup failed
-if [ $GUARDRAIL_STATUS -ne 0 ] || [ $MODELINK_STATUS -ne 0 ] || [ $PHARMIQ_STATUS -ne 0 ]; then
+if [ $GUARDRAIL_STATUS -ne 0 ] || [ $MODELINK_STATUS -ne 0 ]; then
     logger -p user.error "Project backup completed with errors - check $BACKUP_LOG"
     if [ -n "$DISPLAY" ]; then
         notify-send "Project Backup Error" "Some project backups failed - check logs" -u critical
