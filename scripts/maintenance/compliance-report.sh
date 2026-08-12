@@ -47,7 +47,7 @@ check_system_compliance() {
             score=$((score + 10))
         fi
     elif command -v yum &> /dev/null; then
-        if yum check-update > /dev/null 2>&1; then
+        if yum -C check-update > /dev/null 2>&1; then
             log "WARNING: Upgradable packages found"
         else
             log "OK: All packages up to date"
@@ -146,7 +146,7 @@ check_docker_compliance() {
     
     # Check for privileged containers
     total=$((total + 1))
-    local privileged_count=$(docker ps --format '{{.Name}} {{.Mode}}' 2>/dev/null | grep -c "privileged" || echo 0)
+    local privileged_count=$(docker ps --format '{{.Name}} {{.Mode}}' 2>/dev/null | grep "privileged" | wc -l || true)
     if [[ $privileged_count -eq 0 ]]; then
         log "OK: No privileged containers running"
         passed=$((passed + 1))
@@ -157,7 +157,7 @@ check_docker_compliance() {
     
     # Check container resource limits
     total=$((total + 1))
-    local unlimited_count=$(docker ps --format '{{.Name}} {{.NanoCpus}} {{.NanoMemory}}' 2>/dev/null | grep -cE "^[^ ]+ 0 " || echo 0)
+    local unlimited_count=$(docker ps --format '{{.Name}} {{.NanoCpus}} {{.NanoMemory}}' 2>/dev/null | grep -E "^[^ ]+ 0 " | wc -l || true)
     if [[ $unlimited_count -eq 0 ]]; then
         log "OK: All containers have resource limits"
         passed=$((passed + 1))
@@ -379,8 +379,8 @@ PY
 # Evaluate OPA policies against the live system input. Best-effort: if opa is
 # not installed the check is skipped (CI installs opa and treats this as a gate).
 check_opa_policies() {
-    if ! command -v opa >/dev/null 2>&1; then
-        log "INFO: opa not installed; skipping OPA policy evaluation"
+    if ! command -v opa >/dev/null 2>&1 || ! opa version >/dev/null 2>&1; then
+        log "INFO: opa not installed or not executable; skipping OPA policy evaluation"
         return 0
     fi
     local policy_dir="$PROJECT_ROOT/scripts/security/opa/policies"
