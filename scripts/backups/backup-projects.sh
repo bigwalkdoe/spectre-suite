@@ -17,7 +17,6 @@ echo "Backing up project directories..."
 PROJECTS=(
     "$PROJECTS_ROOT/Guardrail-AI"
     "$PROJECTS_ROOT/Modelink"
-    "$PROJECTS_ROOT/PharmiQ"
 )
 
 for project in "${PROJECTS[@]}"; do

@@ -152,7 +152,7 @@ step and report per-step status rather than aborting on the first failure.
 **Secrets in backups:** `.env` files, `secrets/` directories, and other credential
 material are deliberately excluded from `backup-configurations.sh`,
 `backup-projects.sh`, and the project-specific backups (`backup-modelink.sh`,
-`backup-pharmiq.sh`). Store credentials via the Secrets Management flow above.
+). Store credentials via the Secrets Management flow above.
 
 ## VPN & Network
 

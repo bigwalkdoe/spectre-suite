@@ -340,7 +340,7 @@ PROMETHEUS_TEXTFILE="/var/lib/node_exporter/textfile_collector/ids_alerts.prom"
 
 # Monitor Suricata alerts
 if [ -f "$LOG_FILE" ]; then
-    ALERT_COUNT=$(tail -100 "$LOG_FILE" | grep -c " \[**\] " || echo 0)
+    ALERT_COUNT=$(tail -100 "$LOG_FILE" | grep " \[**\] " | wc -l || true)
     
     cat > "$PROMETHEUS_TEXTFILE.$$" << EOFPROM
 # HELP ids_alerts_total Total number of IDS alerts
