@@ -137,9 +137,9 @@ generate_report() {
     
     # Log summary statistics
     local total_events=$(wc -l < "$AUDIT_LOG" 2>/dev/null || echo 0)
-    local auth_events=$(grep -c "^AUTH:" "$AUDIT_LOG" 2>/dev/null || echo 0)
-    local sudo_events=$(grep -c "^SUDO:" "$AUDIT_LOG" 2>/dev/null || echo 0)
-    local security_events=$(grep -c "^SECURITY:" "$AUDIT_LOG" 2>/dev/null || echo 0)
+    local auth_events=$(grep "^AUTH:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
+    local sudo_events=$(grep "^SUDO:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
+    local security_events=$(grep "^SECURITY:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
     
     log "Total Events: $total_events"
     log "Authentication Events: $auth_events"

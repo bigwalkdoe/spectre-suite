@@ -278,7 +278,7 @@ METRICS_FILE="/var/lib/node_exporter/textfile_collector/security_metrics.prom"
 
 # Get security metrics
 fail2ban_banned=$(sudo fail2ban-client status sshd 2>/dev/null | grep "Banned IP list" | awk -F: '{print $2}' | wc -w)
-aide_alerts=$(sudo aide --check 2>&1 | grep -c "added\|removed\|changed" 2>/dev/null || echo 0)
+aide_alerts=$(sudo aide --check 2>&1 | grep "added\|removed\|changed" | wc -l || true)
 last_security_scan=$(stat -c %Y /var/log/security-integration/monitor.log 2>/dev/null || echo 0)
 
 cat > "$METRICS_FILE.$$" << EOF

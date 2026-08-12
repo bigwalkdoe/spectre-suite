@@ -56,7 +56,6 @@ scan_project "$PROJECTS_ROOT/Guardrail-AI"
 # Scan Modelink project
 scan_project "$PROJECTS_ROOT/Modelink"
 
-# Scan PharmiQ project
-scan_project "$PROJECTS_ROOT/PharmiQ"
+
 
 echo "Dependency scanning completed!"
