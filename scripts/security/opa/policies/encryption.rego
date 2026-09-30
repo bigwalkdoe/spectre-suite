@@ -1,36 +1,31 @@
 package security.encryption
 
-# Encryption at rest must be enabled
-encryption_at_rest_enabled = true
+import rego.v1
 
-rule if {
-    input.encryption_at_rest_enabled == true
+# Encryption policy
+deny contains msg if {
+    not input.encryption_at_rest_enabled == true
+    msg := "encryption: encryption at rest is not enabled"
 }
 
-# Encryption in transit must be enabled
-encryption_in_transit_enabled = true
-
-rule if {
-    input.encryption_in_transit_enabled == true
+deny contains msg if {
+    not input.encryption_in_transit_enabled == true
+    msg := "encryption: encryption in transit is not enabled"
 }
 
-# TLS must be configured for all services
-tls_configured = true
-
-rule if {
-    input.tls_configured == true
+deny contains msg if {
+    not input.tls_configured == true
+    msg := "encryption: TLS is not configured for all services"
 }
 
-# Certificate expiration must be monitored
-certificate_monitoring_enabled = true
-
-rule if {
-    input.certificate_monitoring_enabled == true
+deny contains msg if {
+    not input.certificate_monitoring_enabled == true
+    msg := "encryption: certificate expiry is not monitored"
 }
 
-# Key rotation must be performed regularly
-key_rotation_enabled = true
-
-rule if {
-    input.key_rotation_enabled == true
+deny contains msg if {
+    not input.key_rotation_enabled == true
+    msg := "encryption: key rotation is not performed"
 }
+
+# Total controls evaluated for security.encryption: 5

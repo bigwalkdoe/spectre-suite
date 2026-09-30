@@ -4,7 +4,9 @@
 
 # Source configuration if available
 if [ -f /etc/spectre-system-maintenance/cloud-config.yml ]; then
-    eval $(yaml-to-bash /etc/spectre-system-maintenance/cloud-config.yml)
+    yaml-to-bash /etc/spectre-system-maintenance/cloud-config.yml > /tmp/cloud-config.env
+    # shellcheck disable=SC1091  # generated at runtime
+    . /tmp/cloud-config.env
 fi
 
 CLOUD_PROVIDER="${cloud_provider:-aws}"
@@ -27,7 +29,6 @@ collect_metrics() {
     
     # Docker status
     DOCKER_CONTAINERS=$(docker ps --format "{{.Names}}" | wc -l)
-    DOCKER_RUNNING=$(docker ps --format "{{.Names}}" | wc -l)
     
     # Backup status
     BACKUP_STATUS=$(systemctl is-active backup.timer)
@@ -54,46 +55,46 @@ send_to_cloudwatch() {
         INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "unknown")
         
         # Parse metrics
-        CPU=$(echo $metrics | cut -d',' -f1 | cut -d':' -f2)
-        MEM=$(echo $metrics | cut -d',' -f2 | cut -d':' -f2)
-        DISK=$(echo $metrics | cut -d',' -f3 | cut -d':' -f2)
-        NET_IN=$(echo $metrics | cut -d',' -f4 | cut -d':' -f2)
-        NET_OUT=$(echo $metrics | cut -d',' -f5 | cut -d':' -f2)
+        CPU="$(echo "$metrics" | cut -d',' -f1 | cut -d':' -f2)"
+        MEM="$(echo "$metrics" | cut -d',' -f2 | cut -d':' -f2)"
+        DISK="$(echo "$metrics" | cut -d',' -f3 | cut -d':' -f2)"
+        NET_IN="$(echo "$metrics" | cut -d',' -f4 | cut -d':' -f2)"
+        NET_OUT="$(echo "$metrics" | cut -d',' -f5 | cut -d':' -f2)"
         
         # Send to CloudWatch
         aws cloudwatch put-metric-data \
             --namespace SystemMaintenance \
             --metric-name CPUUsage \
-            --value $CPU \
-            --dimensions InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT \
+            --value "$CPU" \
+            --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Percent 2>/dev/null
         
         aws cloudwatch put-metric-data \
             --namespace SystemMaintenance \
             --metric-name MemoryUsage \
-            --value $MEM \
-            --dimensions InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT \
+            --value "$MEM" \
+            --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Percent 2>/dev/null
         
         aws cloudwatch put-metric-data \
             --namespace SystemMaintenance \
             --metric-name DiskUsage \
-            --value $DISK \
-            --dimensions InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT \
+            --value "$DISK" \
+            --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Percent 2>/dev/null
         
         aws cloudwatch put-metric-data \
             --namespace SystemMaintenance \
             --metric-name NetworkInBytes \
-            --value $NET_IN \
-            --dimensions InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT \
+            --value "$NET_IN" \
+            --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Bytes 2>/dev/null
         
         aws cloudwatch put-metric-data \
             --namespace SystemMaintenance \
             --metric-name NetworkOutBytes \
-            --value $NET_OUT \
-            --dimensions InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT \
+            --value "$NET_OUT" \
+            --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Bytes 2>/dev/null
     fi
 }
@@ -124,13 +125,15 @@ send_to_prometheus() {
     
     PROMETHEUS_PUSHGATEWAY="${prometheus_pushgateway_url:-localhost:9091}"
     
-    if curl -s http://$PROMETHEUS_PUSHGATEWAY/-/healthy >/dev/null 2>&1; then
+    if curl -s "http://${PROMETHEUS_PUSHGATEWAY}/-/healthy" >/dev/null 2>&1; then
         # Parse and format metrics for Prometheus
-        CPU=$(echo $metrics | cut -d',' -f1 | cut -d':' -f2)
-        MEM=$(echo $metrics | cut -d',' -f2 | cut -d':' -f2)
-        DISK=$(echo $metrics | cut -d',' -f3 | cut -d':' -f2)
+        CPU="$(echo "$metrics" | cut -d',' -f1 | cut -d':' -f2)"
+        MEM="$(echo "$metrics" | cut -d',' -f2 | cut -d':' -f2)"
+        DISK="$(echo "$metrics" | cut -d',' -f3 | cut -d':' -f2)"
         
-        cat <<EOF | curl --data-binary @- http://$PROMETHEUS_PUSHGATEWAY/metrics/job/cloud-monitor/instance/$(hostname)
+        local push_url
+        push_url="http://${PROMETHEUS_PUSHGATEWAY}/metrics/job/cloud-monitor/instance/$(hostname)"
+        cat <<EOF | curl --data-binary @- "$push_url"
 system_maintenance_cpu_usage $CPU
 system_maintenance_memory_usage $MEM
 system_maintenance_disk_usage $DISK
@@ -147,7 +150,9 @@ log_metrics() {
     echo "$metrics" >> $log_file
     
     # Rotate log if too large
-    if [ $(stat -f%z "$log_file" 2>/dev/null || stat -c%s "$log_file") -gt 10485760 ]; then
+    local log_size
+    log_size=$(stat -f%z "$log_file" 2>/dev/null || stat -c%s "$log_file" 2>/dev/null || echo 0)
+    if [ "$log_size" -gt 10485760 ]; then
         mv $log_file ${log_file}.old
         echo "$metrics" > $log_file
     fi
@@ -157,10 +162,14 @@ log_metrics() {
 health_check() {
     local health_file="/var/www/html/health.json"
     
-    local metrics=$(collect_metrics)
-    local CPU=$(echo $metrics | cut -d',' -f1 | cut -d':' -f2)
-    local MEM=$(echo $metrics | cut -d',' -f2 | cut -d':' -f2)
-    local DISK=$(echo $metrics | cut -d',' -f3 | cut -d':' -f2)
+    local metrics
+    metrics=$(collect_metrics)
+    local CPU
+    CPU="$(echo "$metrics" | cut -d',' -f1 | cut -d':' -f2)"
+    local MEM
+    MEM="$(echo "$metrics" | cut -d',' -f2 | cut -d':' -f2)"
+    local DISK
+    DISK="$(echo "$metrics" | cut -d',' -f3 | cut -d':' -f2)"
     
     # Determine overall health
     local overall_health="healthy"
@@ -180,12 +189,12 @@ health_check() {
         "cpu_usage": $CPU,
         "memory_usage": $MEM,
         "disk_usage": $DISK,
-        "docker_containers": $(echo $metrics | cut -d',' -f6 | cut -d':' -f2),
-        "backup_status": "$(echo $metrics | cut -d',' -f7 | cut -d':' -f2)",
-        "security_status": "$(echo $metrics | cut -d',' -f8 | cut -d':' -f2)",
-        "load_1min": $(echo $metrics | cut -d',' -f9 | cut -d':' -f2),
-        "load_5min": $(echo $metrics | cut -d',' -f10 | cut -d':' -f2),
-        "load_15min": $(echo $metrics | cut -d',' -f11 | cut -d':' -f2)
+        "docker_containers": $(echo "$metrics" | cut -d',' -f6 | cut -d':' -f2),
+        "backup_status": "$(echo "$metrics" | cut -d',' -f7 | cut -d':' -f2)",
+        "security_status": "$(echo "$metrics" | cut -d',' -f8 | cut -d':' -f2)",
+        "load_1min": $(echo "$metrics" | cut -d',' -f9 | cut -d':' -f2),
+        "load_5min": $(echo "$metrics" | cut -d',' -f10 | cut -d':' -f2),
+        "load_15min": $(echo "$metrics" | cut -d',' -f11 | cut -d':' -f2)
     }
 }
 EOF
@@ -193,7 +202,8 @@ EOF
 
 # Main execution
 main() {
-    local metrics=$(collect_metrics)
+    local metrics
+    metrics=$(collect_metrics)
     
     # Log metrics locally
     log_metrics "$metrics"

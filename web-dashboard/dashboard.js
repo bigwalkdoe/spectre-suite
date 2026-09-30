@@ -1,5 +1,12 @@
 // Dashboard JavaScript
-const PROMETHEUS_URL = 'http://localhost:9090';
+// Requests go to the nginx in this compose file, which proxies /api/ to
+// Prometheus, so the default is same-origin and empty. It used to default to
+// `${location.protocol}//${location.hostname}:9090`, a different origin from the
+// page, and Prometheus sends no Access-Control-Allow-Origin, so every fetch was
+// blocked and the dashboard rendered empty.
+// Override with ?prometheus=https://prometheus.example.com to read from a
+// Prometheus reachable from the browser rather than through this proxy.
+const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus') || '';
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
 let chart = null;
@@ -192,15 +199,21 @@ function formatUptime(seconds) {
 // Update Container Status
 async function updateContainerStatus() {
     try {
-        // This would typically come from cAdvisor or Docker API
-        // For demo, we'll simulate container status
-        const containers = [
-            { name: 'prometheus', status: 'running' },
-            { name: 'grafana', status: 'running' },
-            { name: 'alertmanager', status: 'running' },
-            { name: 'node-exporter', status: 'running' },
-            { name: 'cadvisor', status: 'running' }
-        ];
+        // Derive real per-container state from cAdvisor instead of assuming it.
+        // cAdvisor reports last seen; an empty label set means no recent data.
+        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(
+            'count by (name) (container_last_seen{name!=""})'
+        )}`);
+        const data = await response.json();
+        const live = new Map((data.data && data.data.result || [])
+            .map(r => [r.metric.name, r.value[1]]));
+        const expected = ['prometheus', 'grafana', 'alertmanager',
+                          'node-exporter', 'cadvisor', 'redis-exporter',
+                          'postgres-exporter', 'blackbox-exporter'];
+        const containers = expected.map(name => ({
+            name,
+            status: live.has(name) ? 'running' : 'no-data'
+        }));
 
         const grid = document.getElementById('containersGrid');
         grid.innerHTML = containers.map(container => `
@@ -263,7 +276,7 @@ async function checkAlerts() {
 // Check Prometheus Connection
 async function checkPrometheusConnection() {
     try {
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/status/config`);
+        const response = await fetch(`${PROMETHEUS_URL}/api/v1/status/buildinfo`);
         const prometheusStatus = document.getElementById('prometheusStatus');
         if (response.ok) {
             prometheusStatus.textContent = 'Connected';

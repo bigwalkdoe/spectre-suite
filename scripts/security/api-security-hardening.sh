@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # API Security Hardening Script
 
@@ -39,7 +38,7 @@ EOF
 fi
 
 # Create API rate limiting configuration for Docker services
-cat > $SCRIPT_DIR/setup-rate-limiting.sh << 'EOF'
+cat > "$SCRIPT_DIR/setup-rate-limiting.sh" << 'EOF'
 #!/bin/bash
 # Setup API Rate Limiting with Docker
 
@@ -66,13 +65,13 @@ fi
 echo "API rate limiting setup completed!"
 EOF
 
-chmod +x $SCRIPT_DIR/setup-rate-limiting.sh
+chmod +x "$SCRIPT_DIR/setup-rate-limiting.sh"
 
 # Run rate limiting setup
-$SCRIPT_DIR/setup-rate-limiting.sh
+"$SCRIPT_DIR/setup-rate-limiting.sh"
 
 # Create API monitoring script
-cat > $SCRIPT_DIR/monitor-api-security.sh << 'EOF'
+cat > "$SCRIPT_DIR/monitor-api-security.sh" << 'EOF'
 #!/bin/bash
 # API Security Monitoring Script
 
@@ -99,7 +98,7 @@ sudo fail2ban-client status nginx-limit 2>/dev/null || echo "nginx-limit jail no
 echo "API security monitoring completed: $DATE" >> "$SECURITY_LOG"
 EOF
 
-chmod +x $SCRIPT_DIR/monitor-api-security.sh
+chmod +x "$SCRIPT_DIR/monitor-api-security.sh"
 
 echo "API security hardening completed!"
 logger -p user.info "API security hardening completed"

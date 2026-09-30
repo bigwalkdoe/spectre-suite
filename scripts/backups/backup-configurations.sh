@@ -30,7 +30,7 @@ sudo cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config_$DATE" 2>/dev/null || true
 
 # Firewall configuration
 echo "Backing up firewall configuration..."
-sudo firewall-cmd --list-all > "$BACKUP_DIR/firewall_config_$DATE.txt" 2>/dev/null || true
+sudo firewall-cmd --list-all 2>/dev/null | sudo tee "$BACKUP_DIR/firewall_config_$DATE.txt" >/dev/null || true
 
 # Fail2Ban configuration
 echo "Backing up Fail2Ban configuration..."
