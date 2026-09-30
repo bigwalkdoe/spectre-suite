@@ -199,9 +199,22 @@ done
 
 ### Notification Contacts
 
-- **PagerDuty**: Configured in alertmanager.yml (routing_key)
-- **Slack**: #alerts-critical, #alerts-warning channels
-- **Email**: Configured in alertmanager.yml (smtp)
+Credentials are **not** edited into `prometheus/alertmanager.yml`; Alertmanager
+does no `${VAR}` substitution. They are written as one-value files to
+`prometheus/alertmanager-secrets/` by `scripts/setup-notification-channels.sh`
+(directory bind-mounted read-only, gitignored, files mode 0600).
+
+- **PagerDuty**: `PAGERDUTY_ROUTING_KEY` -> `alertmanager-secrets/pagerduty_routing_key`
+  (the old `service_key` was removed in Alertmanager 0.25 and is no longer read)
+- **Slack**: `SLACK_WEBHOOK_URL` -> `alertmanager-secrets/slack_webhook_url`,
+  posting to `#alerts-critical`, `#alerts-warning`, `#alerts-info`, `#alerts-watchdog`
+- **Email**: `SMTP_USERNAME` / `SMTP_PASSWORD` -> `alertmanager-secrets/smtp_username`
+  and `smtp_password`. Note `smtp_username` has no `*_file` equivalent in the
+  receiver config, so it is set inline as `auth_username` in `alertmanager.yml`.
+
+A receiver with no credential still starts but cannot deliver — verify with
+`amtool check-config prometheus/alertmanager.yml` and the setup script's warnings
+rather than by waiting for a page.
 
 ---
 
