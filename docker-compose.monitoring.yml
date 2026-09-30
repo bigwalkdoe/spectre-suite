@@ -25,10 +25,6 @@ services:
       - monitoring
 
   # Grafana - Visualization Dashboard
-    deploy:
-      resources:
-        limits:
-          memory: 1g
   grafana:
     image: grafana/grafana:13.0
     container_name: grafana
@@ -49,12 +45,12 @@ services:
       - monitoring
     depends_on:
       - prometheus
-
-  # Alertmanager - Alert Management
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 1g
+
+  # Alertmanager - Alert Management
   alertmanager:
     image: prom/alertmanager:v0.34.1
     container_name: alertmanager
@@ -74,12 +70,12 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
-
-  # Node Exporter - System Metrics
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
+
+  # Node Exporter - System Metrics
   node-exporter:
     image: prom/node-exporter:v1.12.1
     container_name: node-exporter
@@ -100,21 +96,30 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
   # cAdvisor - Container Metrics
   # cAdvisor needs host access to report container stats, but `privileged: true`
   # grants effectively root-equivalent access to the host. The specific
   # capabilities below plus the read-only host mounts are what it actually
   # requires. Its port is also bound to loopback rather than every interface.
-    deploy:
-      resources:
-        limits:
-          memory: 256m
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
     ports:
       - "127.0.0.1:8080:8080"
+    # Without --docker_only, cAdvisor also walks the host's systemd cgroup tree.
+    # That produced 134 spurious series for slices such as
+    # /system.slice/auditd.service, which carry no `container` label, so the
+    # container memory rule divided by an absent limit and alerted
+    # "Container  is using +Inf of its memory limit" -- all critical-looking and
+    # none actionable. Host metrics come from node-exporter; this is for
+    # containers only.
+    command:
+      - --docker_only=true
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -131,12 +136,12 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
-
-  # Redis Exporter - Redis Metrics
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 256m
+
+  # Redis Exporter - Redis Metrics
   redis-exporter:
     image: oliver006/redis_exporter:v1.92.1
     container_name: redis-exporter
@@ -150,12 +155,12 @@ services:
       - monitoring
     depends_on:
       - redis
-
-  # PostgreSQL Exporter - PostgreSQL Metrics
     deploy:
       resources:
         limits:
-          memory: 128m
+          memory: 512m
+
+  # PostgreSQL Exporter - PostgreSQL Metrics
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.20.1
     container_name: postgres-exporter
@@ -168,14 +173,14 @@ services:
       - monitoring
     depends_on:
       - postgres
-
-  # Redis (for testing/metrics)
-  # Data services are deliberately NOT published to the host. They exist to feed
-  # the exporters; only the exporters themselves are exposed, on loopback.
     deploy:
       resources:
         limits:
           memory: 128m
+
+  # Redis (for testing/metrics)
+  # Data services are deliberately NOT published to the host. They exist to feed
+  # the exporters; only the exporters themselves are exposed, on loopback.
   redis:
     image: redis:8.10.2
     container_name: redis
@@ -185,12 +190,12 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
-
-  # PostgreSQL (for testing/metrics)
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 128m
+
+  # PostgreSQL (for testing/metrics)
   postgres:
     image: postgres:16.15
     container_name: postgres
@@ -205,12 +210,12 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
-
-  # Blackbox Exporter - External endpoint monitoring
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 512m
+
+  # Blackbox Exporter - External endpoint monitoring
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.28.0
     container_name: blackbox-exporter
@@ -223,12 +228,12 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
-
-  # Web Dashboard - Custom Interface
     deploy:
       resources:
         limits:
-          memory: 128m
+          memory: 1g
+
+  # Web Dashboard - Custom Interface
   web-dashboard:
     image: nginx:1.30.5-alpine
     container_name: web-dashboard
@@ -240,11 +245,11 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
-
     deploy:
       resources:
         limits:
-          memory: 64m
+          memory: 128m
+
 networks:
   monitoring:
     driver: bridge
