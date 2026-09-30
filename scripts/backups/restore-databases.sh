@@ -23,16 +23,37 @@ error() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" | tee -a "$LOG_FILE" || true >&2
 }
 
+# The database name to restore into.
+#
+# Archives are written as postgres_<database>_<YYYYmmdd>_<HHMMSS>.sql.gz, so the
+# name can be read back off the archive instead of assumed. The previous default
+# was "guardrail", a database that does not exist here, and the lookup pattern
+# was postgres_guardrail_*.sql.gz, which matched nothing -- so `latest` reported
+# no backup for a database that had been dumped successfully minutes earlier.
+default_database_name() {
+    local archive="${1:-}"
+    if [ -n "$archive" ] && [ -f "$archive" ]; then
+        local base
+        base=$(basename "$archive" .sql.gz)
+        local name
+        name=$(printf '%s' "$base" | sed -E 's/^postgres_//; s/_[0-9]{8}_[0-9]{6}$//')
+        [ -n "$name" ] && { printf '%s' "$name"; return; }
+    fi
+    # No archive, or an unrecognised name: ask the container.
+    local container="${POSTGRES_CONTAINER:-postgres}"
+    if docker inspect "$container" >/dev/null 2>&1; then
+        docker exec "$container" sh -c 'printf %s "${POSTGRES_DB:-postgres}"' 2>/dev/null && return
+    fi
+    printf '%s' 'postgres'
+}
+
 # Find latest backup
 find_latest_backup() {
     local backup_type="$1"
     local pattern
 
     case "$backup_type" in
-        postgres)
-            pattern="postgres_guardrail_*.sql.gz"
-            ;;
-        postgres_generic)
+        postgres|postgres_generic)
             pattern="postgres_*.sql.gz"
             ;;
         *)
@@ -62,7 +83,7 @@ verify_backup() {
 # Restore PostgreSQL database
 restore_postgres() {
     local backup_file="$1"
-    local database_name="${2:-guardrail}"
+    local database_name="${2:-$(default_database_name "$1")}"
     local restore_target="${3:-}"
     
     if [[ ! -f "$backup_file" ]]; then
@@ -85,26 +106,54 @@ restore_postgres() {
         # Locate the running PostgreSQL container: prefer an exact name match,
         # otherwise fall back to any container running a PostgreSQL server
         # (exclude exporters/proxies that merely contain "postgres" in their name).
-        local pg_container=""
-        if docker ps --format '{{.Names}}' | grep -qx "$database_name"; then
+        # Resolve the container by name, not by matching the database name
+        # against container names: they are unrelated, and the two only coincided
+        # here because this database happens to be called "postgres".
+        #
+        # Precedence matters. POSTGRES_CONTAINER is honoured only when the caller
+        # set it explicitly -- defaulting it to "postgres" would hijack restores
+        # that target some other database, such as the restore drill, which runs
+        # a throwaway container named after its own database. -a so a stopped
+        # server is still found, which is the normal state during a restore.
+        local pg_container="${POSTGRES_CONTAINER:-}"
+        if [[ -n "$pg_container" ]] && ! docker inspect "$pg_container" >/dev/null 2>&1; then
+            error "POSTGRES_CONTAINER='$pg_container' does not exist"
+            return 1
+        fi
+        if [[ -z "$pg_container" ]] && docker inspect "$database_name" >/dev/null 2>&1; then
+            # A container named exactly after the database is the unambiguous case.
             pg_container="$database_name"
-        elif pg_container=$(docker ps --format '{{.Names}}' | grep -i "postgres" | grep -vi "exporter" | head -1); then
-            log "Using PostgreSQL container: $pg_container"
+        fi
+        if [[ -z "$pg_container" ]]; then
+            pg_container=$(docker ps -a --format '{{.Names}}' | grep -ix "postgres" | head -1)
+        fi
+        if [[ -z "$pg_container" ]]; then
+            pg_container=$(docker ps -a --format '{{.Names}}' | grep -i "postgres" | grep -vi "exporter" | head -1)
         fi
 
         if [[ -z "$pg_container" ]]; then
-            error "Database container '$database_name' not found. Starting container..."
-            docker run -d \
-                --name "$database_name" \
-                -e POSTGRES_USER=postgres \
-                -e POSTGRES_PASSWORD=postgres \
-                -e POSTGRES_DB="$database_name" \
-                -v "$database_name-data:/var/lib/postgresql/data" \
-                "${PG_IMAGE:-postgres:latest}"
+            error "No PostgreSQL container found. Start the stack, or pass POSTGRES_CONTAINER."
+            return 1
+        fi
+        log "Using PostgreSQL container: $pg_container"
+
+        # Read the role from the container rather than assuming "postgres", which
+        # does not exist in this stack (POSTGRES_USER is 'deon') and made every
+        # restore fail with 'role postgres does not exist'.
+        local pg_user
+        pg_user=$(docker exec "$pg_container" sh -c 'printf %s "${POSTGRES_USER:-postgres}"' 2>/dev/null || printf 'postgres')
+
+        if ! docker exec "$pg_container" pg_isready -U "$pg_user" -d "$database_name" >/dev/null 2>&1; then
+            log "PostgreSQL in $pg_container is not accepting connections; starting it"
+            docker start "$pg_container" >/dev/null
+            for _ in $(seq 1 30); do
+                docker exec "$pg_container" pg_isready -U "$pg_user" -d "$database_name" >/dev/null 2>&1 && break
+                sleep 1
+            done
         fi
 
         # Restore data
-        gunzip -c "$backup_file" | docker exec -i "${pg_container:-$database_name}" psql -U postgres -d "$database_name"
+        gunzip -c "$backup_file" | docker exec -i "$pg_container" psql -U "$pg_user" -d "$database_name"
 
         log "PostgreSQL restore completed successfully"
     else
@@ -117,7 +166,7 @@ restore_postgres() {
             return 1
         fi
         
-        gunzip -c "$backup_file" | psql -U postgres -d "$database_name"
+        gunzip -c "$backup_file" | psql -U "${PGUSER:-postgres}" -d "$database_name"
         
         log "PostgreSQL restore completed successfully"
     fi
@@ -126,7 +175,7 @@ restore_postgres() {
 # Main restore function
 main() {
     local restore_type="${1:-latest}"
-    local database_name="${2:-guardrail}"
+    local database_name="${2:-$(default_database_name "$1")}"
     local restore_target="${3:-docker}"
 
     log "=========================================="
@@ -137,7 +186,7 @@ main() {
     # "latest" takes nothing and derives all three.
     if [ "$restore_type" = "specific" ]; then
         log "Backup file: ${2:-}"
-        log "Database: ${3:-${2:-guardrail}}"
+        log "Database: ${3:-${2:-}}"
         log "Target: ${4:-docker}"
     else
         log "Database: $database_name"
