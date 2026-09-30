@@ -222,7 +222,10 @@ SCRIPT
 }
 
 setup_cron() {
-    local schedule="${1:-0 4 * * *}"
+    # The schedule is fixed at 0 4 * * *, matching the schedule: entries written
+    # into the config above. This previously accepted an optional $1 that no
+    # caller ever passed, so the parameter was dead (shellcheck SC2120).
+    local schedule="0 4 * * *"
     log "Setting up cron job: $schedule"
     (crontab -l 2>/dev/null | grep -v "backup-offsite.sh"; echo "$schedule root /usr/local/bin/backup-offsite.sh") | crontab -
 }
