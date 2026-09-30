@@ -7,10 +7,21 @@ This document outlines the security practices, vulnerability disclosure process,
 ### Development Security
 
 - All scripts use `set -euo pipefail` for strict error handling
-- Secrets are never hardcoded; use environment variables or secret management
+- No secrets are committed. `.env` holds the credentials `docker compose`
+  requires and refuses to start without (`GRAFANA_ADMIN_PASSWORD`,
+  `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `POSTGRES_EXPORTER_DSN`).
+- **Alertmanager does not expand `${VAR}` in its config file**, so notification
+  credentials cannot be interpolated there. They are written as one-value files
+  at mode `0600` under `prometheus/alertmanager-secrets/` by
+  `scripts/setup-notification-channels.sh`, which is gitignored and bind-mounted
+  read-only. Do not edit credentials into `prometheus/alertmanager.yml`.
 - Dependencies are scanned regularly with Trivy
-- Code is linted with shellcheck before commit
-- No sensitive information in `.gitignore` exclusions
+- Code is linted with shellcheck before commit, enforced by CI
+  (`.github/workflows/lint.yml`) along with `terraform validate`, `promtool`,
+  `amtool`, `docker compose config` and the OPA policy baseline
+- Alert policies are Rego `deny` rules derived from input, gated in CI against
+  `scripts/security/opa/baseline.json`. All 38 controls must also deny on empty
+  input, so a policy cannot silently fail open.
 
 ### Deployment Security
 

@@ -30,9 +30,19 @@ cd spectre-system-maintenance
 # Full automated setup (recommended)
 sudo ./install.sh
 
+# Also apply the system performance tuning and network hardening, which
+# mutate live system state (sysctl, firewall rules, docker daemon) and are
+# therefore opt-in rather than an automatic side effect of installing:
+sudo APPLY_HARDENING=1 ./install.sh
+
 # Or deploy all enhancements at once
 bash scripts/setup-all-enhancements.sh
 ```
+
+The installer backs up `/etc/docker/daemon.json` before rewriting it, creates
+`/backups` with mode `700` (it holds database dumps), and installs only the
+scripts from this repository into `/usr/local/bin`. It does **not** copy
+arbitrary `.sh` files out of your home directory.
 
 ## System Architecture
 
@@ -69,11 +79,21 @@ bash scripts/setup-all-enhancements.sh
 
 ## Monitoring Stack
 
-```bash
-docker-compose -f docker-compose.monitoring.yml up -d
+Credentials are **required**. `docker compose` refuses to start without them
+rather than falling back to a default password, so populate them first:
 
-# Access points:
-#   Grafana:      http://localhost:3002   (admin/changeme)
+```bash
+cp .env.example .env
+$EDITOR .env          # GRAFANA_ADMIN_PASSWORD, POSTGRES_PASSWORD,
+                      # REDIS_PASSWORD, POSTGRES_EXPORTER_DSN
+
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+```bash
+# Access points (all bound to 127.0.0.1, so reach them from the host or over an
+# SSH tunnel -- they are not exposed on any other interface):
+#   Grafana:      http://localhost:3002   (user + GRAFANA_ADMIN_PASSWORD)
 #   Prometheus:   http://localhost:9090
 #   Alertmanager: http://localhost:9093
 #   Blackbox:     http://localhost:9115
@@ -81,11 +101,32 @@ docker-compose -f docker-compose.monitoring.yml up -d
 #   Loki:         http://localhost:3100   (logging stack)
 ```
 
+Redis and PostgreSQL are **not** published to the host at all; they are reachable
+only on the internal `monitoring` network by the exporters.
+
+> **Upgrading an existing deployment:** `POSTGRES_PASSWORD` only takes effect when
+> the `postgres-data` volume is first initialised. Changing it in `.env` will not
+> change the password in an existing volume, and the postgres exporter will then
+> fail to authenticate. Either run
+> `docker compose exec postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<new>'"`
+> or destroy the volume (this discards the data).
+
 ### Alertmanager Integrations
-- **Slack**: Channels for critical, warning, info, watchdog alerts
-- **Email**: SMTP-based notifications with HTML templates
-- **PagerDuty**: Critical alert routing with severity mapping
-- **Webhook**: Custom endpoint integration
+
+Slack, email and PagerDuty credentials are **not** read from `.env` directly —
+Alertmanager performs no `${VAR}` substitution in its config file. Supply them
+via:
+
+```bash
+export SMTP_USERNAME=... SMTP_PASSWORD=... \
+       SLACK_WEBHOOK_URL=... PAGERDUTY_ROUTING_KEY=...
+scripts/setup-notification-channels.sh
+```
+
+That writes each value to `prometheus/alertmanager-secrets/` at mode `0600` (the
+directory is bind-mounted read-only and gitignored) and validates the result with
+`amtool`. Receivers without a credential start but cannot deliver, so the script
+warns when one is missing.
 
 ## Security Tools
 
