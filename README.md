@@ -34,9 +34,6 @@ sudo ./install.sh
 # mutate live system state (sysctl, firewall rules, docker daemon) and are
 # therefore opt-in rather than an automatic side effect of installing:
 sudo APPLY_HARDENING=1 ./install.sh
-
-# Or deploy all enhancements at once
-bash scripts/setup-all-enhancements.sh
 ```
 
 The installer backs up `/etc/docker/daemon.json` before rewriting it, creates
@@ -130,42 +127,53 @@ warns when one is missing.
 
 ## Security Tools
 
+Everything below is present in this repository. Vulnerability scanning runs in
+CI via the Trivy and OPA jobs; the local scripts complement that.
+
 ```bash
 # Intrusion Detection
-sudo systemctl start fail2ban          # Brute force protection
-scripts/security/check-file-integrity.sh  # AIDE check
+sudo scripts/security/install-ids-ips.sh      # Suricata + fail2ban
+sudo scripts/security/run-security-hardening.sh
 
 # Vulnerability Scanning
-scripts/security/run-trivy-scan.sh
+scripts/security/scan-docker-images.sh
+scripts/security/scan-dependencies.sh
 
-# Code Analysis
-docker-compose -f security/sonarqube/docker-compose.yml up -d
-scripts/security/run-sonarqube-analysis.sh
+# Docker daemon and API hardening
+sudo scripts/security/docker-security-hardening.sh
+scripts/security/api-security-hardening.sh
 
-# Web App Testing
-docker-compose -f security/zap/docker-compose.yml up -d
-scripts/security/run-zap-scan.sh http://localhost:3000
-
-# Policy Enforcement
-scripts/security/opa/evaluate-policies.sh
+# Audit policy against Docker and the host (same checks CI runs)
+opa check scripts/security/opa/policies/
+opa eval --format raw --data scripts/security/opa/policies \
+  --input <(echo '{}') 'count([m | data.security[k].deny[m]])'
 ```
+
+> **Not implemented here.** This repository does not contain AIDE/file-integrity
+> checking, a standalone Trivy wrapper, SonarQube or OWASP ZAP orchestration, or
+> a compliance report generator. The Trivy scan is the CI job in
+> `.github/workflows/security-scanning.yml`; run it locally with
+> `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+> aquasec/trivy image --severity HIGH,CRITICAL <image>`.
 
 ## Secrets Management
 
+Notification credentials are the secrets this stack consumes, and they are
+written to files rather than interpolated into the Alertmanager config (which
+performs no `${VAR}` substitution):
+
 ```bash
-# Edit your secrets
-vim /home/deon/.secrets/environment
-
-# Source into environment
-source /home/deon/.secrets/environment
-
-# Inject into project files
-scripts/security/inject-secrets.sh
-
-# Or use Vault
-scripts/security/vault-secrets.sh store database/postgres password mypass
-scripts/security/vault-secrets.sh get database/postgres password
+export SMTP_USERNAME=... SMTP_PASSWORD=... \
+       SLACK_WEBHOOK_URL=... PAGERDUTY_ROUTING_KEY=...
+scripts/setup-notification-channels.sh
 ```
+
+Database credentials come from `.env`, which the Compose stack requires and will
+refuse to start without. See `.env.example`.
+
+> **Not implemented here.** There is no Vault integration and no script that
+> injects secrets into project files. Only the `.env` file and the Alertmanager
+> secret files described above are supported.
 
 ## Configuration & Portability
 
@@ -198,45 +206,41 @@ material are deliberately excluded from `backup-configurations.sh`,
 ## VPN & Network
 
 ```bash
-# Start WireGuard VPN
-sudo systemctl start wg-quick@wg0
+# WireGuard VPN
+sudo scripts/network/setup-vpn.sh
 
-# Add a client
-scripts/network/add-vpn-client.sh my-laptop 10.0.0.2
-
-# Check DDoS status
-scripts/network/ddos-mitigation.sh
+# Hardening and inspection
+sudo scripts/network/network-security-hardening.sh
+scripts/network/optimize-network-config.sh
+scripts/network/network-monitor.sh
 ```
+
+> **Not implemented here.** There is no client-management helper
+> (`add-vpn-client`) and no DDoS mitigation script. Configure clients in
+> `/etc/wireguard/wg0.conf` directly.
 
 ## Database Optimization
 
 ```bash
-# Run vacuum manually
-scripts/performance/pg-vacuum.sh
+# Host and container performance
+sudo scripts/performance/optimize-system-performance.sh
+sudo scripts/performance/optimize-docker-resources.sh
+scripts/performance/check-performance.sh
 
-# Start PgBouncer connection pool
-docker-compose -f performance/pgbouncer/docker-compose.yml up -d
-# Connect: psql -h localhost -p 6432 -U postgres -d guardrail
-
-# Set up read replica
-scripts/performance/setup-read-replica.sh
+# Reclaim space and inspect the host
+sudo scripts/maintenance/cleanup-system.sh
+scripts/maintenance/check-disk-space.sh
 ```
+
+> **Not implemented here.** There is no `pg_vacuum` helper, no PgBouncer Compose
+> file under `performance/`, and no read-replica setup. Manage vacuum and
+> replication with the PostgreSQL tooling appropriate to your deployment.
 
 ## Load Testing
 
-```bash
-# k6 test (10 VUs, 30s)
-bash scripts/performance/load-testing/run-k6-test.sh http://localhost:3000 10 30s
-
-# Locust test
-bash scripts/performance/load-testing/run-locust-test.sh http://localhost:3000 10 1 60s
-
-# Performance regression
-bash scripts/performance/load-testing/run-performance-regression.sh
-
-# Capacity planning
-bash scripts/performance/load-testing/capacity-planning.sh
-```
+> **Not implemented here.** This repository ships no k6, Locust, or
+> performance-regression harness, and no capacity-planning tooling. Use the load
+> tooling of your choice against your own environment.
 
 ## Disaster Recovery
 
@@ -310,32 +314,36 @@ scripts/
 
 ## Quick Commands Reference
 
+Every path below exists in this repository.
+
 ```bash
-# Backup
+# Backup and restore
 scripts/backups/backup-all.sh                    # Full backup
-scripts/backups/replicate-to-remote.sh           # Off-site sync
+scripts/backups/backup-verification.sh           # Verify existing backups
+scripts/backups/restore-databases.sh             # Restore databases
+scripts/backups/restore-from-remote.sh           # Restore from off-site copy
+sudo scripts/backups/setup-offsite-backup.sh     # Configure off-site + cron
 
 # Security
-scripts/security/run-trivy-scan.sh               # Container scan
-scripts/security/check-file-integrity.sh          # AIDE check
-scripts/security/opa/evaluate-policies.sh         # Policy audit
+scripts/security/scan-docker-images.sh            # Container scan
+scripts/security/scan-dependencies.sh            # Dependency scan
+sudo scripts/security/docker-security-hardening.sh
+opa check scripts/security/opa/policies/         # Policy audit
 
 # Monitoring
-docker-compose -f docker-compose.monitoring.yml up -d        # Start stack
-spectre-system-maintenance/prometheus/business-metrics-exporter.sh   # Export metrics
+docker compose -f docker-compose.monitoring.yml up -d   # Start stack
+prometheus/business-metrics-exporter.sh           # Export host metrics
+scripts/check-config-consistency.sh               # Config references resolve
 
 # Maintenance
 scripts/maintenance/audit-trail.sh                # Generate audit
 scripts/maintenance/compliance-report.sh          # Compliance check
-scripts/maintenance/cleanup-unused-resources.sh   # Cleanup
-
-# Database
-scripts/performance/pg-vacuum.sh                 # Vacuum DB
-scripts/performance/resource-rightsizing.sh      # Analyze usage
-
-# Load test
-bash scripts/performance/load-testing/run-k6-test.sh
+sudo scripts/maintenance/cleanup-system.sh        # Cleanup
+scripts/maintenance/system-health-check.sh        # Host health
 ```
+
+Container vulnerability scanning is the Trivy job in
+`.github/workflows/security-scanning.yml`; it is not wrapped in a local script.
 
 ## Documentation
 
