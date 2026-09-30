@@ -54,6 +54,17 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.34.1
     container_name: alertmanager
+    # The image defaults to uid 65534 (nobody). The secrets directory is mode
+    # 0700 owned by the host user, so nobody cannot even traverse it: every
+    # notification failed with "could not read
+    # /etc/alertmanager/secrets/smtp_password: permission denied". This only
+    # surfaces at notification time, not at config-load time, so it looks like a
+    # healthy Alertmanager. Running as root is the same trade-off already made
+    # for node-exporter below, and keeps the secret files at 0600 rather than
+    # making them world-readable to satisfy nobody. A tighter fix is matching
+    # this to the host UID/GID, or switching to top-level Compose secrets under
+    # /run/secrets; both need a way to set the owner without sudo.
+    user: root
     ports:
       - "127.0.0.1:9093:9093"
     volumes:

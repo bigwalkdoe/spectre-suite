@@ -117,13 +117,27 @@ via:
 ```bash
 export SMTP_USERNAME=... SMTP_PASSWORD=... \
        SLACK_WEBHOOK_URL=... PAGERDUTY_ROUTING_KEY=...
-scripts/setup-notification-channels.sh
+scripts/setup-notification-channels.sh --test
 ```
 
 That writes each value to `prometheus/alertmanager-secrets/` at mode `0600` (the
-directory is bind-mounted read-only and gitignored) and validates the result with
-`amtool`. Receivers without a credential start but cannot deliver, so the script
-warns when one is missing.
+directory is bind-mounted read-only and gitignored), then restarts Alertmanager,
+waits for readiness, and confirms Prometheus still points at it.
+
+`--test` posts a self-resolving critical alert and reads the dispatcher log to
+confirm it was actually **delivered**, not merely accepted. This matters because
+`amtool check-config` is not a delivery test: `*_file` options are not
+existence-checked, so it reports success with every secret missing. The script
+also reads each secret back from inside the container, since a permissions
+mismatch there fails only at notification time while `/-/ready` still returns
+200. It exits non-zero while any channel is unconfigured.
+
+Two settings cannot be supplied from the environment and must be edited in
+`prometheus/alertmanager.yml`: the recipient address (`smtp_from` and each
+receiver's `to:`, still `alertmanager@example.com`) and `smtp_smarthost` (still
+`smtp.gmail.com:587`). The script warns while the placeholder address is present.
+
+See `prometheus/alertmanager-secrets/README.md` for details.
 
 ## Security Tools
 
@@ -190,8 +204,11 @@ the following environment overrides:
 | `POSTGRES_CONTAINER` | `guardrail-ai-postgres-1` | `backup-databases.sh` |
 | `REDIS_CONTAINER` | `guardrail-ai-redis-1` | `backup-databases.sh` |
 | `NEO4J_CONTAINER` | `guardrail-ai-neo4j-1` | `backup-databases.sh` |
-| `PROMETHEUS_CONTAINER` | `guardrail-ai-prometheus-1` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
-| `ALERTMANAGER_CONTAINER` | `guardrail-alertmanager` | `setup-notification-channels.sh` |
+| `PROMETHEUS_CONTAINER` | `prometheus` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
+| `ALERTMANAGER_CONTAINER` | `alertmanager` | `setup-notification-channels.sh` |
+| `SECRETS_DIR` | `prometheus/alertmanager-secrets` | `setup-notification-channels.sh` |
+| `READY_TIMEOUT` | `60` (seconds to wait for `/-/ready`) | `setup-notification-channels.sh` |
+| `TEST_TIMEOUT` | `90` (seconds to wait for the `--test` delivery attempt) | `setup-notification-channels.sh` |
 
 `REPO_ROOT` is derived automatically from the script location and should not
 normally need overriding. Orchestrator scripts (`run-maintenance.sh`,

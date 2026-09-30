@@ -17,6 +17,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 COMPOSE="$PROJECT_ROOT/docker-compose.monitoring.yml"
 PROMETHEUS="$PROJECT_ROOT/prometheus/prometheus.yml"
 NGINX_CONF="$PROJECT_ROOT/web-dashboard/nginx.conf"
+ALERTMANAGER="$PROJECT_ROOT/prometheus/alertmanager.yml"
+RULES="$PROJECT_ROOT/prometheus/alert_rules.yml"
 
 # Hosts that are legitimately not compose service names.
 ALLOWED_HOSTS="localhost 127.0.0.1 ::1 host.docker.internal"
@@ -45,9 +47,49 @@ if [ -z "$services" ]; then
 fi
 
 # Host portion of every scrape target and of every relabel replacement.
+# Every host named by a scrape target or a blackbox `replacement`, in both the
+# inline form (targets: ['a', 'b']) and the block form:
+#
+#   targets:
+#     - 'alertmanager:9093'
+#
+# The block form is how all six blackbox TCP probes are written, and the earlier
+# regex only matched the inline form, so those targets were never checked. That
+# is the same set of targets that produced eight false UptimeCheckFailed alerts
+# when they pointed at host.docker.internal.
+#
+# The trailing `|| true` matters: grep exits 1 on no match, and under
+# `set -o pipefail` that aborted the whole gate with no message, so an empty or
+# restructured config produced a silent non-zero exit instead of a diagnosis.
 referenced_hosts=$(
-    grep -oE "(targets|replacement):[[:space:]]*(\[[^]]*\]|'[^']*')" "$PROMETHEUS" \
-        | grep -oE "'[^']+'" | tr -d "'" | cut -d: -f1 | sort -u
+    awk '
+        /targets:[[:space:]]*\[/ {
+            line = $0
+            sub(/.*targets:[[:space:]]*\[/, "", line)
+            gsub(/[]\047]/, "", line)
+            gsub(/[[:space:]]/, "", line)
+            n = split(line, item, ",")
+            for (i = 1; i <= n; i++) if (item[i] != "") print item[i]
+        }
+        /replacement:[[:space:]]*/ {
+            line = $0
+            sub(/.*replacement:[[:space:]]*/, "", line)
+            gsub(/[\047]/, "", line)
+            gsub(/[[:space:]]/, "", line)
+            if (line != "") print line
+        }
+        /targets:[[:space:]]*$/ { inblock = 1; next }
+        inblock && /^[[:space:]]*$/ { next }
+        inblock && /^[[:space:]]*-[[:space:]]*/ {
+            line = $0
+            sub(/^[[:space:]]*-[[:space:]]*/, "", line)
+            gsub(/[\047]/, "", line)
+            gsub(/[[:space:]]/, "", line)
+            if (line != "") print line
+            next
+        }
+        inblock { inblock = 0 }
+    ' "$PROMETHEUS" | sort -u || true
 )
 
 check_host() {
@@ -61,8 +103,18 @@ check_host() {
     fi
 }
 
-for host in $referenced_hosts; do
-    check_host "$host" "prometheus.yml"
+# Only host:port targets are service references. A bare public IP (1.1.1.1) or a
+# URL (https://api.github.com) is an intentional external blackbox probe, not a
+# misspelled service, and cannot be validated against docker-compose. Anything
+# carrying an explicit port must name a service, or it is a typo that resolves to
+# a permanently-down target.
+for target in $referenced_hosts; do
+    case "$target" in
+        *://*) continue ;;   # external HTTP/ICMP/DNS probe
+    esac
+    if printf '%s' "$target" | grep -q ':'; then
+        check_host "${target%%:*}" "prometheus.yml"
+    fi
 done
 
 # The dashboard reaches Prometheus through this proxy, so a misspelled upstream
@@ -136,15 +188,79 @@ stray=$(awk '
     !in_services && /^  (monitoring|prometheus-data|grafana-data|alertmanager-data|postgres-data):/ { in_net = 1; next }
     in_net && /^    (deploy|mem_limit|cpus|mem_reservation):/ { print "  - " $1 " attached to a network or volume" }
 ' "$COMPOSE")
-if [ -n "$stray" ]; then
-    echo "ERROR: keys that cannot belong to a network or volume:" >&2
-    printf '%s\n' "$stray" >&2
-    fail=1
-fi
+  if [ -n "$stray" ]; then
+      echo "ERROR: keys that cannot belong to a network or volume:" >&2
+      printf '%s\n' "$stray" >&2
+      fail=1
+  fi
 
-if [ "$fail" -ne 0 ]; then
-    echo "config consistency check FAILED" >&2
-    exit 1
-fi
+  # alertmanager.yml routes and inhibition rules are matched by alertname, and
+  # Alertmanager does not validate those against any rule file. An alertname that
+  # is spelled wrong, or a rule that was never written, produces a route that
+  # silently never matches. That is how alertmanager.yml shipped a dedicated
+  # Watchdog receiver with no Watchdog alert behind it, and two inhibition rules
+  # naming InstanceDown/InstanceHealthcheck, neither of which has ever existed.
+  alertnames=$(grep -oE '^[[:space:]]*-[[:space:]]*alert:[[:space:]]*.+$' "$RULES" \
+      | sed 's/.*alert:[[:space:]]*//' | tr -d "'" | sed 's/[[:space:]]*$//' | sort -u || true)
 
-echo "config consistency OK: $(printf '%s\n' "$referenced_hosts" | grep -c .) prometheus target host(s) and $(printf '%s\n' "${nginx_upstreams:-}" | grep -c . || echo 0) nginx upstream(s) all resolve to compose services; $(printf '%s\n' "$actual_limits" | grep -c .) service memory limit(s) on the intended service"
+  # Extracted with plain grep rather than a YAML parser on purpose: PyYAML is not
+  # installed in the project's test venv, and CI only installs shellcheck, so a
+  # python3 dependency here fails the build. Checking *every* alertname in the
+  # file is also stricter than walking the route tree, and receivers use no other
+  # alertname/receiver keys, so a full parse buys nothing.
+  route_names=$(grep -oE "^[[:space:]]*alertname:[[:space:]]*'?[A-Za-z0-9_-]+" "$ALERTMANAGER" \
+      | sed "s/.*alertname:[[:space:]]*'\{0,1\}//" | sort -u)
+  recv_names=$(grep -oE "^[[:space:]]*receiver:[[:space:]]*'?[A-Za-z0-9_-]+" "$ALERTMANAGER" \
+      | sed "s/.*receiver:[[:space:]]*'\{0,1\}//" | sort -u)
+  recv_defined=$(grep -oE "^[[:space:]]*-[[:space:]]*name:[[:space:]]*'?[A-Za-z0-9_-]+" "$ALERTMANAGER" \
+      | sed "s/.*name:[[:space:]]*'\{0,1\}//" | sort -u)
+
+  # A hardcoded floor, so a broken extraction is itself a failure rather than a
+  # vacuous pass. This is the failure mode that let a regex with a required
+  # literal bracket verify nothing while reporting success.
+  if [ "$(printf '%s\n' "$alertnames" | grep -c .)" -lt 1 ]; then
+      echo "ERROR: no alert rules found in $(basename "$RULES")." >&2
+      echo "  Every alertmanager alertname reference is now dangling." >&2
+      fail=1
+  fi
+  if [ "$(printf '%s\n' "$route_names" | grep -c .)" -lt 1 ] \
+      || [ "$(printf '%s\n' "$recv_names" | grep -c .)" -lt 1 ] \
+      || [ "$(printf '%s\n' "$recv_defined" | grep -c .)" -lt 1 ]; then
+      echo "ERROR: could not extract alertnames/receivers from alertmanager.yml." >&2
+      echo "  Expected at least one of each. Refusing to pass on a partial check." >&2
+      fail=1
+  fi
+
+  for name in $route_names; do
+      if ! printf '%s\n' "$alertnames" | grep -qx "$name"; then
+          echo "ERROR: alertmanager.yml references alertname '$name', but no rule in" >&2
+          echo "  alert_rules.yml defines it. The route or inhibition can never match." >&2
+          fail=1
+      fi
+  done
+
+  for receiver in $recv_names; do
+      if ! printf '%s\n' "$recv_defined" | grep -qx "$receiver"; then
+          echo "ERROR: a route targets receiver '$receiver', which is not defined." >&2
+          fail=1
+      fi
+  done
+
+  # Alertmanager defaults to uid 65534 (nobody). The secrets directory is 0700
+  # owned by the host user, so the container cannot traverse it and every
+  # notification fails with "permission denied" -- while /-/ready returns 200 and
+  # the stack looks healthy, because the failure only happens at send time.
+  if grep -q 'alertmanager-secrets:/etc/alertmanager/secrets' "$COMPOSE" \
+      && ! awk '/^  alertmanager:/{f=1; next} f&&/^  [a-zA-Z]/{f=0} f&&/^[[:space:]]*user:/{print}' "$COMPOSE" | grep -q .; then
+      echo "ERROR: alertmanager bind-mounts a 0700 secrets directory but sets no" >&2
+      echo "  'user:'. The image defaults to uid 65534 (nobody) and cannot read" >&2
+      echo "  the secrets; notifications fail at send time only." >&2
+      fail=1
+  fi
+
+  if [ "$fail" -ne 0 ]; then
+      echo "config consistency check FAILED" >&2
+      exit 1
+  fi
+
+  echo "config consistency OK: $(printf '%s\n' "$referenced_hosts" | grep -c .) prometheus target host(s) and $(printf '%s\n' "${nginx_upstreams:-}" | grep -c . || echo 0) nginx upstream(s) all resolve to compose services; $(printf '%s\n' "$actual_limits" | grep -c .) service memory limit(s) on the intended service; $(printf '%s\n' "$route_names" | grep -c .) alertmanager alertname reference(s) and $(printf '%s\n' "$recv_names" | grep -c .) receiver target(s) all exist"

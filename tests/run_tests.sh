@@ -227,6 +227,7 @@ main() {
     check_script_syntax
     
     # Run component tests
+    run_test_suite "$SCRIPT_DIR/test_config_consistency.sh" "Config Consistency Gate Tests"
     run_test_suite "$SCRIPT_DIR/test_backup.sh" "Backup Script Tests"
     run_test_suite "$SCRIPT_DIR/test_security.sh" "Security Script Tests"
     run_test_suite "$SCRIPT_DIR/test_ml.sh" "ML Anomaly + Fix Engine Tests"

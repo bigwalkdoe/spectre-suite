@@ -106,6 +106,31 @@ groups:
           summary: "Redis exporter is down"
           description: "Redis exporter has been down for more than 5 minutes"
 
+  # Dead-man's switch. alertmanager.yml routes alertname="Watchdog" to
+  # watchdog-receiver, but no rule ever produced a Watchdog alert, so that
+  # receiver and route were dead configuration.
+  #
+  # This alert is meant to fire constantly and resolve just before it would. If
+  # you receive it, the delivery path itself has failed -- which is the one
+  # condition no other alert in this file can report, because if notification is
+  # broken nothing can tell you. `vector(1)` is always present, so the alert
+  # resolves on the next evaluation after Prometheus stops; with repeat_interval
+  # of 24h in the route, silence means the watchman still works.
+  - name: watchdog
+    interval: 60s
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Watchdog alive"
+          description: >-
+            If you can read this, notification delivery is working. This alert
+            fires continuously and is expected; ignore it. Its absence is the
+            signal that alerting is broken.
+
   - name: uptime_alerts
     interval: 30s
     rules:
