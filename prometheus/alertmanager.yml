@@ -12,8 +12,10 @@ global:
   # Slack configuration
   slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
 
-templates:
-  - '/etc/alertmanager/templates/*.tmpl'
+# Note: there is deliberately no `templates:` key. The previous value
+# ('/etc/alertmanager/templates/*.tmpl') had no corresponding bind mount, so the
+# glob never matched anything, and every receiver formats inline via html/text
+# rather than from a template file. Add a mount here when adding templates.
 
 # Notification routes
 route:
@@ -23,6 +25,15 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # Must be first. Alertmanager stops at the first matching sibling route, and
+    # the Watchdog alert carries severity="info", so when this route sat below the
+    # severity routes the info-receiver matched first and watchdog-receiver was
+    # never used. Matched before severity so the dead-man's switch has its own
+    # receiver rather than riding on the info path.
+    - match:
+        alertname: 'Watchdog'
+      receiver: 'watchdog-receiver'
+      repeat_interval: 24h
     - match:
         severity: critical
       receiver: 'critical-receiver'
@@ -35,10 +46,6 @@ route:
     - match:
         severity: info
       receiver: 'info-receiver'
-      repeat_interval: 24h
-    - match:
-        alertname: 'Watchdog'
-      receiver: 'watchdog-receiver'
       repeat_interval: 24h
 
 # Notification receivers
@@ -129,8 +136,23 @@ inhibit_rules:
     target_match:
       severity: 'info'
     equal: ['alertname', 'instance', 'job']
+  # The previous third rule inhibited alertnames InstanceDown and
+  # InstanceHealthcheck. Neither is defined in alert_rules.yml -- the real
+  # target-liveness alerts are UptimeCheckFailed, BlackboxExporterDown and the
+  # *ExporterDown family -- so the rule could never inhibit anything. These
+  # express the evident intent against alertnames that exist: do not report
+  # latency or DNS trouble for an endpoint already known to be down.
+  #
+  # One rule per target alertname. target_match takes a single string per key,
+  # not a list, so listing both alertnames here makes Alertmanager refuse to
+  # start with "cannot unmarshal !!seq into string".
   - source_match:
-      alertname: 'InstanceDown'
+      alertname: 'UptimeCheckFailed'
     target_match:
-      alertname: 'InstanceHealthcheck'
+      alertname: 'HighEndpointLatency'
+    equal: ['instance']
+  - source_match:
+      alertname: 'UptimeCheckFailed'
+    target_match:
+      alertname: 'DNSCheckFailed'
     equal: ['instance']
