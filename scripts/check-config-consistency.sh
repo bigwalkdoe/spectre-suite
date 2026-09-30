@@ -258,6 +258,59 @@ stray=$(awk '
       fail=1
   fi
 
+  # `{{ .GeneratorURL }}` is a field of an alert, not of the alert group. In a
+  # single-value field such as title_link it fails template execution, and the
+  # damage is not confined to that field: color, text and fallback all rendered
+  # empty while only the title survived, so Slack showed a bare heading with no
+  # severity colour and no body. It is only valid inside {{ range .Alerts }}.
+  # Omitting title_link entirely is the safe default; Alertmanager then links to
+  # its own alert page.
+  bad_genurl=$(
+      awk '
+          /^[[:space:]]*(title|title_link|pretext):/ && /\{\{[^}]*\.GeneratorURL/ {
+              line = $0
+              sub(/^[[:space:]]*/, "", line)
+              print "    " line
+          }
+      ' "$ALERTMANAGER" || true
+  )
+  if [ -n "$bad_genurl" ]; then
+      echo "ERROR: .GeneratorURL used outside 'range .Alerts'. It only exists on an" >&2
+      echo "  alert, not on the group, and the template error empties color/text too:" >&2
+      printf '%s\n' "$bad_genurl" >&2
+      fail=1
+  fi
+
+  # Every bind-mounted file needs a shared SELinux label (`:z`). Without it the
+  # host file carries whatever category it was created with while each container
+  # gets its own MCS pair, so the mount is unreadable -- even to root -- and the
+  # container crash-loops on "permission denied" reading its own config. Because
+  # the label is per-inode, any rewrite of the file (git checkout, sed -i) resets
+  # it, so this breaks on an ordinary pull rather than at deploy time.
+  unlabelled=$(
+      awk '
+          /^services:/ { insvc = 1; next }
+          /^[a-zA-Z]/ { insvc = 0 }
+          insvc && /^  [a-zA-Z0-9_-]+:[[:space:]]*$/ {
+              service = $1; sub(/:$/, "", service); next
+          }
+          insvc && /^[[:space:]]*-[[:space:]]*\.\// {
+              mount = $0
+              sub(/^[[:space:]]*-[[:space:]]*/, "", mount)
+              n = split(mount, part, ":")
+              opts = (n >= 3) ? part[n] : ""
+              if (opts !~ /(^|,)(z|Z)(,|$)/) print "    " service ": " mount
+          }
+      ' "$COMPOSE" || true
+  )
+  if [ -n "$unlabelled" ]; then
+      echo "ERROR: bind mounts without a shared SELinux label (:z). These are" >&2
+      echo "  unreadable inside the container under SELinux, and any rewrite of" >&2
+      echo "  the file resets the label:" >&2
+      printf '%s\n' "$unlabelled" >&2
+      fail=1
+  fi
+
   if [ "$fail" -ne 0 ]; then
       echo "config consistency check FAILED" >&2
       exit 1

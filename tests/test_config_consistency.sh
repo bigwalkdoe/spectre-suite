@@ -167,6 +167,47 @@ PY
 expect_fail "memory limit on a network is rejected" "$TREE" "network or volume"
 rm -rf "$TREE"
 
+# ---------------------------------------------------------------------------
+# 9. A bind mount without a shared SELinux label. Under SELinux each container
+#    gets its own MCS category pair, so a host file labelled for a different
+#    container is unreadable even by root, and Alertmanager crash-loops on its
+#    own config. Because the label lives on the inode, a git checkout resets it.
+# ---------------------------------------------------------------------------
+TREE="$(stage)"
+sed -i 's|alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,z|alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro|' \
+    "$TREE/docker-compose.monitoring.yml"
+expect_fail "bind mount without a shared SELinux label is rejected" "$TREE" "SELinux"
+rm -rf "$TREE"
+
+# ---------------------------------------------------------------------------
+# 10. A directory mount loses its label the same way, and is easier to miss
+#     because the mode is often already permissive.
+# ---------------------------------------------------------------------------
+TREE="$(stage)"
+sed -i 's|grafana-dashboards:/etc/grafana/provisioning/dashboards:z|grafana-dashboards:/etc/grafana/provisioning/dashboards|' \
+    "$TREE/docker-compose.monitoring.yml"
+expect_fail "unlabelled directory mount is rejected" "$TREE" "grafana-dashboards"
+rm -rf "$TREE"
+
+# ---------------------------------------------------------------------------
+# 11. `{{ .GeneratorURL }}` belongs to an alert, not the group. Used in a
+#     single-value field it fails template execution and silently empties
+#     color/text/fallback, so Slack shows a bare heading. Rendering this needs a
+#     running Alertmanager, but the mistake is statically visible.
+# ---------------------------------------------------------------------------
+TREE="$(stage)"
+sed -i "s|^        title: '\[CRITICAL\].*|&\n        title_link: '{{ .GeneratorURL }}'|" \
+    "$TREE/prometheus/alertmanager.yml"
+expect_fail "title_link using .GeneratorURL is rejected" "$TREE" "GeneratorURL"
+rm -rf "$TREE"
+
+# ---------------------------------------------------------------------------
+# 12. A per-alert link inside the body is the correct usage and must stay legal.
+# ---------------------------------------------------------------------------
+TREE="$(stage)"
+expect_pass "per-alert .GeneratorURL inside range is accepted" "$TREE"
+rm -rf "$TREE"
+
 echo ""
 echo "Config consistency tests: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]
