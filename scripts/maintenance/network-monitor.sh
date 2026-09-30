@@ -30,7 +30,9 @@ check_internet() {
 check_dns() {
     log "Checking DNS resolution..."
     
-    local dns_servers=(${DNS_SERVERS:-"8.8.8.8 8.8.4.4 1.1.1.1"})
+    local dns_servers_str="${DNS_SERVERS:-8.8.8.8 8.8.4.4 1.1.1.1}"
+    local -a dns_servers
+    read -r -a dns_servers <<< "$dns_servers_str"
     
     for dns in "${dns_servers[@]}"; do
         if nslookup google.com "$dns" > /dev/null 2>&1; then
@@ -82,7 +84,8 @@ check_firewall() {
     log "Checking firewall status..."
     
     if command -v ufw &> /dev/null; then
-        local status=$(ufw status | grep Status | awk '{print $2}')
+        local status
+        status=$(ufw status | grep Status | awk '{print $2}')
         if [[ "$status" == "active" ]]; then
             log "OK: UFW firewall is active"
             return 0
@@ -91,7 +94,8 @@ check_firewall() {
             return 1
         fi
     elif command -v firewall-cmd &> /dev/null; then
-        local status=$(firewall-cmd --state 2>/dev/null || echo "inactive")
+        local status
+        status=$(firewall-cmd --state 2>/dev/null || echo "inactive")
         if [[ "$status" == "running" ]]; then
             log "OK: firewalld is active"
             return 0
@@ -110,10 +114,12 @@ check_network_interface() {
     log "Checking network interface..."
     
     if command -v ip &> /dev/null; then
-        local interfaces=$(ip addr show | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | cut -d/ -f1)
+        local interfaces
+        interfaces=$(ip addr show | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | cut -d/ -f1)
         
         for iface in $interfaces; do
-            local speed=$(ip link show "$iface" 2>/dev/null | grep -oP 'speed \K\d+' || echo "unknown")
+            local speed
+            speed=$(ip link show "$iface" 2>/dev/null | grep -oP 'speed \K\d+' || echo "unknown")
             log "OK: Interface $iface is up (speed: ${speed}Mbit)"
         done
     else
