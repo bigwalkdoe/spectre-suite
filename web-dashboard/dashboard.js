@@ -1,9 +1,12 @@
 // Dashboard JavaScript
-// Runs in the browser: a hardcoded localhost pointed at the viewer's machine,
-// and cross-origin queries were blocked by CORS anyway. Override with
-// ?prometheus=https://prometheus.example.com (nginx must proxy /api in that case).
-const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus')
-    || `${location.protocol}//${location.hostname}:9090`;
+// Requests go to the nginx in this compose file, which proxies /api/ to
+// Prometheus, so the default is same-origin and empty. It used to default to
+// `${location.protocol}//${location.hostname}:9090`, a different origin from the
+// page, and Prometheus sends no Access-Control-Allow-Origin, so every fetch was
+// blocked and the dashboard rendered empty.
+// Override with ?prometheus=https://prometheus.example.com to read from a
+// Prometheus reachable from the browser rather than through this proxy.
+const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus') || '';
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
 let chart = null;
