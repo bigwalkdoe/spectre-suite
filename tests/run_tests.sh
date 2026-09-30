@@ -236,6 +236,7 @@ main() {
     run_test_suite "$SCRIPT_DIR/test_config_consistency.sh" "Config Consistency Gate Tests"
     run_test_suite "$SCRIPT_DIR/test_backup_health.sh" "Backup Health Check Tests"
     run_test_suite "$SCRIPT_DIR/test_security_metrics.sh" "Security Metrics Exporter Tests"
+    run_test_suite "$SCRIPT_DIR/test_schedule_ownership.sh" "Scheduled Job Ownership Tests"
     run_test_suite "$SCRIPT_DIR/test_backup.sh" "Backup Script Tests"
     run_test_suite "$SCRIPT_DIR/test_security.sh" "Security Script Tests"
     run_test_suite "$SCRIPT_DIR/test_ml.sh" "ML Anomaly + Fix Engine Tests"
