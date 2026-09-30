@@ -22,7 +22,10 @@ jobs:
         # Pinned to a released tag. This job holds security-events: write, so a
         # mutable ref (it was @master) means whoever moves that branch runs
         # arbitrary code with SARIF upload rights.
-        uses: aquasecurity/trivy-action@0.28.0
+        # Pinned to an immutable commit SHA of v0.36.0. This job holds
+        # security-events: write, so a mutable ref (it was @master) let whoever
+        # moved that branch run code with SARIF upload rights.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
