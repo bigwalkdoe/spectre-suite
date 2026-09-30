@@ -1,36 +1,31 @@
 package security.docker
 
-# Docker must not run as root
-docker_not_root = true
+import rego.v1
 
-rule if {
-    input.docker_not_root == true
+# Docker hardening
+deny contains msg if {
+    not input.docker_not_root == true
+    msg := "docker: dockerd must not run as root"
 }
 
-# Docker must have no-new-privileges
-docker_no_new_privileges = true
-
-rule if {
-    input.docker_no_new_privileges == true
+deny contains msg if {
+    not input.docker_no_new_privileges == true
+    msg := "docker: no-new-privileges is not set"
 }
 
-# Docker must have userland-proxy disabled
-docker_userland_proxy_disabled = true
-
-rule if {
-    input.docker_userland_proxy_disabled == true
+deny contains msg if {
+    not input.docker_userland_proxy_disabled == true
+    msg := "docker: userland-proxy is not disabled"
 }
 
-# Containers must have resource limits
-docker_resource_limits = true
-
-rule if {
-    input.docker_resource_limits == true
+deny contains msg if {
+    not input.docker_resource_limits == true
+    msg := "docker: containers have no resource limits"
 }
 
-# Privileged containers must be disabled
-docker_privileged_disabled = true
-
-rule if {
-    input.docker_privileged_disabled == true
+deny contains msg if {
+    not input.docker_privileged_disabled == true
+    msg := "docker: privileged containers are enabled"
 }
+
+# Total controls evaluated for security.docker: 5

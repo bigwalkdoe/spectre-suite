@@ -1,41 +1,36 @@
 package security.backups
 
-# Backup encryption must be enabled
-backup_encryption_enabled = true
+import rego.v1
 
-rule if {
-    input.backup_encryption_enabled == true
+# Backup policy
+deny contains msg if {
+    not input.backup_encryption_enabled == true
+    msg := "backups: encryption at rest is not enabled"
 }
 
-# Backup retention must meet minimum period
-rule if {
-    input.backup_retention_days >= 7
+deny contains msg if {
+    object.get(input, "backup_retention_days", 0) < 7
+    msg := "backups: retention is under 7 days"
 }
 
-# Off-site replication must be enabled
-backup_offsite_enabled = true
-
-rule if {
-    input.backup_offsite_enabled == true
+deny contains msg if {
+    not input.backup_offsite_enabled == true
+    msg := "backups: off-site replication is not enabled"
 }
 
-# Backup verification must be performed
-backup_verification_enabled = true
-
-rule if {
-    input.backup_verification_enabled == true
+deny contains msg if {
+    not input.backup_verification_enabled == true
+    msg := "backups: restore verification is not enabled"
 }
 
-# Database backups must be included
-database_backups_enabled = true
-
-rule if {
-    input.database_backups_enabled == true
+deny contains msg if {
+    not input.database_backups_enabled == true
+    msg := "backups: databases are not included"
 }
 
-# Docker volume backups must be included
-docker_volume_backups_enabled = true
-
-rule if {
-    input.docker_volume_backups_enabled == true
+deny contains msg if {
+    not input.docker_volume_backups_enabled == true
+    msg := "backups: docker volumes are not included"
 }
+
+# Total controls evaluated for security.backups: 6

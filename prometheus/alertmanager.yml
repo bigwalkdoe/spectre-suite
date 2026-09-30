@@ -3,12 +3,14 @@ global:
   # Email notification configuration
   smtp_smarthost: 'smtp.gmail.com:587'
   smtp_from: 'alertmanager@example.com'
-  smtp_auth_username: '${SMTP_USERNAME}'
-  smtp_auth_password: '${SMTP_PASSWORD}'
+  # Credentials come from files written by scripts/setup-notification-channels.sh;
+  # Alertmanager does not expand ${VAR} in this file. The *_file variants are
+  # only valid per-receiver, not under `global`, so SMTP auth is set on each
+  # email_config below and slack_api_url_file sits here.
   # PagerDuty configuration
   pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
   # Slack configuration
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
 
 templates:
   - '/etc/alertmanager/templates/*.tmpl'
@@ -40,33 +42,35 @@ route:
       repeat_interval: 24h
 
 # Notification receivers
+# Alertmanager performs NO environment-variable substitution in its config file,
+# so the previous '${SMTP_PASSWORD}' style placeholders were passed through as
+# literal strings. Secrets are supplied via file-based auth_config files
+# generated from the environment before startup -- see
+# scripts/setup-notification-channels.sh and docs/CONFIGURATION_EXAMPLES.md.
 receivers:
   - name: 'default-receiver'
     email_configs:
-      - to: '${ALERT_EMAIL_TO}'
+      - to: 'alertmanager@example.com'
         send_resolved: true
+        auth_username: 'alertmanager'
+        auth_password_file: '/etc/alertmanager/secrets/smtp_password'
         headers:
           Subject: '[ALERT] {{ .GroupLabels.alertname }}'
         html: '<h2>{{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
 
   - name: 'critical-receiver'
     email_configs:
-      - to: '${ALERT_EMAIL_TO}'
+      - to: 'alertmanager@example.com'
         send_resolved: true
+        auth_username: 'alertmanager'
+        auth_password_file: '/etc/alertmanager/secrets/smtp_password'
         headers:
           Subject: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
         html: '<h2 style="color:red;">CRITICAL: {{ .GroupLabels.alertname }}</h2><p><strong>Instance:</strong> {{ .GroupLabels.instance }}</p><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p><p><strong>Graph:</strong> <a href="{{ .ExternalURL }}">View in Prometheus</a></p>'
-    slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#alerts-critical'
-        username: 'Alertmanager'
-        icon_emoji: ':rotating_light:'
-        title: '[CRITICAL] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n*Graph:* {{ .GeneratorURL }}\n{{ end }}"
-        send_resolved: true
     pagerduty_configs:
-      - routing_key: '${PAGERDUTY_ROUTING_KEY}'
-        service_key: '${PAGERDUTY_SERVICE_KEY}'
+      # routing_key only: service_key was removed in Alertmanager 0.25 and is a
+      # validation error alongside it on current releases.
+      - routing_key_file: '/etc/alertmanager/secrets/pagerduty_routing_key'
         client: 'System-Maintenance'
         client_url: 'http://localhost:9093'
         description: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
@@ -76,19 +80,18 @@ receivers:
           - src: 'https://img.icons8.com/color/48/high-priority.png'
             alt: 'Critical Alert'
             href: '{{ .ExternalURL }}'
-    webhook_configs:
-      - url: 'http://localhost:8081/webhook/alert'
-        send_resolved: true
 
   - name: 'warning-receiver'
     email_configs:
-      - to: '${ALERT_EMAIL_TO}'
+      - to: 'alertmanager@example.com'
         send_resolved: true
+        auth_username: 'alertmanager'
+        auth_password_file: '/etc/alertmanager/secrets/smtp_password'
         headers:
           Subject: '[WARNING] {{ .GroupLabels.alertname }}'
         html: '<h2 style="color:orange;">WARNING: {{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         channel: '#alerts-warning'
         username: 'Alertmanager'
         icon_emoji: ':warning:'
@@ -98,7 +101,7 @@ receivers:
 
   - name: 'info-receiver'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         channel: '#alerts-info'
         username: 'Alertmanager'
         icon_emoji: ':information_source:'
@@ -107,7 +110,7 @@ receivers:
 
   - name: 'watchdog-receiver'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         channel: '#alerts-watchdog'
         username: 'Alertmanager'
         icon_emoji: ':dog:'

@@ -1,36 +1,31 @@
 package security.network
 
-# Network segmentation must be enabled
-network_segmentation_enabled = true
+import rego.v1
 
-rule if {
-    input.network_segmentation_enabled == true
+# Network policy
+deny contains msg if {
+    not input.network_segmentation_enabled == true
+    msg := "network: segmentation is not enabled"
 }
 
-# DMZ must be isolated
-dmz_isolated = true
-
-rule if {
-    input.dmz_isolated == true
+deny contains msg if {
+    not input.dmz_isolated == true
+    msg := "network: the DMZ is not isolated"
 }
 
-# Internal network must not access internet directly
-internal_no_internet = true
-
-rule if {
-    input.internal_no_internet == true
+deny contains msg if {
+    not input.internal_no_internet == true
+    msg := "network: the internal network has direct internet access"
 }
 
-# VPN must be enabled for remote access
-vpn_enabled = true
-
-rule if {
-    input.vpn_enabled == true
+deny contains msg if {
+    not input.vpn_enabled == true
+    msg := "network: no VPN is configured for remote access"
 }
 
-# DDoS protection must be enabled
-ddos_protection_enabled = true
-
-rule if {
-    input.ddos_protection_enabled == true
+deny contains msg if {
+    not input.ddos_protection_enabled == true
+    msg := "network: DDoS protection is not enabled"
 }
+
+# Total controls evaluated for security.network: 5
