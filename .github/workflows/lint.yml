@@ -8,10 +8,11 @@ name: Lint & Config Validation
 #   - amtool for the Alertmanager config
 #   - docker compose config, including the required-secret guards
 on:
+  # Runs on every branch push, not just main: a lint gate that only runs on main
+  # gives no feedback until merge, and this branch's own CI was green locally
+  # while the pipelines that did run were failing.
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
