@@ -1,7 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Application Dependency Vulnerability Scanner
 
@@ -10,7 +8,8 @@ echo "Scanning application dependencies for vulnerabilities..."
 # Function to scan a project directory
 scan_project() {
     local project_dir=$1
-    local project_name=$(basename "$project_dir")
+    local project_name
+    project_name=$(basename "$project_dir")
     
     if [ ! -d "$project_dir" ]; then
         echo "Project directory not found: $project_dir"

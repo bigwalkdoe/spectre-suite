@@ -6,6 +6,7 @@ set -euo pipefail
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# shellcheck disable=SC1091  # resolved at runtime
 source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
@@ -29,9 +30,11 @@ install_security_tools() {
     
     case "$PKG_MANAGER" in
         dnf)
+                        # shellcheck disable=SC2086  # PKG_INSTALL is a command string, split intentionally
             $PKG_INSTALL $tools
             ;;
         apt)
+                        # shellcheck disable=SC2086  # PKG_INSTALL is a command string, split intentionally
             $PKG_INSTALL $tools
             ;;
         pacman)
@@ -166,7 +169,8 @@ alert() {
 # Check Fail2Ban status
 check_fail2ban() {
     if command -v fail2ban-client >/dev/null 2>&1; then
-        local banned=$(sudo fail2ban-client status sshd | grep "Banned IP list" | awk -F: '{print $2}')
+        local banned
+        banned=$(sudo fail2ban-client status sshd | grep "Banned IP list" | awk -F: '{print $2}')
         if [ -n "$banned" ]; then
             log "Fail2Ban banned IPs: $banned"
         fi
@@ -176,7 +180,8 @@ check_fail2ban() {
 # Check AIDE integrity
 check_aide() {
     if command -v aide >/dev/null 2>&1; then
-        local aide_output=$(sudo aide --check 2>&1)
+        local aide_output
+        aide_output=$(sudo aide --check 2>&1)
         if echo "$aide_output" | grep -q "differences found"; then
             alert "AIDE integrity check found differences"
             log "$aide_output"
@@ -187,7 +192,8 @@ check_aide() {
 # Check rootkits
 check_rootkits() {
     if command -v rkhunter >/dev/null 2>&1; then
-        local rkhunter_output=$(sudo rkhunter --check --skip-keypress 2>&1)
+        local rkhunter_output
+        rkhunter_output=$(sudo rkhunter --check --skip-keypress 2>&1)
         if echo "$rkhunter_output" | grep -q "Warning"; then
             alert "Rootkit scan found warnings"
             log "$rkhunter_output"
@@ -197,8 +203,10 @@ check_rootkits() {
 
 # Check for unauthorized users
 check_users() {
-    local current_users=$(cat /etc/passwd | wc -l)
-    local known_users=$(cat /etc/security-integration/baseline.users 2>/dev/null | wc -l)
+    local current_users
+    current_users=$(cat /etc/passwd | wc -l)
+    local known_users
+    known_users=$(cat /etc/security-integration/baseline.users 2>/dev/null | wc -l)
     
     if [ $current_users -gt $known_users ]; then
         alert "Unauthorized user accounts detected"
@@ -208,7 +216,8 @@ check_users() {
 
 # Check for suspicious processes
 check_processes() {
-    local suspicious=$(ps aux | grep -E "nc.*-l|/bin/sh.*-i|perl.*-e" | grep -v grep)
+    local suspicious
+    suspicious=$(ps aux | grep -E "nc.*-l|/bin/sh.*-i|perl.*-e" | grep -v grep)
     if [ -n "$suspicious" ]; then
         alert "Suspicious processes detected"
         log "$suspicious"

@@ -143,7 +143,7 @@ resource "aws_backup_plan" "main" {
 resource "aws_s3_bucket" "backups" {
   count = var.deployment_target == "aws" ? 1 : 0
 
-  bucket = "${local.project_name}-backups-${var.environment}"
+  bucket        = "${local.project_name}-backups-${var.environment}"
   force_destroy = var.environment == "dev" ? true : false
 
   tags = local.common_tags
@@ -176,22 +176,40 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
 
   bucket = aws_s3_bucket.backups[0].id
 
+  # The AWS provider requires exactly one of filter/prefix per rule. Each
+  # storage-tier transition gets its own rule so the tiers cannot be confused.
   rule {
-    id     = "expire-old-backups"
+    id     = "transition-to-standard-ia"
     status = "Enabled"
 
-    expiration {
-      days = 90
-    }
+    filter {}
 
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
     }
+  }
+
+  rule {
+    id     = "archive-to-glacier"
+    status = "Enabled"
+
+    filter {}
 
     transition {
       days          = 60
       storage_class = "GLACIER"
+    }
+  }
+
+  rule {
+    id     = "expire-old-backups"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 90
     }
   }
 }
@@ -225,8 +243,8 @@ resource "aws_wafv2_web_acl" "main" {
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name               = "RateLimitRule"
-      sampled_requests_enabled  = true
+      metric_name                = "RateLimitRule"
+      sampled_requests_enabled   = true
     }
   }
 
@@ -247,15 +265,15 @@ resource "aws_wafv2_web_acl" "main" {
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name               = "BlockBadBots"
-      sampled_requests_enabled  = true
+      metric_name                = "BlockBadBots"
+      sampled_requests_enabled   = true
     }
   }
 
   visibility_config {
     cloudwatch_metrics_enabled = true
-    metric_name               = "${local.project_name}-waf"
-    sampled_requests_enabled  = true
+    metric_name                = "${local.project_name}-waf"
+    sampled_requests_enabled   = true
   }
 
   tags = local.common_tags
@@ -273,7 +291,7 @@ resource "aws_wafv2_web_acl_association" "main" {
 resource "aws_lb" "main" {
   count = var.deployment_target == "aws" ? 1 : 0
 
-  name               = "${local.project-name}-alb"
+  name               = "${local.project_slug}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.main[0].id]
@@ -287,7 +305,7 @@ resource "aws_lb" "main" {
 resource "aws_lb_target_group" "grafana" {
   count = var.deployment_target == "aws" ? 1 : 0
 
-  name     = "${local.project-name}-grafana-tg"
+  name     = "${local.project_slug}-grafana-tg"
   port     = 3002
   protocol = "HTTP"
   vpc_id   = aws_vpc.main[0].id
@@ -326,16 +344,16 @@ variable "ssl_certificate_arn" {
 
 # Outputs
 output "backup_bucket_name" {
-  value = var.deployment_target == "aws" ? aws_s3_bucket.backups[0].id : ""
+  value       = var.deployment_target == "aws" ? aws_s3_bucket.backups[0].id : ""
   description = "S3 bucket for off-site backups"
 }
 
 output "waf_acl_id" {
-  value = var.deployment_target == "aws" ? aws_wafv2_web_acl.main[0].id : ""
+  value       = var.deployment_target == "aws" ? aws_wafv2_web_acl.main[0].id : ""
   description = "WAF ACL ID"
 }
 
 output "alb_dns_name" {
-  value = var.deployment_target == "aws" ? aws_lb.main[0].dns_name : ""
+  value       = var.deployment_target == "aws" ? aws_lb.main[0].dns_name : ""
   description = "ALB DNS name"
 }

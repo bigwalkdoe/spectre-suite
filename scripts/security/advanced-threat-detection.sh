@@ -6,6 +6,7 @@ set -euo pipefail
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# shellcheck disable=SC1091  # resolved at runtime
 source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
@@ -30,14 +31,14 @@ establish_baseline() {
     echo "Establishing security baselines..."
     
     # Network baseline
-    sudo netstat -tuln > "$THRESHOLD_FILE.network.tmp"
-    sudo ss -tuln >> "$THRESHOLD_FILE.network.tmp"
+    sudo netstat -tuln | sudo tee "$THRESHOLD_FILE.network.tmp" >/dev/null
+    sudo ss -tuln | sudo tee -a "$THRESHOLD_FILE.network.tmp" >/dev/null
     
     # Process baseline
     ps aux > "$THRESHOLD_FILE.process.tmp"
     
     # File system baseline (critical directories)
-    sudo find /etc /usr/bin /usr/sbin -type f -perm -4000 -o -perm -2000 > "$THRESHOLD_FILE.suid.tmp"
+    sudo find /etc /usr/bin /usr/sbin -type f \( -perm -4000 -o -perm -2000 \) | sudo tee "$THRESHOLD_FILE.suid.tmp" >/dev/null
     
     # User baseline
     cat /etc/passwd > "$THRESHOLD_FILE.users.tmp"
@@ -56,8 +57,10 @@ detect_network_anomalies() {
     local alerts=0
     
     # Check for unusual open ports
-    local current_ports=$(sudo netstat -tuln | awk '{print $4}' | grep -E ':[0-9]+' | cut -d: -f2 | sort -u)
-    local baseline_ports=$(cat "$THRESHOLD_FILE.network" 2>/dev/null | awk '{print $4}' | grep -E ':[0-9]+' | cut -d: -f2 | sort -u)
+    local current_ports
+    current_ports=$(sudo netstat -tuln | awk '{print $4}' | grep -E ':[0-9]+' | cut -d: -f2 | sort -u)
+    local baseline_ports
+    baseline_ports=$(cat "$THRESHOLD_FILE.network" 2>/dev/null | awk '{print $4}' | grep -E ':[0-9]+' | cut -d: -f2 | sort -u)
     
     # Check for new ports
     for port in $current_ports; do
@@ -68,8 +71,11 @@ detect_network_anomalies() {
     done
     
     # Check for suspicious connections
-    local suspicious=$(sudo netstat -an | grep ESTABLISHED | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -rn | head -5)
-    if [ $(echo "$suspicious" | awk '{sum+=$1} END {print sum}') -gt 100 ]; then
+    local suspicious
+    suspicious=$(sudo netstat -an | grep ESTABLISHED | awk '{print $5}' | cut -d: -f1 | sort | uniq -c | sort -rn | head -5)
+    local suspicious_total
+    suspicious_total=$(echo "$suspicious" | awk '{sum+=$1} END {print sum+0}')
+    if [ "${suspicious_total:-0}" -gt 100 ]; then
         echo "ALERT: High number of connections from single IPs" | sudo tee -a "$ALERT_LOG"
         ((alerts++))
     fi
@@ -93,7 +99,8 @@ detect_process_anomalies() {
     local alerts=0
     
     # Check for processes with high CPU usage
-    local high_cpu=$(ps aux --sort=-%cpu | head -10 | awk '{if ($3 > 80) print}')
+    local high_cpu
+    high_cpu=$(ps aux --sort=-%cpu | head -10 | awk '{if ($3 > 80) print}')
     if [ -n "$high_cpu" ]; then
         echo "WARNING: Processes with high CPU usage detected" | sudo tee -a "$ALERT_LOG"
         echo "$high_cpu" | sudo tee -a "$ALERT_LOG"
@@ -101,7 +108,8 @@ detect_process_anomalies() {
     fi
     
     # Check for processes with high memory usage
-    local high_mem=$(ps aux --sort=-%mem | head -10 | awk '{if ($4 > 80) print}')
+    local high_mem
+    high_mem=$(ps aux --sort=-%mem | head -10 | awk '{if ($4 > 80) print}')
     if [ -n "$high_mem" ]; then
         echo "WARNING: Processes with high memory usage detected" | sudo tee -a "$ALERT_LOG"
         echo "$high_mem" | sudo tee -a "$ALERT_LOG"
@@ -118,7 +126,8 @@ detect_process_anomalies() {
     done
     
     # Check for processes with no executable path
-    local no_path=$(ps aux | awk '{if ($11 == "" || $11 == "?" && $2 != 1 && $2 != 2) print}')
+    local no_path
+    no_path=$(ps aux | awk '{if ($11 == "" || $11 == "?" && $2 != 1 && $2 != 2) print}')
     if [ -n "$no_path" ]; then
         echo "WARNING: Processes with no executable path detected" | sudo tee -a "$ALERT_LOG"
         echo "$no_path" | sudo tee -a "$ALERT_LOG"
@@ -135,8 +144,10 @@ monitor_file_integrity() {
     local alerts=0
     
     # Check for new SUID/SGID files
-    local current_suid=$(sudo find /etc /usr/bin /usr/sbin -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null)
-    local baseline_suid=$(cat "$THRESHOLD_FILE.suid" 2>/dev/null)
+    local current_suid
+    current_suid=$(sudo find /etc /usr/bin /usr/sbin -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null)
+    local baseline_suid
+    baseline_suid=$(cat "$THRESHOLD_FILE.suid" 2>/dev/null)
     
     if [ "$current_suid" != "$baseline_suid" ]; then
         echo "ALERT: SUID/SGID files have changed!" | sudo tee -a "$ALERT_LOG"
@@ -149,11 +160,13 @@ monitor_file_integrity() {
     local critical_files="/etc/passwd /etc/shadow /etc/group /etc/sudoers /etc/ssh/sshd_config"
     for file in $critical_files; do
         if [ -f "$file" ]; then
-            local checksum=$(sudo md5sum "$file" | awk '{print $1}')
-            local baseline_checksum=$(grep "$file" "$THRESHOLD_FILE.checksums" 2>/dev/null | awk '{print $2}')
+            local checksum
+            checksum=$(sudo md5sum "$file" | awk '{print $1}')
+            local baseline_checksum
+            baseline_checksum=$(grep "$file" "$THRESHOLD_FILE.checksums" 2>/dev/null | awk '{print $2}')
             
             if [ "$checksum" != "$baseline_checksum" ] && [ -n "$baseline_checksum" ]; then
-                echo "ALERT: Critical file changed - $file" | sudo tee -a "$ALREAT_LOG"
+                echo "ALERT: Critical file changed - $file" | sudo tee -a "$ALERT_LOG"
                 ((alerts++))
             fi
         fi
@@ -162,7 +175,8 @@ monitor_file_integrity() {
     # Check for new files in suspicious locations
     local suspicious_dirs="/tmp /var/tmp /dev/shm"
     for dir in $suspicious_dirs; do
-        local new_files=$(sudo find "$dir" -type f -mmin -60 2>/dev/null)
+        local new_files
+        new_files=$(sudo find "$dir" -type f -mmin -60 2>/dev/null)
         if [ -n "$new_files" ]; then
             echo "WARNING: New files in suspicious directory - $dir" | sudo tee -a "$ALERT_LOG"
             echo "$new_files" | sudo tee -a "$ALERT_LOG"
@@ -180,21 +194,24 @@ analyze_logs() {
     local alerts=0
     
     # Check for failed login attempts
-    local failed_logins=$(sudo grep "Failed password" /var/log/auth.log /var/log/secure 2>/dev/null | tail -100 | wc -l)
-    if [ $failed_logins -gt 10 ]; then
+    local failed_logins
+    failed_logins=$(sudo grep "Failed password" /var/log/auth.log /var/log/secure 2>/dev/null | tail -100 | wc -l)
+    if [ "$failed_logins" -gt 10 ]; then
         echo "ALERT: High number of failed login attempts - $failed_logins" | sudo tee -a "$ALERT_LOG"
         ((alerts++))
     fi
     
     # Check for sudo usage
-    local sudo_usage=$(sudo grep "sudo:" /var/log/auth.log /var/log/secure 2>/dev/null | tail -50)
+    local sudo_usage
+    sudo_usage=$(sudo grep "sudo:" /var/log/auth.log /var/log/secure 2>/dev/null | tail -50)
     if [ -n "$sudo_usage" ]; then
         echo "INFO: Recent sudo activity" | sudo tee -a "$MONITOR_LOG"
         echo "$sudo_usage" | sudo tee -a "$MONITOR_LOG"
     fi
     
     # Check for kernel errors
-    local kernel_errors=$(sudo dmesg | grep -i "error\|fail" | tail -20)
+    local kernel_errors
+    kernel_errors=$(sudo dmesg | grep -i "error\|fail" | tail -20)
     if [ -n "$kernel_errors" ]; then
         echo "WARNING: Kernel errors detected" | sudo tee -a "$ALERT_LOG"
         echo "$kernel_errors" | sudo tee -a "$ALERT_LOG"
@@ -203,7 +220,8 @@ analyze_logs() {
     
     # Check for unusual system calls (using auditd if available)
     if command -v aureport >/dev/null 2>&1; then
-        local audit_failures=$(sudo aureport --failed 2>/dev/null | tail -20)
+        local audit_failures
+        audit_failures=$(sudo aureport --failed 2>/dev/null | tail -20)
         if [ -n "$audit_failures" ]; then
             echo "WARNING: Audit system failures detected" | sudo tee -a "$ALERT_LOG"
             echo "$audit_failures" | sudo tee -a "$ALERT_LOG"
@@ -280,7 +298,8 @@ main_monitoring() {
 generate_report() {
     echo "Generating threat detection report..."
     
-    local report_file="/tmp/threat-report-$(date +%Y%m%d-%H%M%S).txt"
+    local report_file
+    report_file="/tmp/threat-report-$(date +%Y%m%d-%H%M%S).txt"
     
     cat > "$report_file" << EOF
 THREAT DETECTION REPORT

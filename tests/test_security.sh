@@ -124,11 +124,31 @@ run_all_tests() {
     local passed=0
     local failed=0
     
-    test_security_scripts_exist && ((passed+=1)) || ((failed+=1))
-    test_security_scripts_executable && ((passed+=1)) || ((failed+=1))
-    test_security_scripts_syntax && ((passed+=1)) || ((failed+=1))
-    test_security_configurations && ((passed+=1)) || ((failed+=1))
-    test_ids_ips_script && ((passed+=1)) || ((failed+=1))
+    if test_security_scripts_exist; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_security_scripts_executable; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_security_scripts_syntax; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_security_configurations; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_ids_ips_script; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
     
     echo ""
     echo "Security Script Tests Summary:"

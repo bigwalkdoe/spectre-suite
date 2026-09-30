@@ -14,7 +14,6 @@ elif [[ -w /var/log ]]; then
 else
     LOG_FILE="${TMPDIR:-/tmp}/database-restore.log"
 fi
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE" || true
@@ -42,7 +41,7 @@ find_latest_backup() {
             ;;
     esac
 
-    ls -t "$BACKUP_DIR"/$pattern 2>/dev/null | head -1 || true
+    find "$BACKUP_DIR" -maxdepth 1 -name "$pattern" -printf "%T@ %p\n" 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2- || true
 }
 
 # Verify backup integrity

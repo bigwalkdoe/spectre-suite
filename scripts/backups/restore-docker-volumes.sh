@@ -6,7 +6,6 @@ set -euo pipefail
 
 BACKUP_DIR="/backups/docker-volumes"
 LOG_FILE="/var/log/docker-volume-restore.log"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE" || true
@@ -18,7 +17,7 @@ error() {
 
 # Find latest backup
 find_latest_backup() {
-    ls -t "$BACKUP_DIR"/guardrail-ai_*_data_*.tar.gz 2>/dev/null | head -1
+    find "$BACKUP_DIR" -maxdepth 1 -name 'guardrail-ai_*_data_*.tar.gz' -printf "%T@ %p\n" 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-
 }
 
 # Verify backup integrity
@@ -54,17 +53,21 @@ restore_volumes() {
     fi
     
     # Extract backup to temp directory
-    local temp_dir=$(mktemp -d)
+    local temp_dir
+    temp_dir=$(mktemp -d)
     log "Extracting backup to: $temp_dir"
     
     tar -xzf "$backup_file" -C "$temp_dir"
     
     # Find volume directories
-    local volume_dirs=$(find "$temp_dir" -maxdepth 1 -type d -name "*/data" | head -10)
+    local volume_dirs
+    volume_dirs=$(find "$temp_dir" -maxdepth 1 -type d -name "*/data" | head -10)
     
     for volume_dir in $volume_dirs; do
-        local volume_path=$(dirname "$volume_dir")
-        local volume_name=$(basename "$volume_path")
+        local volume_path
+        volume_path=$(dirname "$volume_dir")
+        local volume_name
+        volume_name=$(basename "$volume_path")
         
         log "Restoring volume: $volume_name"
         
@@ -113,10 +116,12 @@ restore_specific_volume() {
     log "Restoring specific volume: $volume_name"
     
     # Find volume directory in backup
-    local temp_dir=$(mktemp -d)
+    local temp_dir
+    temp_dir=$(mktemp -d)
     tar -xzf "$backup_file" -C "$temp_dir"
     
-    local volume_path=$(find "$temp_dir" -maxdepth 1 -type d -name "*$volume_name*" | head -1)
+    local volume_path
+    volume_path=$(find "$temp_dir" -maxdepth 1 -type d -name "*$volume_name*" | head -1)
     
     if [[ -z "$volume_path" ]]; then
         error "Volume directory not found in backup"
