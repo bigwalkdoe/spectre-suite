@@ -81,6 +81,23 @@ services:
     container_name: node-exporter
     ports:
       - "127.0.0.1:9100:9100"
+    # The image defaults to uid 65534 (nobody), and /host/proc is the *host's*
+    # procfs: procfs denies access to a PID that is not in the mount's own PID
+    # namespace, so /host/proc/1/mountinfo was unreadable and the filesystem
+    # collector failed with "permission denied" on every scrape. That published
+    # no node_filesystem_* series at all, and HighDiskUsage and CriticalDiskUsage
+    # both divide node_filesystem_avail_bytes{mountpoint="/"} by
+    # node_filesystem_size_bytes -- with no series they could never fire, so a
+    # disk alert that silently never triggers reads as coverage.
+    #
+    # `pid: host` is what actually fixes it: the container then shares the host
+    # PID namespace, so the bind-mounted /proc and the mount's namespace agree
+    # and PID 1 is readable. Running as root is still required, because the
+    # host's PID 1 mountinfo is root-owned. This is the standard node-exporter
+    # host-monitoring configuration; it stays loopback-bound with read-only
+    # mounts, and it is the only service granted either privilege.
+    user: root
+    pid: host
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
