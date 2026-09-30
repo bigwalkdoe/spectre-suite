@@ -156,6 +156,14 @@ jobs:
             nginx:1.30.5-alpine \
             nginx -t
 
+      - name: Config references must resolve to real services
+        # Replaces "Configuration Drift Detection" in security-scanning.yml,
+        # which globbed the config files and echoed OK for each one found and so
+        # could not fail. It lives here because this workflow runs on every
+        # branch push, whereas security-scanning.yml only runs on main and pull
+        # requests. Needs no Docker: it only reads the config files.
+        run: bash scripts/check-config-consistency.sh
+
       - name: Documented commands resolve to real files
         # The README told readers to run ~20 scripts that do not exist here, so
         # the documented quick start failed on the first command. Nothing
