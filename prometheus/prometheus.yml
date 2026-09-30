@@ -75,24 +75,28 @@ scrape_configs:
     scrape_interval: 60s
 
   # Blackbox Exporter - TCP connectivity checks
-  # These targets are resolved inside the Prometheus container, so "localhost"
-  # meant the container's own loopback, not the host. Every check failed
-  # permanently. host.docker.internal is defined via extra_hosts in
-  # docker-compose.monitoring.yml.
+  # blackbox-exporter is on the `monitoring` network alongside every service, so
+  # these are addressed by Compose service name. That is the path real clients
+  # use, and it is the only one that works for services publishing no host port.
+  #
+  # Earlier revisions used "localhost" (the exporter's own loopback) and then
+  # "host.docker.internal" (the Docker gateway). Both failed permanently: the
+  # gateway cannot reach services that publish no host port, which postgres and
+  # redis do not, and the list carried ports this stack never serves -- 443 and
+  # 3100/Loki -- so all eight checks reported UptimeCheckFailed within minutes of
+  # a clean start.
   - job_name: 'blackbox-tcp'
     metrics_path: /probe
     params:
       module: [tcp_connect]
     static_configs:
       - targets:
-        - 'host.docker.internal:22'
-        - 'host.docker.internal:443'
-        - 'host.docker.internal:5432'
-        - 'host.docker.internal:6379'
-        - 'host.docker.internal:9090'
-        - 'host.docker.internal:3002'
-        - 'host.docker.internal:8081'
-        - 'host.docker.internal:3100'
+        - 'prometheus:9090'
+        - 'grafana:3000'
+        - 'alertmanager:9093'
+        - 'web-dashboard:80'
+        - 'postgres:5432'
+        - 'redis:6379'
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

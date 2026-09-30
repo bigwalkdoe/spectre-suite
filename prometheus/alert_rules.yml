@@ -217,9 +217,16 @@ groups:
           summary: "High container CPU usage"
           description: "Container {{ $labels.name }} is using {{ $value }} CPU"
 
+      # The container!="" filter mirrors HighContainerCPU above and is not
+      # optional. Without it this rule matched every systemd cgroup cAdvisor
+      # reported (/system.slice/auditd.service and 133 others), which have no
+      # container name. The `and on(instance, name)` join then matched on an
+      # empty `name`, divided by an absent limit, and paged 134 critical-looking
+      # instances reading "Container  is using +Inf of its memory limit" -- none
+      # of them containers, and none actionable.
       - alert: HighContainerMemory
-        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8)
-              and on(instance, name) (container_spec_memory_limit_bytes > 0)
+        expr: (container_memory_usage_bytes{container!=""} / container_spec_memory_limit_bytes{container!=""} > 0.8)
+              and on(instance, name) (container_spec_memory_limit_bytes{container!=""} > 0)
         for: 10m
         labels:
           severity: warning
