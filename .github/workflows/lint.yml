@@ -156,6 +156,13 @@ jobs:
             nginx:1.30.5-alpine \
             nginx -t
 
+      - name: Documented commands resolve to real files
+        # The README told readers to run ~20 scripts that do not exist here, so
+        # the documented quick start failed on the first command. Nothing
+        # checked it. Unimplemented capabilities are now described in prose
+        # without a path, which satisfies this check.
+        run: bash scripts/check-docs-references.sh
+
       - name: Required secrets are actually required
         # Guards the fail-closed behaviour: compose must refuse to render when
         # the credentials are absent rather than falling back to defaults.

@@ -53,7 +53,7 @@ ansible-playbook -i inventory/production.yml playbook.yml
 scripts/backups/restore-from-remote.sh
 
 # 4. Verify services
-scripts/healthcheck.sh
+scripts/maintenance/system-health-check.sh
 ```
 
 ### 3. Docker Daemon Failure
@@ -82,19 +82,24 @@ sudo iptables -A INPUT -s <attacker_ip> -j DROP
 sudo fail2ban-client set sshd banip <attacker_ip>
 
 # 2. Run security scan
-scripts/security/run-trivy-scan.sh
-scripts/security/check-file-integrity.sh
+# Container scanning is a CI job, not a local script. Scan an image directly:
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy image --severity HIGH,CRITICAL <image>
+scripts/security/scan-docker-images.sh
 
 # 3. Review logs
 sudo journalctl -u docker --since "24 hours ago" | grep -i error
 tail -100 /var/log/auth.log | grep -i "failed\|error\|unauthorized"
 
 # 4. Rotate credentials
-scripts/security/inject-secrets.sh
+# There is no secrets-injection script. Rotate by editing .env (database and
+# Redis credentials) and re-running scripts/setup-notification-channels.sh for
+# the Alertmanager receivers, then restart the stack.
 sudo systemctl restart all services
 
 # 5. Generate incident report
-scripts/security/generate-security-report.sh
+# No report generator is provided. The inputs are: the scan output above, the
+# journal/auth log greps, and scripts/maintenance/audit-trail.sh.
 ```
 
 ### 5. Disk Space Exhaustion
@@ -168,7 +173,7 @@ scripts/backups/restore-docker-volumes.sh
 docker-compose -f docker-compose.monitoring.yml up -d
 
 # Step 6: Verify
-scripts/healthcheck.sh
+scripts/maintenance/system-health-check.sh
 ```
 
 ### Backup Verification Procedure
