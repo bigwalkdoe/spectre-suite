@@ -1,17 +1,20 @@
 global:
   resolve_timeout: 5m
-  # Email notification configuration
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'alertmanager@example.com'
-  smtp_auth_username: '${SMTP_USERNAME}'
-  smtp_auth_password: '${SMTP_PASSWORD}'
-  # PagerDuty configuration
-  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
-  # Slack configuration
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # Slack is the only notification channel, so SMTP and PagerDuty are gone from
+  # this file entirely. Leaving them in place meant every alert logged a
+  # "Notify for alerts failed" for an integration nobody had configured, which
+  # buries the failures that matter.
+  #
+  # Alertmanager performs no ${VAR} substitution, so the webhook is read from a
+  # file written by scripts/setup-notification-channels.sh rather than
+  # interpolated here. The *_file variants are only valid per-receiver, not
+  # under `global`, so each slack_config names the file explicitly.
+  slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
 
-templates:
-  - '/etc/alertmanager/templates/*.tmpl'
+# Note: there is deliberately no `templates:` key. The previous value
+# ('/etc/alertmanager/templates/*.tmpl') had no corresponding bind mount, so the
+# glob never matched anything, and every receiver formats inline via html/text
+# rather than from a template file. Add a mount here when adding templates.
 
 # Notification routes
 route:
@@ -21,6 +24,15 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # Must be first. Alertmanager stops at the first matching sibling route, and
+    # the Watchdog alert carries severity="info", so when this route sat below the
+    # severity routes the info-receiver matched first and watchdog-receiver was
+    # never used. Matched before severity so the dead-man's switch has its own
+    # receiver rather than riding on the info path.
+    - match:
+        alertname: 'Watchdog'
+      receiver: 'watchdog-receiver'
+      repeat_interval: 24h
     - match:
         severity: critical
       receiver: 'critical-receiver'
@@ -34,85 +46,73 @@ route:
         severity: info
       receiver: 'info-receiver'
       repeat_interval: 24h
-    - match:
-        alertname: 'Watchdog'
-      receiver: 'watchdog-receiver'
-      repeat_interval: 24h
 
 # Notification receivers
+# Alertmanager performs NO environment-variable substitution in its config file,
+# so the webhook URL is read from a file rather than interpolated here. It is
+# written by scripts/setup-notification-channels.sh -- see
+# prometheus/alertmanager-secrets/README.md.
 receivers:
+  # Slack is the only channel. Severity is carried by the attachment colour and
+  # the title prefix rather than by separate channels: Slack routes incoming
+  # webhooks to the channel the webhook was created for and commonly ignores the
+  # `channel`, `username` and `icon_emoji` fields, so per-severity channel names
+  # in this file were decorative. `color` is honoured.
+  #
+  # Every receiver posts to the same webhook, so there is one place to rotate the
+  # secret. There is deliberately no `channel:` field; the webhook decides.
+  #
+  # There is also deliberately no `title_link:`. `{{ .GeneratorURL }}` is a field
+  # of an *alert*, not of the alert group, so referencing it in a single-value
+  # field like title_link fails template execution -- and the failure is not
+  # confined to that field: color, text and fallback all came out empty while
+  # only the title rendered, so a Slack message arrived as a bare heading with no
+  # severity colour. Omitting title_link uses Alertmanager's default, which links
+  # to its own alert page. A per-alert Prometheus link is added inside
+  # `{{ range .Alerts }}` in the body instead, which is the only place
+  # .GeneratorURL exists.
   - name: 'default-receiver'
-    email_configs:
-      - to: '${ALERT_EMAIL_TO}'
+    slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
-        headers:
-          Subject: '[ALERT] {{ .GroupLabels.alertname }}'
-        html: '<h2>{{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
+        color: '#d40d0d'
+        title: '[ALERT] {{ .GroupLabels.alertname }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
 
   - name: 'critical-receiver'
-    email_configs:
-      - to: '${ALERT_EMAIL_TO}'
-        send_resolved: true
-        headers:
-          Subject: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
-        html: '<h2 style="color:red;">CRITICAL: {{ .GroupLabels.alertname }}</h2><p><strong>Instance:</strong> {{ .GroupLabels.instance }}</p><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p><p><strong>Graph:</strong> <a href="{{ .ExternalURL }}">View in Prometheus</a></p>'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#alerts-critical'
-        username: 'Alertmanager'
-        icon_emoji: ':rotating_light:'
-        title: '[CRITICAL] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n*Graph:* {{ .GeneratorURL }}\n{{ end }}"
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
-    pagerduty_configs:
-      - routing_key: '${PAGERDUTY_ROUTING_KEY}'
-        service_key: '${PAGERDUTY_SERVICE_KEY}'
-        client: 'System-Maintenance'
-        client_url: 'http://localhost:9093'
-        description: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
-        severity: 'critical'
-        send_resolved: true
-        images:
-          - src: 'https://img.icons8.com/color/48/high-priority.png'
-            alt: 'Critical Alert'
-            href: '{{ .ExternalURL }}'
-    webhook_configs:
-      - url: 'http://localhost:8081/webhook/alert'
-        send_resolved: true
+        color: '#d40d0d'
+        title: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n*Summary:* {{ .Annotations.summary }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
 
   - name: 'warning-receiver'
-    email_configs:
-      - to: '${ALERT_EMAIL_TO}'
-        send_resolved: true
-        headers:
-          Subject: '[WARNING] {{ .GroupLabels.alertname }}'
-        html: '<h2 style="color:orange;">WARNING: {{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#alerts-warning'
-        username: 'Alertmanager'
-        icon_emoji: ':warning:'
-        title: '[WARNING] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n{{ end }}"
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
+        color: '#daa038'
+        title: '[WARNING] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
 
   - name: 'info-receiver'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#alerts-info'
-        username: 'Alertmanager'
-        icon_emoji: ':information_source:'
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
+        send_resolved: true
+        color: '#2eb886'
         title: '[INFO] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Description:* {{ .Annotations.description }}\n{{ end }}"
+        text: "{{ range .Alerts }}*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
 
+  # The dead-man's switch. The text says what to do, because the only time anyone
+  # reads it is when it fires, which means delivery has already failed and
+  # everything else they would normally rely on is silent.
   - name: 'watchdog-receiver'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
-        channel: '#alerts-watchdog'
-        username: 'Alertmanager'
-        icon_emoji: ':dog:'
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
+        send_resolved: true
+        color: '#2eb886'
         title: 'Watchdog Alive'
-        text: 'Alertmanager is running and sending notifications'
+        text: 'Alerting is working. This message repeats every 24h; its *absence* is the problem. If you are reading this and expected an outage alert, that alert could not be delivered.'
 
 # Inhibition rules
 inhibit_rules:
@@ -126,8 +126,23 @@ inhibit_rules:
     target_match:
       severity: 'info'
     equal: ['alertname', 'instance', 'job']
+  # The previous third rule inhibited alertnames InstanceDown and
+  # InstanceHealthcheck. Neither is defined in alert_rules.yml -- the real
+  # target-liveness alerts are UptimeCheckFailed, BlackboxExporterDown and the
+  # *ExporterDown family -- so the rule could never inhibit anything. These
+  # express the evident intent against alertnames that exist: do not report
+  # latency or DNS trouble for an endpoint already known to be down.
+  #
+  # One rule per target alertname. target_match takes a single string per key,
+  # not a list, so listing both alertnames here makes Alertmanager refuse to
+  # start with "cannot unmarshal !!seq into string".
   - source_match:
-      alertname: 'InstanceDown'
+      alertname: 'UptimeCheckFailed'
     target_match:
-      alertname: 'InstanceHealthcheck'
+      alertname: 'HighEndpointLatency'
+    equal: ['instance']
+  - source_match:
+      alertname: 'UptimeCheckFailed'
+    target_match:
+      alertname: 'DNSCheckFailed'
     equal: ['instance']

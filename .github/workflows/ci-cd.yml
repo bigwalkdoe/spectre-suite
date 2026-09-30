@@ -4,22 +4,28 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: syntax-check
+    # Previously `needs: syntax-check`, a job that does not exist in this
+    # workflow, so this job could never start and its problems went unnoticed.
     permissions:
-      contents: read  # Required for public repos
+      contents: read
       security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        # Pinned to a released tag; @master gave a mutable ref SARIF upload
+        # rights (security-events: write).
+        # Pinned to an immutable commit SHA of v0.36.0. This job holds
+        # security-events: write, so a mutable ref (it was @master) let whoever
+        # moved that branch run code with SARIF upload rights.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
-          scan-ref: '. '
+          # Was '. ' with a trailing space, which scanned a non-existent path.
+          scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()

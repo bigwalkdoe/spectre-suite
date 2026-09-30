@@ -30,31 +30,27 @@ fi
 # Create directories
 echo "Creating directories..."
 mkdir -p /backups/{databases,docker-volumes,configurations,projects}
-mkdir -p /var/log
-mkdir -p "$USER_HOME/.local/share"
 
 # Set permissions
+# Backups hold database dumps and volume archives, so they must not be
+# world-readable. 700 keeps them private to the owning account.
 echo "Setting permissions..."
 chown -R "$USER_NAME:$USER_NAME" /backups
-chmod -R 755 /backups
-chmod -R 755 "$USER_HOME/.local/share"
+chmod -R 700 /backups
+chmod 700 /backups /backups/{databases,docker-volumes,configurations,projects}
 
 # Copy scripts to /usr/local/bin
 echo "Installing scripts..."
-cp scripts/backups/*.sh /usr/local/bin/
-cp scripts/performance/*.sh /usr/local/bin/
-cp scripts/maintenance/*.sh /usr/local/bin/
-cp scripts/network/*.sh /usr/local/bin/
-cp scripts/security/*.sh /usr/local/bin/
+install -m 0755 -o root -g root scripts/backups/*.sh /usr/local/bin/
+install -m 0755 -o root -g root scripts/performance/*.sh /usr/local/bin/
+install -m 0755 -o root -g root scripts/maintenance/*.sh /usr/local/bin/
+install -m 0755 -o root -g root scripts/network/*.sh /usr/local/bin/
+install -m 0755 -o root -g root scripts/security/*.sh /usr/local/bin/
 
-# Copy enhancement scripts from user's scripts directory
-echo "Installing enhancement scripts..."
-if [ -d "$USER_HOME/scripts" ]; then
-    find "$USER_HOME/scripts" -name "*.sh" -type f -exec cp {} /usr/local/bin/ \; 2>/dev/null || true
-fi
-
-# Make scripts executable
-chmod +x /usr/local/bin/*.sh
+# Note: an earlier version copied every *.sh under the invoking user's ~/scripts
+# into /usr/local/bin and then executed some of them as root below. That let a
+# user-writable file run with root privileges. User scripts are no longer
+# installed automatically; drop them in place yourself if you need them.
 
 # Create systemd directory
 mkdir -p /etc/systemd/system
@@ -241,18 +237,32 @@ systemctl start network-monitor.timer
 systemctl start disk-space-check.timer
 systemctl start security-scan.timer
 
-# Apply system performance optimizations
-echo "Applying system performance optimizations..."
-/usr/local/bin/optimize-system-performance.sh
+# Apply system performance optimizations and network hardening.
+# These mutate live system state (sysctl, firewall rules, docker daemon), so
+# they are opt-in rather than an automatic side effect of installing.
+if [ "${APPLY_HARDENING:-0}" = "1" ]; then
+    echo "Applying system performance optimizations..."
+    /usr/local/bin/optimize-system-performance.sh
+    echo "Applying network security hardening..."
+    /usr/local/bin/network-security-hardening.sh
+else
+    echo "Skipping system hardening (set APPLY_HARDENING=1 to apply)."
+    echo "  optimize-system-performance.sh    # tune sysctl/limits"
+    echo "  network-security-hardening.sh     # apply firewall rules"
+fi
 
-# Apply network security hardening
-echo "Applying network security hardening..."
-/usr/local/bin/network-security-hardening.sh
-
-# Configure Docker security
-echo "Configuring Docker security..."
+# Configure Docker security. Backs up any existing daemon.json first: the
+# previous version overwrote it unconditionally and restarted the daemon, so a
+# customised config was lost on every install.
 if command -v docker >/dev/null 2>&1; then
-    bash -c 'cat > /etc/docker/daemon.json << "EOF"
+    DAEMON_JSON=/etc/docker/daemon.json
+    if [ -f "$DAEMON_JSON" ]; then
+        BACKUP="${DAEMON_JSON}.spectre-backup.$(date +%Y%m%d%H%M%S)"
+        cp -a "$DAEMON_JSON" "$BACKUP"
+        echo "Backed up existing $DAEMON_JSON to $BACKUP"
+    fi
+
+    cat > "$DAEMON_JSON" << 'EOF'
 {
   "log-driver": "json-file",
   "log-opts": {
@@ -264,8 +274,14 @@ if command -v docker >/dev/null 2>&1; then
   "no-new-privileges": true,
   "icc": false
 }
-EOF'
-    systemctl restart docker
+EOF
+    chmod 0644 "$DAEMON_JSON"
+
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        systemctl restart docker
+    else
+        echo "Docker daemon not running; skipped restart. Reload it yourself when ready."
+    fi
 fi
 
 # Create verification script

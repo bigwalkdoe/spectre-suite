@@ -17,7 +17,7 @@ fi
 
 # Scan running containers
 echo "Scanning running containers..."
-docker ps --format "{{.Image}}" | sort -u | while read image; do
+docker ps --format "{{.Image}}" | sort -u | while read -r image; do
     echo "Scanning image: $image"
     trivy image --severity HIGH,CRITICAL "$image" || echo "Failed to scan $image"
 done

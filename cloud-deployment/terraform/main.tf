@@ -3,13 +3,16 @@
 
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    azure = {
+    # Key must match the provider block local name below, which is "azurerm".
+    # It was "azure", so Terraform implicitly required the provider under a
+    # different name than the one configured.
+    azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }
@@ -22,7 +25,7 @@ terraform {
 
 # Provider selection based on environment
 provider "aws" {
-  region = var.aws_region
+  region     = var.aws_region
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
@@ -36,12 +39,69 @@ provider "azurerm" {
 }
 
 provider "google" {
-  project = var.gcp_project_id
-  region  = var.gcp_region
+  project     = var.gcp_project_id
+  region      = var.gcp_region
   credentials = var.gcp_credentials
 }
 
 # Variables
+# Provider credentials were referenced by the provider blocks above but never
+# declared, so `terraform validate` failed on every run. Declared here as
+# sensitive and optional: with no values Terraform falls back to the standard
+# provider credential chain (env vars, workload identity, instance metadata),
+# which is preferable to hardcoding keys in tfvars.
+variable "aws_access_key" {
+  description = "Optional static AWS access key. Prefer the provider credential chain."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "aws_secret_key" {
+  description = "Optional static AWS secret key. Prefer the provider credential chain."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "azure_subscription_id" {
+  description = "Azure subscription ID (omit to use the Azure CLI credential chain)"
+  type        = string
+  default     = null
+}
+
+variable "azure_client_id" {
+  description = "Azure AD client ID (omit to use the Azure CLI credential chain)"
+  type        = string
+  default     = null
+}
+
+variable "azure_client_secret" {
+  description = "Azure AD client secret (omit to use the Azure CLI credential chain)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "azure_tenant_id" {
+  description = "Azure AD tenant ID (omit to use the Azure CLI credential chain)"
+  type        = string
+  default     = null
+}
+
+variable "gcp_project_id" {
+  description = "GCP project ID (omit to use Application Default Credentials)"
+  type        = string
+  default     = null
+}
+
+variable "gcp_credentials" {
+  description = "Path to a GCP service-account JSON key (omit to use ADC)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
 variable "deployment_target" {
   description = "Target cloud provider (aws, azure, gcp)"
   type        = string
@@ -72,6 +132,12 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "repo_url" {
+  description = "Git URL of the system-maintenance-suite repository cloned on boot"
+  type        = string
+  default     = "https://github.com/bigwalkdoe/spectre-system-maintenance-suite.git"
+}
+
 variable "instance_count" {
   description = "Number of instances to deploy"
   type        = number
@@ -81,6 +147,9 @@ variable "instance_count" {
 # Local variables
 locals {
   project_name = "spectre-system-maintenance"
+  # Some AWS resource names are capped at 32 characters; this slug leaves room
+  # for the suffixes below (e.g. "-grafana-tg" = 26 chars).
+  project_slug = "spectre-maint"
   common_tags = {
     Project     = local.project_name
     Environment = var.environment
@@ -107,11 +176,11 @@ data "aws_ami" "ubuntu" {
 # AWS Resources (conditional)
 resource "aws_vpc" "main" {
   count = var.deployment_target == "aws" ? 1 : 0
-  
+
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
   enable_dns_support   = true
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-vpc"
   })
@@ -119,12 +188,12 @@ resource "aws_vpc" "main" {
 
 resource "aws_subnet" "public" {
   count = var.deployment_target == "aws" ? 2 : 0
-  
+
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = "10.0.${count.index + 1}.0/24"
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-public-subnet-${count.index + 1}"
   })
@@ -136,9 +205,9 @@ data "aws_availability_zones" "available" {
 
 resource "aws_internet_gateway" "main" {
   count = var.deployment_target == "aws" ? 1 : 0
-  
+
   vpc_id = aws_vpc.main[0].id
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-igw"
   })
@@ -146,14 +215,14 @@ resource "aws_internet_gateway" "main" {
 
 resource "aws_route_table" "public" {
   count = var.deployment_target == "aws" ? 1 : 0
-  
+
   vpc_id = aws_vpc.main[0].id
-  
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.main[0].id
   }
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-public-rt"
   })
@@ -161,17 +230,17 @@ resource "aws_route_table" "public" {
 
 resource "aws_route_table_association" "public" {
   count = var.deployment_target == "aws" ? 2 : 0
-  
+
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public[0].id
 }
 
 resource "aws_security_group" "main" {
   count = var.deployment_target == "aws" ? 1 : 0
-  
+
   name_prefix = "${local.project_name}-"
   vpc_id      = aws_vpc.main[0].id
-  
+
   # SSH access
   ingress {
     from_port   = 22
@@ -179,7 +248,7 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   # HTTP access for monitoring
   ingress {
     from_port   = 80
@@ -187,7 +256,7 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   # Grafana dashboard
   ingress {
     from_port   = 3002
@@ -195,7 +264,7 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   # Prometheus
   ingress {
     from_port   = 9090
@@ -203,7 +272,7 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   # Custom web dashboard
   ingress {
     from_port   = 8081
@@ -211,14 +280,14 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-sg"
   })
@@ -226,18 +295,19 @@ resource "aws_security_group" "main" {
 
 resource "aws_instance" "maintenance_server" {
   count = var.deployment_target == "aws" ? var.instance_count : 0
-  
+
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.deployment_target == "aws" ? var.aws_instance_type : "t3.micro"
   subnet_id     = aws_subnet.public[count.index % 2].id
-  
+
   vpc_security_group_ids = [aws_security_group.main[0].id]
-  
+
   user_data = templatefile("${path.module}/user-data.sh", {
-    environment = var.environment
+    environment  = var.environment
     project_name = local.project_name
+    repo_url     = var.repo_url
   })
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-server-${count.index + 1}"
   })
@@ -245,10 +315,10 @@ resource "aws_instance" "maintenance_server" {
 
 resource "aws_eip" "maintenance" {
   count = var.deployment_target == "aws" ? var.instance_count : 0
-  
+
   instance = aws_instance.maintenance_server[count.index].id
   domain   = "vpc"
-  
+
   tags = merge(local.common_tags, {
     Name = "${local.project_name}-eip-${count.index + 1}"
   })
@@ -262,11 +332,11 @@ variable "aws_instance_type" {
 
 # Outputs
 output "aws_instance_ips" {
-  value = var.deployment_target == "aws" ? aws_eip.maintenance[*].public_ip : []
+  value       = var.deployment_target == "aws" ? aws_eip.maintenance[*].public_ip : []
   description = "Public IPs of AWS instances"
 }
 
 output "aws_vpc_id" {
-  value = var.deployment_target == "aws" ? aws_vpc.main[0].id : ""
+  value       = var.deployment_target == "aws" ? aws_vpc.main[0].id : ""
   description = "VPC ID"
 }

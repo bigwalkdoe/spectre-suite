@@ -6,6 +6,7 @@ set -euo pipefail
 # Detect Linux distribution
 detect_distribution() {
     if [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091  # resolved at runtime
         . /etc/os-release
         DISTRO=$ID
         DISTRO_VERSION=$VERSION_ID
@@ -82,15 +83,15 @@ set_package_manager() {
             ;;
         *)
             PKG_MANAGER="unknown"
-            PKG_INSTALL="echo 'Unknown package manager'"
-            PKG_REMOVE="echo 'Unknown package manager'"
-            PKG_UPDATE="echo 'Unknown package manager'"
-            PKG_UPGRADE="echo 'Unknown package manager'"
-            PKG_CLEAN="echo 'Unknown package manager'"
-            PKG_AUTOREMOVE="echo 'Unknown package manager'"
-            PKG_SEARCH="echo 'Unknown package manager'"
+            PKG_INSTALL="echo Unsupported-distribution:"
+            PKG_REMOVE="echo Unsupported-distribution:"
+            PKG_UPDATE="echo Unsupported-distribution:"
+            PKG_UPGRADE="echo Unsupported-distribution:"
+            PKG_CLEAN="echo Unsupported-distribution:"
+            PKG_AUTOREMOVE="echo Unsupported-distribution:"
+            PKG_SEARCH="echo Unsupported-distribution:"
             SERVICE_CMD="systemctl"
-            FIREWALL_CMD="echo 'Unknown firewall'"
+            FIREWALL_CMD="echo Unknown-firewall"
             ;;
     esac
     

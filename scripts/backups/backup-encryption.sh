@@ -49,7 +49,6 @@ encrypt_file() {
     log "Encrypting: $input_file -> $output_file"
     
     # Get key
-    local key=$(cat "$ENCRYPTION_KEY_FILE")
     
     # Encrypt with AES-256-CBC
     openssl enc -aes-256-cbc -salt -pbkdf2 \
@@ -86,7 +85,8 @@ encrypt_backup_dir() {
     # Encrypt each file
     for file in "$source_dir"/*; do
         if [[ -f "$file" ]]; then
-            local filename=$(basename "$file")
+            local filename
+            filename=$(basename "$file")
             local encrypted_file="$dest_dir/${filename}.enc"
             
             encrypt_file "$file" "$encrypted_file"
@@ -112,7 +112,6 @@ decrypt_file() {
     log "Decrypting: $input_file -> $output_file"
     
     # Get key
-    local key=$(cat "$ENCRYPTION_KEY_FILE")
     
     # Decrypt with AES-256-CBC
     openssl enc -aes-256-cbc -d -salt -pbkdf2 \
@@ -146,7 +145,8 @@ decrypt_backup_dir() {
     # Decrypt each file
     for file in "$source_dir"/*.enc; do
         if [[ -f "$file" ]]; then
-            local filename=$(basename "$file" .enc)
+            local filename
+            filename=$(basename "$file" .enc)
             local decrypted_file="$dest_dir/$filename"
             
             decrypt_file "$file" "$decrypted_file"

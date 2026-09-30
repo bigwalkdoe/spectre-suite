@@ -174,18 +174,22 @@ DISK_THRESHOLD=90
 ### Prometheus Configuration for System Monitoring
 ```yaml
 # prometheus.yml example
+# NOTE: targets are resolved from inside the Prometheus container, so "localhost"
+# means the container itself. Use host.docker.internal for host ports (declared
+# via extra_hosts in docker-compose.monitoring.yml) or the compose service name.
 scrape_configs:
   - job_name: 'node_exporter'
     static_configs:
-      - targets: ['localhost:9100']
-  
+      - targets: ['node-exporter:9100']
+
   - job_name: 'system_maintenance'
     static_configs:
-      - targets: ['localhost:9101']
+      - targets: ['host.docker.internal:9101']
 ```
 
 ### Grafana Dashboard Import
-1. Access Grafana at http://localhost:3002
+1. Access Grafana at http://localhost:3002 (loopback-only; over SSH use
+   `ssh -L 3002:127.0.0.1:3002 <host>`)
 2. Go to Dashboards -> Import
 3. Upload the dashboard JSON from docs/grafana/
 4. Configure Prometheus data source

@@ -134,7 +134,7 @@ df -h /backups
 docker ps
 
 # Check database connectivity
-docker exec guardrail-ai-postgres-1 pg_isready
+docker exec postgres pg_isready
 
 # Fix and re-run
 scripts/backups/backup-all.sh
@@ -179,23 +179,31 @@ docker-compose restart nginx
 
 **Check:**
 ```bash
-cat scripts/security/reports/trivy_image_latest.json | jq '.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")'
+# The CI Trivy job uploads SARIF to the Security tab; there is no committed
+# JSON report and no local wrapper script. Produce one on demand:
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /tmp:/out aquasec/trivy image --format json -o /out/trivy.json <image>
+jq '.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")' /tmp/trivy.json
 ```
 
 **Resolution:**
 ```bash
 # Immediate mitigation (if applicable)
-docker pull <image>:latest
+docker pull <image>:pinned-tag
 
 # Rebuild with patches
-docker-compose build --no-cache <service>
+docker compose build --no-cache <service>
 
-# Run full scan
-scripts/security/run-trivy-scan.sh
+# Re-run the scan
+scripts/security/scan-docker-images.sh
 
-# Update exception list if false positive
-echo "<CVE-ID> false-positive" >> scripts/security/.trivyignore
+# Record a false positive. Trivy reads .trivyignore from the working directory,
+# so create it where you run the scan:
+echo "<CVE-ID> false-positive" >> .trivyignore
 ```
+
+Note that every image in `docker-compose.monitoring.yml` is pinned to an
+explicit version, so there is no `:latest` to pull for the monitoring stack.
 
 ---
 
@@ -302,9 +310,21 @@ docker-compose -f docker-compose.monitoring.yml up -d prometheus
 
 **Check:**
 ```bash
-scripts/security/check-file-integrity.sh
+# Config references must resolve to services that exist. The integrity-check
+# script this runbook used to call is not in this repository, so the primary
+# diagnostic for this runbook failed on invocation.
+scripts/check-config-consistency.sh
+
+# Confirm nothing drifted from version control.
+git status --short
+git diff -- prometheus/prometheus.yml docker-compose.monitoring.yml
+
+# Compare the live Docker daemon config against the intended one.
 diff <(cat /etc/docker/daemon.json) <(echo '{"live-restore":true}')
 ```
+
+The same consistency check runs in CI as the `Configuration Consistency` job, so
+a typo that breaks a scrape target or the dashboard proxy fails the build.
 
 **Resolution:**
 ```bash

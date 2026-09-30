@@ -1,20 +1,21 @@
 package security.audit
 
-# Audit logging must be enabled
-audit_logging_enabled = true
+import rego.v1
 
-rule if {
-    input.audit_logging_enabled == true
+# Audit logging
+deny contains msg if {
+    not input.audit_logging_enabled == true
+    msg := "audit: auditd/audit logging is not enabled"
 }
 
-# Audit logs must be retained for minimum period
-rule if {
-    input.audit_retention_days >= 90
+deny contains msg if {
+    object.get(input, "audit_retention_days", 0) < 90
+    msg := "audit: audit log retention is under 90 days"
 }
 
-# Sudo logging must be enabled
-sudo_logging_enabled = true
-
-rule if {
-    input.sudo_logging_enabled == true
+deny contains msg if {
+    not input.sudo_logging_enabled == true
+    msg := "audit: sudo logging is not enabled"
 }
+
+# Total controls evaluated for security.audit: 3
