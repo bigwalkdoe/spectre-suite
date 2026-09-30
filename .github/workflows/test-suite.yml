@@ -3,6 +3,8 @@ on: [push]
 jobs:
   test-suite:
     name: Full Test Suite
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ['3.11']
@@ -14,9 +16,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          # pip cache purge below discarded the cache this enabled.
+          cache: pip
       - name: Install Python dependencies
         run: |
-          pip cache purge
           pip install numpy==1.26.0 pandas==2.0.3 scikit-learn scipy requests
       - name: Verify Python dependencies
         run: python -c "import numpy as np; import pandas; print('Numpy:', np.__version__, '| Pandas:', pandas.__version__)"
