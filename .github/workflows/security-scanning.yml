@@ -5,6 +5,10 @@ on:
     - cron: '0 6 * * 0'  # Weekly on Sunday
   push:
     branches: [ main, develop ]
+  # The OPA compliance gate needs to run before merge; with only a main/develop
+  # push trigger and a weekly schedule, a policy that fails open could reach
+  # main unnoticed.
+  pull_request:
   workflow_dispatch:
 
 jobs:
