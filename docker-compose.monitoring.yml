@@ -236,6 +236,7 @@ services:
       - "127.0.0.1:8081:80"
     volumes:
       - ./web-dashboard:/usr/share/nginx/html:ro
+      - ./web-dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
     networks:
       - monitoring
