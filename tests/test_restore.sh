@@ -3,7 +3,7 @@
 # Starts a throwaway Postgres container, writes data, backs it up, drops the
 # data, restores from the backup, and verifies the data returned.
 
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -21,12 +21,21 @@ if ! docker info >/dev/null 2>&1; then
     exit 0
 fi
 
-CONTAINER="guardrail"
-BACKUP_DIR="${BACKUP_DIR:-/backups/databases}"
-mkdir -p "$BACKUP_DIR"
+# The container name and the database name are both derived from a unique token.
+# restore-databases.sh resolves the container by exact name match on the database
+# name, so the two must match -- but they must NOT be a fixed shared name like
+# the previous "guardrail", because the script unconditionally ran
+# `docker rm -f guardrail` first and would destroy a real container of that name.
+# Backups go to a throwaway directory, not the real /backups/databases.
+DRILL="spectre_drill_$$_$RANDOM"
+CONTAINER="$DRILL"
+DRILL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/spectre-restore-drill.XXXXXX")"
+BACKUP_DIR="${BACKUP_DIR:-$DRILL_DIR}"
 
+# shellcheck disable=SC2329  # invoked via trap
 cleanup() {
     docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+    rm -rf "$DRILL_DIR"
 }
 trap cleanup EXIT
 
@@ -40,15 +49,18 @@ if [ -z "$PG_IMAGE" ]; then
     exit 0
 fi
 
-# Start a throwaway Postgres container (name matches restore-databases.sh default).
-docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+# Start the throwaway Postgres container. Its name matches the database name so
+# restore-databases.sh resolves it by exact match rather than falling back to
+# "any container running postgres", which could target an unrelated database.
+mkdir -p "$BACKUP_DIR"
 docker run -d --name "$CONTAINER" \
-    -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=guardrail \
+    --label "spectre.test=restore-drill" \
+    -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB="$DRILL" \
     "$PG_IMAGE" >/dev/null
 
 # Wait for it to accept connections.
 ready=0
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
     if docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then
         ready=1
         break
@@ -61,12 +73,12 @@ if [ "$ready" -ne 1 ]; then
 fi
 
 # Seed data.
-docker exec "$CONTAINER" psql -U postgres -d guardrail -c "CREATE TABLE drill(id int); INSERT INTO drill VALUES (42);" >/dev/null
+docker exec "$CONTAINER" psql -U postgres -d "$DRILL" -c "CREATE TABLE drill(id int); INSERT INTO drill VALUES (42);" >/dev/null
 
 # Back up (use the same naming scheme restore-databases.sh expects).
 TS=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/postgres_guardrail_${TS}.sql"
-docker exec "$CONTAINER" pg_dump -U postgres -d guardrail > "$BACKUP_FILE"
+BACKUP_FILE="$BACKUP_DIR/postgres_${DRILL}_${TS}.sql"
+docker exec "$CONTAINER" pg_dump -U postgres -d "$DRILL" > "$BACKUP_FILE"
 gzip "$BACKUP_FILE"
 BACKUP_FILE="${BACKUP_FILE}.gz"
 
@@ -76,18 +88,18 @@ if [ ! -f "$BACKUP_FILE" ]; then
 fi
 
 # Drop the data so we can prove the restore brings it back.
-docker exec "$CONTAINER" psql -U postgres -d guardrail -c "DROP TABLE drill;" >/dev/null
+docker exec "$CONTAINER" psql -U postgres -d "$DRILL" -c "DROP TABLE drill;" >/dev/null
 
 # Restore from the specific backup file.
-bash "$RESTORE_SCRIPT" specific "$BACKUP_FILE" guardrail docker
-rc=$?
+rc=0
+bash "$RESTORE_SCRIPT" specific "$BACKUP_FILE" "$DRILL" docker || rc=$?
 if [ "$rc" -ne 0 ]; then
     echo "FAIL: restore script exited with $rc"
     exit 1
 fi
 
 # Verify the data returned.
-RESULT=$(docker exec "$CONTAINER" psql -U postgres -d guardrail -tAc "SELECT count(*) FROM drill;" 2>/dev/null)
+RESULT=$(docker exec "$CONTAINER" psql -U postgres -d "$DRILL" -tAc "SELECT count(*) FROM drill;" 2>/dev/null)
 if [ "$RESULT" = "1" ]; then
     echo "RESTORE DRILL PASSED (table restored, row count = 1)"
     exit 0

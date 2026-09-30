@@ -53,9 +53,11 @@ remote_backup:
 EOF
     
     log "Testing SSH connection..."
-    ssh -p "$RSYNC_PORT" -o BatchMode=yes -o ConnectTimeout=10 "$RSYNC_HOST" "mkdir -p $RSYNC_PATH" && \
-        log "Rsync destination configured successfully" || \
+    if ssh -p "$RSYNC_PORT" -o BatchMode=yes -o ConnectTimeout=10 "$RSYNC_HOST" "mkdir -p '$RSYNC_PATH'"; then
+        log "Rsync destination configured successfully"
+    else
         log "WARNING: SSH connection failed. Set up key-based auth manually."
+    fi
 }
 
 setup_s3() {
@@ -81,9 +83,11 @@ remote_backup:
   schedule: "0 4 * * *"
 EOF
     
-    aws s3 ls "s3://${S3_BUCKET}" >/dev/null 2>&1 && \
-        log "S3 bucket accessible" || \
+    if aws s3 ls "s3://${S3_BUCKET}" >/dev/null 2>&1; then
+        log "S3 bucket accessible"
+    else
         log "WARNING: Cannot access S3 bucket. Check credentials."
+    fi
 }
 
 setup_b2() {
@@ -106,9 +110,11 @@ remote_backup:
   schedule: "0 4 * * *"
 EOF
     
-    rclone lsd "b2:${B2_BUCKET}" >/dev/null 2>&1 && \
-        log "B2 bucket accessible" || \
+    if rclone lsd "b2:${B2_BUCKET}" >/dev/null 2>&1; then
+        log "B2 bucket accessible"
+    else
         log "WARNING: Cannot access B2 bucket. Run 'rclone config' to set up."
+    fi
 }
 
 setup_rclone() {

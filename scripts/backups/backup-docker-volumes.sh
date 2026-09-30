@@ -44,7 +44,7 @@ done
 
 # Backup other project volumes
 echo "Backing up additional project volumes..."
-docker volume ls --format "{{.Name}}" | grep -E "(modelink|pharmaiq)" | while read volume; do
+docker volume ls --format "{{.Name}}" | grep -E "(modelink|pharmaiq)" | while read -r volume; do
     volume_name=$(basename "$volume")
     echo "Backing up volume: $volume"
     docker run --rm \

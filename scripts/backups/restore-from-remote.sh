@@ -7,9 +7,7 @@ set -euo pipefail
 REMOTE_BACKUP_SERVER="${REMOTE_BACKUP_SERVER:-backup.example.com}"
 REMOTE_BACKUP_PORT="${REMOTE_BACKUP_PORT:-2222}"
 REMOTE_BACKUP_USER="${REMOTE_BACKUP_USER:-backup}"
-BACKUP_DIR="/backups"
 LOG_FILE="/var/log/remote-restore.log"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE" || true
@@ -68,7 +66,8 @@ restore_from_s3() {
     fi
     
     # Download backup
-    local temp_dir=$(mktemp -d)
+    local temp_dir
+    temp_dir=$(mktemp -d)
     aws s3 sync "s3://$bucket/$prefix/" "$temp_dir/" \
         --exclude '*.gz' \
         --exclude '*.tar.gz' \
@@ -80,7 +79,8 @@ restore_from_s3() {
     }
     
     # Find and restore latest backup
-    local backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
+    local backup_file
+    backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
     
     if [[ -z "$backup_file" ]]; then
         backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*.gz" | sort -r | head -1)
@@ -88,7 +88,8 @@ restore_from_s3() {
     
     if [[ -n "$backup_file" ]]; then
         log "Found backup: $backup_file"
-        local dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
+        local dest_dir
+        dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
         mkdir -p "$dest_dir"
         gunzip -c "$backup_file" > "$dest_dir/restore.sql"
         
@@ -123,8 +124,9 @@ restore_from_b2() {
     fi
     
     # Download backup
-    local temp_dir=$(mktemp -d)
-    b2 sync ftp://$bucket_name "$temp_dir/$prefix" \
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    b2 sync "ftp://$bucket_name" "$temp_dir/$prefix" \
         --exclude '*.gz' \
         --exclude '*.tar.gz' \
         || {
@@ -134,7 +136,8 @@ restore_from_b2() {
     }
     
     # Find and restore latest backup
-    local backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
+    local backup_file
+    backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
     
     if [[ -z "$backup_file" ]]; then
         backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*.gz" | sort -r | head -1)
@@ -142,7 +145,8 @@ restore_from_b2() {
     
     if [[ -n "$backup_file" ]]; then
         log "Found backup: $backup_file"
-        local dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
+        local dest_dir
+        dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
         mkdir -p "$dest_dir"
         gunzip -c "$backup_file" > "$dest_dir/restore.sql"
         
@@ -173,7 +177,8 @@ restore_database_from_sql() {
     
     if [[ "$restore_target" == "docker" ]]; then
         # Get database name from SQL file or use default
-        local db_name=$(grep -m1 "CREATE DATABASE" "$sql_file" 2>/dev/null | sed 's/.*CREATE DATABASE \([^ ]*\).*/\1/' || echo "guardrail")
+        local db_name
+        db_name=$(grep -m1 "CREATE DATABASE" "$sql_file" 2>/dev/null | sed 's/.*CREATE DATABASE \([^ ]*\).*/\1/' || echo "guardrail")
         
         log "Restoring to Docker container: $db_name"
         
@@ -206,12 +211,14 @@ restore_docker_volumes_from_tar() {
     log "Restoring Docker volumes from tar archive"
     
     # Extract tar archive
-    local extract_dir=$(mktemp -d)
+    local extract_dir
+    extract_dir=$(mktemp -d)
     tar -xzf "$tar_dir/volumes.tar.gz" -C "$extract_dir"
     
     # Restore each volume
     for volume_path in "$extract_dir"/*/; do
-        local volume_name=$(basename "$volume_path")
+        local volume_name
+        volume_name=$(basename "$volume_path")
         log "Restoring volume: $volume_name"
         
         # Stop and remove existing container
