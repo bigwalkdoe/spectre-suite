@@ -39,14 +39,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Use a locally available Postgres image to avoid pulling during the drill.
-PG_IMAGE="postgres:15"
+# Use a pinned Postgres image, pulling it only if it is not already present.
+# The previous version searched for *any* local postgres image with
+# `docker images | grep -i '^postgres:'`. On a runner with no such image that
+# grep exits 1, which pipefail propagates; under `set -e` the command
+# substitution aborted the script before it could reach the SKIP branch below,
+# so the drill hard-failed on every CI runner instead of skipping.
+PG_IMAGE="postgres:16-alpine"
 if ! docker image inspect "$PG_IMAGE" >/dev/null 2>&1; then
-    PG_IMAGE="$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -i '^postgres:' | head -1)"
-fi
-if [ -z "$PG_IMAGE" ]; then
-    echo "SKIP: no local postgres image available"
-    exit 0
+    echo "Pulling $PG_IMAGE for the drill..."
+    if ! docker pull "$PG_IMAGE" >/dev/null 2>&1; then
+        echo "SKIP: could not obtain $PG_IMAGE (no local copy and pull failed)"
+        exit 0
+    fi
 fi
 
 # Start the throwaway Postgres container. Its name matches the database name so
