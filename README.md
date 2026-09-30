@@ -65,6 +65,8 @@ arbitrary `.sh` files out of your home directory.
 | 02:00 | Full backup (Sat) / Docker volume backup | Daily/Weekly |
 | 02:30 | PostgreSQL vacuum & analyze | Daily |
 | 04:30 | Off-site backup replication | Daily |
+| 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
+| 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
 | 05:00 | AIDE file integrity check | Daily |
 | 06:00 | Trivy container scan | Weekly (Sun) |
 | 07:00 | OWASP ZAP scan | Weekly (Sun) |
@@ -75,6 +77,15 @@ arbitrary `.sh` files out of your home directory.
 | Every 6h | Audit trail generation | Continuous |
 | Every 5m | Metrics exporter (`prometheus/business-metrics-exporter.sh`) | Continuous |
 
+> **Backup health is verified against the archives, not a log.**
+> `scripts/backups/check-backup-health.sh` inspects each backup: a real
+> PostgreSQL dump must carry the `PostgreSQL database dump` header (a failed dump
+> gzips to ~50 bytes), an RDB must start with the `REDIS` magic, a volume tarball
+> must list a member, and a success marker must exist and be recent. It exits
+> non-zero listing what is wrong, and records its verdict where the exporter
+> publishes it as `backup_health_check_ok`, so `BackupHealthCheckFailed` can
+> alert. Run it directly at any time — it reads only.
+>
 > **The exporter must actually be scheduled.** It is not a container: it is a
 > script that writes `.prom` files for the node-exporter textfile collector, and
 > nothing runs it unless a cron entry exists. Without it, `backup_last_success_timestamp`
