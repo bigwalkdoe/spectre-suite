@@ -19,7 +19,7 @@ BACKUP_DIR="${BACKUP_DIR:-/backups/databases}"
 # Kept outside BACKUP_DIR on purpose: the retention step below deletes every
 # file in that directory older than the retention window, so a marker stored
 # there would be swept away and look like "no successful backup" on day 8.
-BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/var/lib/backup-state}"
+BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/backups/backup-state}"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 
