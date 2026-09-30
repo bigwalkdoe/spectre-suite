@@ -18,9 +18,11 @@ permissions:
   contents: read
 
 env:
-  # Pinned so a moving tag cannot change what CI validates against.
-  PROMETHEUS_IMAGE: prom/prometheus:v2.53.0
-  ALERTMANAGER_IMAGE: prom/alertmanager:v0.27.0
+  # Must match the images docker-compose.monitoring.yml actually runs, otherwise
+  # CI validates a version the stack never uses. Both are pinned so a moving tag
+  # cannot change what is validated either.
+  PROMETHEUS_IMAGE: prom/prometheus:v3.13.4
+  ALERTMANAGER_IMAGE: prom/alertmanager:v0.34.1
 
 jobs:
   shellcheck:
@@ -116,6 +118,30 @@ jobs:
         run: |
           docker compose -f docker-compose.monitoring.yml config -q
           echo "compose config valid"
+
+      - name: No floating image tags in compose
+        # Every service used :latest, which meant a `docker compose pull` could
+        # silently change what ran, including the exporters Alertmanager's
+        # notification routing depends on. Rejects the floating tag names
+        # outright and requires an explicit tag, since a bare image name
+        # defaults to :latest.
+        run: |
+          fail=0
+          while read -r img; do
+            [ -n "$img" ] || continue
+            tag="${img##*:}"
+            base="${img%:*}"
+            case "$tag" in
+              latest|stable|edge|nightly|main|master)
+                echo "ERROR floating tag: $img" >&2; fail=1 ;;
+            esac
+            if [ "$base" = "$img" ]; then
+              echo "ERROR untagged (implicitly :latest): $img" >&2; fail=1
+            fi
+          done < <(grep -E '^[[:space:]]*image:[[:space:]]*' docker-compose.monitoring.yml \
+                   | sed -E 's/^[[:space:]]*image:[[:space:]]*//')
+          [ "$fail" -eq 0 ] || exit 1
+          echo "all compose images carry an explicit non-floating version tag"
 
       - name: Required secrets are actually required
         # Guards the fail-closed behaviour: compose must refuse to render when
