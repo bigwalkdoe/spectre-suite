@@ -286,3 +286,29 @@ groups:
             or missing backups are currently invisible. Check the cron entry
             installed by scripts/deploy-enhanced-monitoring.sh, and run
             prometheus/business-metrics-exporter.sh manually to confirm.
+
+  # check-backup-health.sh inspects the backup archives themselves: it verifies
+  # each one is a real dump rather than a valid archive of nothing, that it is
+  # recent, and that a success marker exists. 54 archives left by the previous
+  # backup script were 45-59 byte shells, and the check that used to consume its
+  # output only grepped a log for the string "FAILED", so it reported healthy the
+  # whole time.
+  #
+  # A cron job that merely exits non-zero is still silent, so the health check
+  # records its verdict where this exporter can publish it.
+  - name: backup_health_alerts
+    interval: 60s
+    rules:
+      - alert: BackupHealthCheckFailed
+        expr: backup_health_check_ok == 0
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup health check is failing"
+          description: >-
+            scripts/backups/check-backup-health.sh last reported failure. It
+            verifies that each backup archive is a real dump rather than a valid
+            archive of nothing, that it is recent, and that a success marker
+            exists. Run it directly for the specific problem:
+            scripts/backups/check-backup-health.sh
