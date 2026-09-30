@@ -77,9 +77,74 @@ if [ -f "$NGINX_CONF" ]; then
     done
 fi
 
+# Every service's memory limit, read with the same `services:`-scoped awk pass so
+# that a block cannot be attributed to a network or volume.
+#
+# This check exists because a `deploy:` block placed *before* the service it
+# documents is still valid YAML: at four-space indentation it silently attaches
+# to the preceding service instead. All eleven limits in this file were shifted by
+# one -- Grafana's 1 GiB was applied to Prometheus, cAdvisor's 256 MiB to
+# node-exporter, and web-dashboard's limit ended up on the `monitoring` network.
+# `docker compose config` reported the file as valid, so nothing caught it. The
+# table below pins the intended limit per service; changing one on purpose means
+# changing it here too.
+expected_limits="prometheus:none
+grafana:1g
+alertmanager:512m
+node-exporter:256m
+cadvisor:256m
+redis-exporter:512m
+postgres-exporter:128m
+redis:128m
+postgres:512m
+blackbox-exporter:1g
+web-dashboard:128m"
+
+actual_limits=$(
+    awk '
+        /^services:/ { in_services = 1; next }
+        /^[a-zA-Z]/   { in_services = 0 }
+        !in_services  { next }
+        /^  [a-zA-Z0-9._-]+:[[:space:]]*$/ {
+            if (name != "") printf "%s:%s\n", name, (limit == "" ? "none" : limit)
+            name = $0
+            sub(/^  /, "", name); sub(/:[[:space:]]*$/, "", name)
+            limit = ""; in_deploy = 0
+            next
+        }
+        /^    deploy:/ { in_deploy = 1; next }
+        /^    [a-zA-Z]/ { in_deploy = 0 }
+        in_deploy && /^ *memory:/ { limit = $2 }
+        END { if (name != "") printf "%s:%s\n", name, (limit == "" ? "none" : limit) }
+    ' "$COMPOSE"
+)
+
+if [ "$actual_limits" != "$expected_limits" ]; then
+    echo "ERROR: memory limits do not match the intended per-service table." >&2
+    echo "  A 'deploy:' block written before the service it documents attaches to" >&2
+    echo "  the previous service instead. Diff (expected vs actual):" >&2
+    diff <(printf '%s\n' "$expected_limits") <(printf '%s\n' "$actual_limits") >&2 || true
+    fail=1
+fi
+
+# A resource limit under a network or volume is always wrong: those accept none,
+# and Compose ignores the stray key without complaining. Only limit-bearing keys
+# are flagged, since `driver` and `name` are legitimate there.
+stray=$(awk '
+    /^services:/ { in_services = 1; next }
+    /^[a-zA-Z]/   { in_services = 0 }
+    !in_services && /^  (monitoring|prometheus-data|grafana-data|alertmanager-data|postgres-data):/ { in_net = 1; next }
+    in_net && /^    (deploy|mem_limit|cpus|mem_reservation):/ { print "  - " $1 " attached to a network or volume" }
+' "$COMPOSE")
+if [ -n "$stray" ]; then
+    echo "ERROR: keys that cannot belong to a network or volume:" >&2
+    printf '%s\n' "$stray" >&2
+    fail=1
+fi
+
 if [ "$fail" -ne 0 ]; then
     echo "config consistency check FAILED" >&2
     exit 1
 fi
 
-echo "config consistency OK: $(printf '%s\n' "$referenced_hosts" | grep -c .) prometheus target host(s) and $(printf '%s\n' "${nginx_upstreams:-}" | grep -c . || echo 0) nginx upstream(s) all resolve to compose services"
+echo "config consistency OK: $(printf '%s\n' "$referenced_hosts" | grep -c .) prometheus target host(s) and $(printf '%s\n' "${nginx_upstreams:-}" | grep -c . || echo 0) nginx upstream(s) all resolve to compose services; $(printf '%s\n' "$actual_limits" | grep -c .) service memory limit(s) on the intended service"
