@@ -132,8 +132,17 @@ main() {
     log "=========================================="
     log "Database Restore Started"
     log "Restore type: $restore_type"
-    log "Database: $database_name"
-    log "Target: $restore_target"
+    # Positional args shift meaning by mode, so the summary has to follow the
+    # same shift: "specific" takes <backup_file> <database_name> <target>,
+    # "latest" takes nothing and derives all three.
+    if [ "$restore_type" = "specific" ]; then
+        log "Backup file: ${2:-}"
+        log "Database: ${3:-${2:-guardrail}}"
+        log "Target: ${4:-docker}"
+    else
+        log "Database: $database_name"
+        log "Target: $restore_target"
+    fi
     log "=========================================="
 
     case "$restore_type" in

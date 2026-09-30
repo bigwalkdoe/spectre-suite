@@ -58,17 +58,21 @@ docker run -d --name "$CONTAINER" \
     -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB="$DRILL" \
     "$PG_IMAGE" >/dev/null
 
-# Wait for it to accept connections.
+# Wait for the target database to actually accept queries. `pg_isready` reports
+# ready while postgres is still running its bootstrap server during init, so a
+# probe that only checks the server socket proceeds too early and the next psql
+# fails with "the database system is shutting down".
 ready=0
-for _ in $(seq 1 30); do
-    if docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then
+for _ in $(seq 1 45); do
+    if docker exec "$CONTAINER" psql -U postgres -d "$DRILL" -tAc 'SELECT 1' >/dev/null 2>&1; then
         ready=1
         break
     fi
     sleep 2
 done
 if [ "$ready" -ne 1 ]; then
-    echo "FAIL: postgres did not become ready"
+    echo "FAIL: database '$DRILL' did not become ready"
+    docker logs "$CONTAINER" 2>&1 | tail -20 || true
     exit 1
 fi
 
