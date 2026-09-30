@@ -312,3 +312,92 @@ groups:
             archive of nothing, that it is recent, and that a success marker
             exists. Run it directly for the specific problem:
             scripts/backups/check-backup-health.sh
+
+  # Security findings from the Spectre agent, published by
+  # prometheus/security-metrics-exporter.sh from GET /api/security/summary.
+  #
+  # Every value is read from the agent. The exporter that previously carried these
+  # names emitted hardcoded zeros plus a security_last_scan_timestamp set to the
+  # current time on every run, so a scan that never happened was reported as
+  # having just completed, and "no findings" was indistinguishable from "no data".
+  # The exporter now omits the finding counts entirely when the agent is
+  # unreachable, which is why SecurityAgentDown is a separate alert rather than
+  # being inferred from a count of zero.
+  - name: security_alerts
+    interval: 60s
+    rules:
+      - alert: SecurityAgentDown
+        expr: spectre_agent_up == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cannot read security findings from the Spectre agent"
+          description: >-
+            The exporter has been unable to reach the agent's security summary for
+            10 minutes, so no finding counts are being published at all. Absence of
+            findings in Prometheus means absence of data, not absence of problems.
+            Check the agent is running, that SPECTRE_API_KEY_FILE is readable, and
+            that the API key still matches SPECTRE_API_KEY.
+
+      - alert: SecurityScanNeverRun
+        expr: spectre_security_ever_scanned == 0
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The security agent has never recorded a scan"
+          description: >-
+            No security MaintenanceRecord exists, so the host has never been
+            audited by the security agent. Run the security-audit workflow.
+
+      - alert: SecurityScanStale
+        # Only meaningful once a scan has happened. Without the guard this would
+        # fire on a never-scanned host, duplicating SecurityScanNeverRun and
+        # reporting a scan time of epoch 0 as if it were merely old.
+        expr: (spectre_security_ever_scanned == 1)
+              and on() (time() - security_last_scan_timestamp > 86400)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last security scan is over 24 hours old"
+          description: >-
+            The most recent scan the agent recorded was at
+            {{ $value | humanizeDuration }} ago. Findings recorded since then are
+            not reflected in the counts.
+
+      - alert: CriticalSecurityFindings
+        expr: security_findings_unresolved_by_severity{severity="critical"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Unresolved critical security finding"
+          description: >-
+            The security agent has {{ $value }} unresolved critical finding(s).
+            These are conditions such as SELinux disabled or a firewalld service
+            that is not running.
+
+      - alert: HighSecurityFindings
+        expr: security_findings_unresolved_by_severity{severity="high"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unresolved high-severity security findings"
+          description: >-
+            The security agent has {{ $value }} unresolved high-severity finding(s).
+
+      - alert: SecurityFindingsNotAged
+        expr: security_oldest_unresolved_timestamp > 0
+              and on() (time() - security_oldest_unresolved_timestamp > 604800)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "A security finding has been unresolved for over 7 days"
+          description: >-
+            The oldest unresolved finding was recorded
+            {{ $value | humanizeDuration }} ago. Findings that are never resolved
+            make the unresolved counts less useful as a signal.
