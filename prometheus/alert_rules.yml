@@ -258,3 +258,31 @@ groups:
         annotations:
           summary: "High container memory usage"
           description: "Container {{ $labels.name }} is using {{ $value }} of its memory limit"
+
+  # The textfile exporter is not a container: it is a script that
+  # scripts/deploy-enhanced-monitoring.sh installs into crontab every 5 minutes.
+  # When that cron entry is missing -- the state on any host where the deploy
+  # script was never run -- no .prom files are written, the metrics it produces
+  # do not exist, and BackupStale has nothing to evaluate. Prometheus does not
+  # fire a rule whose series is absent, so the backup alerting silently does
+  # nothing at all, which is the worst possible failure mode for the rule meant
+  # to report failed backups.
+  #
+  # absent() turns that blind spot into a firing alert.
+  - name: exporter_alerts
+    interval: 60s
+    rules:
+      - alert: MetricsExporterNotRunning
+        expr: absent(backup_last_success_timestamp) or absent(system_uptime_seconds)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Metrics exporter is producing no output"
+          description: >-
+            No .prom files have appeared in the node-exporter textfile directory,
+            so backup_last_success_timestamp and the system/docker gauges do not
+            exist. BackupStale cannot evaluate while this holds, meaning failed
+            or missing backups are currently invisible. Check the cron entry
+            installed by scripts/deploy-enhanced-monitoring.sh, and run
+            prometheus/business-metrics-exporter.sh manually to confirm.
