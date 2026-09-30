@@ -110,32 +110,37 @@ only on the internal `monitoring` network by the exporters.
 
 ### Alertmanager Integrations
 
-Slack, email and PagerDuty credentials are **not** read from `.env` directly —
-Alertmanager performs no `${VAR}` substitution in its config file. Supply them
-via:
+**Slack is the only notification channel.** The webhook URL is **not** read from
+`.env` — Alertmanager performs no `${VAR}` substitution in its config file.
+Supply it via:
 
 ```bash
-export SMTP_USERNAME=... SMTP_PASSWORD=... \
-       SLACK_WEBHOOK_URL=... PAGERDUTY_ROUTING_KEY=...
-scripts/setup-notification-channels.sh --test
+SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
+  scripts/setup-notification-channels.sh --test
 ```
 
-That writes each value to `prometheus/alertmanager-secrets/` at mode `0600` (the
-directory is bind-mounted read-only and gitignored), then restarts Alertmanager,
-waits for readiness, and confirms Prometheus still points at it.
+That writes the URL to `prometheus/alertmanager-secrets/slack_webhook_url` at mode
+`0600` (the directory is bind-mounted read-only and gitignored), restarts
+Alertmanager, waits for readiness, and confirms Prometheus still points at it.
 
 `--test` posts a self-resolving critical alert and reads the dispatcher log to
 confirm it was actually **delivered**, not merely accepted. This matters because
 `amtool check-config` is not a delivery test: `*_file` options are not
-existence-checked, so it reports success with every secret missing. The script
-also reads each secret back from inside the container, since a permissions
-mismatch there fails only at notification time while `/-/ready` still returns
-200. It exits non-zero while any channel is unconfigured.
+existence-checked, so it reports success with the webhook missing. The script also
+reads the secret back from inside the container, since a permissions mismatch
+there fails only at notification time while `/-/ready` still returns 200. It exits
+non-zero while no webhook is configured.
 
-Two settings cannot be supplied from the environment and must be edited in
-`prometheus/alertmanager.yml`: the recipient address (`smtp_from` and each
-receiver's `to:`, still `alertmanager@example.com`) and `smtp_smarthost` (still
-`smtp.gmail.com:587`). The script warns while the placeholder address is present.
+Severity is expressed by the message's attachment colour and title prefix
+(`danger` / `warning` / `good`) rather than by separate channels: Slack routes an
+incoming webhook to the channel it was created for and commonly ignores the
+`channel`, `username` and `icon_emoji` fields, so per-severity channel names in
+`alertmanager.yml` would be decorative. Pick the channel when you create the
+webhook.
+
+`Watchdog` is a continuous informational alert routed to its own receiver. It is
+the dead-man's switch: its **absence** means alerting itself is broken, which is
+the one condition no other alert in this stack can report.
 
 See `prometheus/alertmanager-secrets/README.md` for details.
 
@@ -177,9 +182,8 @@ written to files rather than interpolated into the Alertmanager config (which
 performs no `${VAR}` substitution):
 
 ```bash
-export SMTP_USERNAME=... SMTP_PASSWORD=... \
-       SLACK_WEBHOOK_URL=... PAGERDUTY_ROUTING_KEY=...
-scripts/setup-notification-channels.sh
+SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
+  scripts/setup-notification-channels.sh
 ```
 
 Database credentials come from `.env`, which the Compose stack requires and will
@@ -285,7 +289,7 @@ spectre-system-maintenance/
 │   ├── DISASTER_RECOVERY.md #    RTO/RPO + runbooks
 │   └── RUNBOOKS.md          #    10 incident runbooks
 ├── prometheus/              # Monitoring configs
-│   ├── alertmanager.yml     #    Slack/Email/PagerDuty
+│   ├── alertmanager.yml     #    Slack
 │   ├── blackbox-exporter.yml#    External monitoring
 │   └── business-metrics*    #    Custom metrics
 ├── grafana-*/               # Grafana dashboards

@@ -8,7 +8,7 @@
 # covers it. It then tried to "apply" configuration with `docker cp` into
 # alertmanager.yml and `sed -i` on prometheus.yml, both of which are read-only
 # bind mounts, so it aborted on a read-only filesystem after writing the caller's
-# SMTP password to the wrong place. It also printed the wrong Prometheus port.
+# password to the wrong place. It also printed the wrong Prometheus port.
 #
 # Nothing needs copying into a container here: both files are bind-mounted from
 # the repository and take effect on restart.
@@ -39,13 +39,10 @@ that it loaded the configuration.
            file is missing, because *_file options are not existence-checked.
 
 Environment:
-  SMTP_USERNAME          SMTP auth username (config hardcodes "alertmanager")
-  SMTP_PASSWORD          SMTP auth password
-  SLACK_WEBHOOK_URL      Slack incoming webhook URL
-  PAGERDUTY_ROUTING_KEY  PagerDuty integration routing key
+  SLACK_WEBHOOK_URL      Slack incoming webhook URL (the only channel)
 
-Existing secret files are retained when the matching variable is unset, so the
-script can be re-run to add one channel at a time.
+An existing secret file is retained when the variable is unset, so the script can
+be re-run without discarding a working webhook.
 EOF
 }
 
@@ -98,30 +95,18 @@ write_secret() {
     note "write  $name"
 }
 
-write_secret smtp_username "${SMTP_USERNAME:-}"
-write_secret smtp_password "${SMTP_PASSWORD:-}"
 write_secret slack_webhook_url "${SLACK_WEBHOOK_URL:-}"
-write_secret pagerduty_routing_key "${PAGERDUTY_ROUTING_KEY:-}"
 
-# Which receivers can actually work, given the secrets present.
-unusable=()
-for required in smtp_password slack_webhook_url pagerduty_routing_key; do
-    if [ ! -s "$SECRETS_DIR/$required" ]; then
-        unusable+=("$required")
-    fi
-done
+# Slack is the only channel, so its absence is the only thing that can break
+# delivery. Anything else in the config is a formatting concern.
+webhook_configured=0
+[ -s "$SECRETS_DIR/slack_webhook_url" ] && webhook_configured=1
 
-if [ "${#unusable[@]}" -gt 0 ]; then
-    warn "no value for: ${unusable[*]}"
-    note "The matching receiver will accept the alert and then fail to deliver it."
-    note "Supply the variable and re-run, or see prometheus/alertmanager-secrets/README.md."
-fi
-
-# The recipient address is hardcoded in alertmanager.yml and nothing interpolates
-# it, so a complete-looking setup still delivers to a placeholder mailbox.
-if grep -q "alertmanager@example.com" "$REPO_ROOT/prometheus/alertmanager.yml"; then
-    warn "alertmanager.yml still uses the placeholder recipient 'alertmanager@example.com'"
-    note "Replace smtp_from and each receiver's 'to:' with a real address, or mail goes nowhere."
+if [ "$webhook_configured" -eq 0 ]; then
+    warn "no Slack webhook configured; every alert will fail to deliver"
+    note "Create an incoming webhook in Slack, then:"
+    note "  SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \\"
+    note "    $0"
 fi
 
 # Check readability from inside the container. A mode 0700 secrets directory owned
@@ -129,27 +114,18 @@ fi
 # Alertmanager reports that only when it tries to deliver -- so config loading and
 # /-/ready both succeed while every notification fails. A host-side test cannot
 # see this, which is exactly why it shipped.
-if [ "${#unusable[@]}" -eq 0 ]; then
+if [ "$webhook_configured" -eq 1 ]; then
     echo
     echo "Checking that the container can read the secrets..."
-fi
-# Runs for whichever secrets exist, not only when all three are present: a
-# partially configured channel is exactly when a permission mistake still goes
-# unnoticed.
-for name in smtp_password slack_webhook_url pagerduty_routing_key; do
-    [ -s "$SECRETS_DIR/$name" ] || continue
-    if [ "${#unusable[@]}" -eq 0 ]; then
-        echo
-    fi
     if docker exec "$ALERTMANAGER_CONTAINER" \
-        sh -c "head -c1 /etc/alertmanager/secrets/$name >/dev/null 2>&1"; then
-        note "readable in container: $name"
+        sh -c "head -c1 /etc/alertmanager/secrets/slack_webhook_url >/dev/null 2>&1"; then
+        note "readable in container: slack_webhook_url"
     else
-        err "container cannot read $name (uid $(docker exec "$ALERTMANAGER_CONTAINER" id -u 2>/dev/null || echo '?'), dir mode $(stat -c '%a' "$SECRETS_DIR") owned by $(stat -c '%U' "$SECRETS_DIR"))"
+        err "container cannot read slack_webhook_url (uid $(docker exec "$ALERTMANAGER_CONTAINER" id -u 2>/dev/null || echo '?'), dir mode $(stat -c '%a' "$SECRETS_DIR") owned by $(stat -c '%U' "$SECRETS_DIR"))"
         note "Set 'user:' on the alertmanager service in docker-compose.monitoring.yml,"
         note "or relax the directory mode. Do not assume a healthy Alertmanager means delivery works."
     fi
-done
+fi
 
 # Validate before restarting, not after. The previous version restarted first and
 # only then checked, so a bad config was already live by the time it complained.
@@ -269,10 +245,11 @@ if [ "$RUN_TEST" -eq 1 ]; then
             | grep 'receiver=critical-receiver' | grep "$TEST_ALERTNAME" \
             | tail -1 | sed 's/.*err=/  err=/' | cut -c1-200 >&2 || true
         note "Delivery is NOT working. See the warnings above."
-    elif [ "${#unusable[@]}" -gt 0 ]; then
-        note "no failure logged, but ${#unusable[@]} receiver secret(s) are missing, so this is not proof of delivery"
+    elif [ "$webhook_configured" -eq 0 ]; then
+        note "no failure logged, but no webhook is configured, so delivery was never attempted"
     else
-        note "critical-receiver accepted the alert with no failure logged"
+        note "critical-receiver's Slack integration accepted the alert with no failure logged"
+        note "(check the Slack channel to confirm it arrived and looks right)"
     fi
 
     note "test alert self-resolves via endsAt (DELETE is not supported by Alertmanager 0.34)"
