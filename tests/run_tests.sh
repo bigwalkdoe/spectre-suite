@@ -161,7 +161,13 @@ check_executable_permissions() {
     
     local permission_errors=0
     
-    for script in "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/*/*.sh; do
+    # prometheus/*.sh is included deliberately. The glob used to cover only
+    # scripts/**, which is why business-metrics-exporter.sh shipped without its
+    # executable bit: the cron entry that runs it every 5 minutes failed with
+    # "Permission denied", so it never wrote a .prom file, and the metrics it
+    # produces silently did not exist. Nothing caught it because nothing looked.
+    for script in "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/*/*.sh \
+                  "$PROJECT_ROOT"/prometheus/*.sh; do
         if [ -f "$script" ]; then
             if [ ! -x "$script" ]; then
                 echo -e "${YELLOW}⚠️  Script not executable: $script${NC}"
