@@ -1,0 +1,166 @@
+name: Lint & Config Validation
+
+# Gates on the tooling that was previously only run by hand, so the classes of
+# defect these checks catch cannot silently regress:
+#   - shellcheck errors and warnings across all 60 shell scripts
+#   - terraform fmt / validate for the cloud deployment path
+#   - promtool for scrape config and alert rules
+#   - amtool for the Alertmanager config
+#   - docker compose config, including the required-secret guards
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Pinned so a moving tag cannot change what CI validates against.
+  PROMETHEUS_IMAGE: prom/prometheus:v2.53.0
+  ALERTMANAGER_IMAGE: prom/alertmanager:v0.27.0
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --version
+
+      - name: Check every tracked script
+        run: |
+          mapfile -t scripts < <(git ls-files '*.sh')
+          echo "Checking ${#scripts[@]} scripts"
+          # Warnings are treated as failures; SC2129 is a style note about
+          # grouping repeated redirects with no behavioural effect, and an
+          # earlier attempt to restructure them introduced a double-redirect.
+          shellcheck --severity=warning \
+            --exclude=SC2129 \
+            --format=gcc "${scripts[@]}"
+
+      - name: Syntax-check every script
+        run: |
+          mapfile -t scripts < <(git ls-files '*.sh')
+          for s in "${scripts[@]}"; do
+            bash -n "$s"
+          done
+          echo "bash -n clean"
+
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3.1.0
+
+      - name: terraform fmt -check
+        run: terraform -chdir=cloud-deployment/terraform fmt -check -diff
+
+      - name: terraform init
+        run: terraform -chdir=cloud-deployment/terraform init -backend=false -input=false
+
+      # Catches undeclared variables, invalid resource arguments, AWS 32-char
+      # name limits and lifecycle-rule schema errors. This configuration
+      # previously failed validate outright.
+      - name: terraform validate
+        run: terraform -chdir=cloud-deployment/terraform validate
+
+  monitoring-config:
+    name: Monitoring Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate scrape config and alert rules
+        run: |
+          # prometheus.yml references rule_files by its in-container absolute
+          # path, so the directory has to be mounted where it expects it.
+          # --entrypoint is required because the image's entrypoint is
+          # prometheus itself.
+          docker run --rm \
+            --entrypoint promtool \
+            -v "$PWD/prometheus:/etc/prometheus:ro" \
+            "$PROMETHEUS_IMAGE" \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: Validate Alertmanager config
+        run: |
+          # Secret files are supplied so the *_file options resolve; Alertmanager
+          # needs them at runtime and this keeps the check honest.
+          mkdir -p /tmp/secrets
+          for f in smtp_username smtp_password slack_webhook_url pagerduty_routing_key; do
+            printf 'placeholder' > "/tmp/secrets/$f"
+          done
+          docker run --rm \
+            --entrypoint amtool \
+            -v "$PWD/prometheus/alertmanager.yml:/w/alertmanager.yml:ro" \
+            -v "/tmp/secrets:/secrets:ro" \
+            "$ALERTMANAGER_IMAGE" \
+            check-config /w/alertmanager.yml
+
+      - name: Validate compose file
+        env:
+          GRAFANA_ADMIN_PASSWORD: ci-placeholder
+          POSTGRES_PASSWORD: ci-placeholder
+          REDIS_PASSWORD: ci-placeholder
+          POSTGRES_EXPORTER_DSN: postgresql://postgres:ci@postgres:5432/postgres?sslmode=disable
+        run: |
+          docker compose -f docker-compose.monitoring.yml config -q
+          echo "compose config valid"
+
+      - name: Required secrets are actually required
+        # Guards the fail-closed behaviour: compose must refuse to render when
+        # the credentials are absent rather than falling back to defaults.
+        run: |
+          if docker compose -f docker-compose.monitoring.yml config -q 2>/dev/null; then
+            echo "ERROR: compose started with no credentials configured" >&2
+            exit 1
+          fi
+          echo "compose correctly refuses to run without credentials"
+
+  opa-policies:
+    name: OPA Policies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: v0.68.0
+
+      - name: Check Rego syntax
+        run: opa check scripts/security/opa/policies/
+
+      # Empty input must deny every control: a policy that passes when its
+      # input is absent fails open and is worse than no policy at all.
+      - name: Policies fail closed
+        run: |
+          count=$(opa eval --format raw \
+            --data scripts/security/opa/policies \
+            --input <(echo '{}') \
+            'count([m | data.security[k].deny[m]])')
+          echo "denials on empty input: $count"
+          if [ "$count" -lt 38 ]; then
+            echo "::error::expected all 38 controls to deny on empty input, got $count" >&2
+            exit 1
+          fi
+
+      - name: Declared baseline has no violations
+        run: |
+          denials=$(opa eval --format raw \
+            --data scripts/security/opa/policies \
+            --input scripts/security/opa/baseline.json \
+            '[m | data.security[k].deny[m]]' | tail -1)
+          echo "baseline denials: $denials"
+          if [ "$denials" != "[]" ]; then
+            echo "::error::OPA policy violations: $denials" >&2
+            exit 1
+          fi
