@@ -1,15 +1,14 @@
 global:
   resolve_timeout: 5m
-  # Email notification configuration
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'alertmanager@example.com'
-  # Credentials come from files written by scripts/setup-notification-channels.sh;
-  # Alertmanager does not expand ${VAR} in this file. The *_file variants are
-  # only valid per-receiver, not under `global`, so SMTP auth is set on each
-  # email_config below and slack_api_url_file sits here.
-  # PagerDuty configuration
-  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
-  # Slack configuration
+  # Slack is the only notification channel, so SMTP and PagerDuty are gone from
+  # this file entirely. Leaving them in place meant every alert logged a
+  # "Notify for alerts failed" for an integration nobody had configured, which
+  # buries the failures that matter.
+  #
+  # Alertmanager performs no ${VAR} substitution, so the webhook is read from a
+  # file written by scripts/setup-notification-channels.sh rather than
+  # interpolated here. The *_file variants are only valid per-receiver, not
+  # under `global`, so each slack_config names the file explicitly.
   slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
 
 # Note: there is deliberately no `templates:` key. The previous value
@@ -50,79 +49,70 @@ route:
 
 # Notification receivers
 # Alertmanager performs NO environment-variable substitution in its config file,
-# so the previous '${SMTP_PASSWORD}' style placeholders were passed through as
-# literal strings. Secrets are supplied via file-based auth_config files
-# generated from the environment before startup -- see
-# scripts/setup-notification-channels.sh and docs/CONFIGURATION_EXAMPLES.md.
+# so the webhook URL is read from a file rather than interpolated here. It is
+# written by scripts/setup-notification-channels.sh -- see
+# prometheus/alertmanager-secrets/README.md.
 receivers:
+  # Slack is the only channel. Severity is carried by the attachment colour and
+  # the title prefix rather than by separate channels: Slack routes incoming
+  # webhooks to the channel the webhook was created for and commonly ignores the
+  # `channel`, `username` and `icon_emoji` fields, so per-severity channel names
+  # in this file were decorative. `color` is honoured.
+  #
+  # Every receiver posts to the same webhook, so there is one place to rotate the
+  # secret. There is deliberately no `channel:` field; the webhook decides.
+  #
+  # There is also deliberately no `title_link:`. `{{ .GeneratorURL }}` is a field
+  # of an *alert*, not of the alert group, so referencing it in a single-value
+  # field like title_link fails template execution -- and the failure is not
+  # confined to that field: color, text and fallback all came out empty while
+  # only the title rendered, so a Slack message arrived as a bare heading with no
+  # severity colour. Omitting title_link uses Alertmanager's default, which links
+  # to its own alert page. A per-alert Prometheus link is added inside
+  # `{{ range .Alerts }}` in the body instead, which is the only place
+  # .GeneratorURL exists.
   - name: 'default-receiver'
-    email_configs:
-      - to: 'alertmanager@example.com'
-        send_resolved: true
-        auth_username: 'alertmanager'
-        auth_password_file: '/etc/alertmanager/secrets/smtp_password'
-        headers:
-          Subject: '[ALERT] {{ .GroupLabels.alertname }}'
-        html: '<h2>{{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
-
-  - name: 'critical-receiver'
-    email_configs:
-      - to: 'alertmanager@example.com'
-        send_resolved: true
-        auth_username: 'alertmanager'
-        auth_password_file: '/etc/alertmanager/secrets/smtp_password'
-        headers:
-          Subject: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
-        html: '<h2 style="color:red;">CRITICAL: {{ .GroupLabels.alertname }}</h2><p><strong>Instance:</strong> {{ .GroupLabels.instance }}</p><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p><p><strong>Graph:</strong> <a href="{{ .ExternalURL }}">View in Prometheus</a></p>'
-    pagerduty_configs:
-      # routing_key only: service_key was removed in Alertmanager 0.25 and is a
-      # validation error alongside it on current releases.
-      - routing_key_file: '/etc/alertmanager/secrets/pagerduty_routing_key'
-        client: 'System-Maintenance'
-        client_url: 'http://localhost:9093'
-        description: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
-        severity: 'critical'
-        send_resolved: true
-        images:
-          - src: 'https://img.icons8.com/color/48/high-priority.png'
-            alt: 'Critical Alert'
-            href: '{{ .ExternalURL }}'
-
-  - name: 'warning-receiver'
-    email_configs:
-      - to: 'alertmanager@example.com'
-        send_resolved: true
-        auth_username: 'alertmanager'
-        auth_password_file: '/etc/alertmanager/secrets/smtp_password'
-        headers:
-          Subject: '[WARNING] {{ .GroupLabels.alertname }}'
-        html: '<h2 style="color:orange;">WARNING: {{ .GroupLabels.alertname }}</h2><p>{{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
-        channel: '#alerts-warning'
-        username: 'Alertmanager'
-        icon_emoji: ':warning:'
-        title: '[WARNING] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n{{ end }}"
         send_resolved: true
+        color: '#d40d0d'
+        title: '[ALERT] {{ .GroupLabels.alertname }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
+
+  - name: 'critical-receiver'
+    slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
+        send_resolved: true
+        color: '#d40d0d'
+        title: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n*Summary:* {{ .Annotations.summary }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
+
+  - name: 'warning-receiver'
+    slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
+        send_resolved: true
+        color: '#daa038'
+        title: '[WARNING] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
+        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
 
   - name: 'info-receiver'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
-        channel: '#alerts-info'
-        username: 'Alertmanager'
-        icon_emoji: ':information_source:'
+        send_resolved: true
+        color: '#2eb886'
         title: '[INFO] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Description:* {{ .Annotations.description }}\n{{ end }}"
+        text: "{{ range .Alerts }}*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
 
+  # The dead-man's switch. The text says what to do, because the only time anyone
+  # reads it is when it fires, which means delivery has already failed and
+  # everything else they would normally rely on is silent.
   - name: 'watchdog-receiver'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
-        channel: '#alerts-watchdog'
-        username: 'Alertmanager'
-        icon_emoji: ':dog:'
+        send_resolved: true
+        color: '#2eb886'
         title: 'Watchdog Alive'
-        text: 'Alertmanager is running and sending notifications'
+        text: 'Alerting is working. This message repeats every 24h; its *absence* is the problem. If you are reading this and expected an outage alert, that alert could not be delivered.'
 
 # Inhibition rules
 inhibit_rules:

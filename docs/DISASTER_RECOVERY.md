@@ -197,10 +197,15 @@ done
 
 | Severity | Notification Method | Response Time | Escalation |
 |----------|-------------------|---------------|------------|
-| Critical | PagerDuty + Slack + Email | 15 minutes | Manager + On-call team |
-| High | Slack + Email | 1 hour | On-call team |
-| Medium | Email | 4 hours | Next business day |
+| Critical | Slack (`danger` attachment) | 15 minutes | Manager + On-call team |
+| High | Slack (`warning` attachment) | 1 hour | On-call team |
+| Medium | Slack (`good` attachment) | 4 hours | Next business day |
 | Low | Dashboard alert | 24 hours | Next sprint |
+
+Slack is the only configured channel, so all severities land in the one channel
+the webhook was created for; the attachment colour and title prefix carry the
+severity. Absence of the `Watchdog Alive` message is itself an incident: it means
+notification itself is broken.
 
 ### Notification Contacts
 
@@ -209,13 +214,10 @@ does no `${VAR}` substitution. They are written as one-value files to
 `prometheus/alertmanager-secrets/` by `scripts/setup-notification-channels.sh`
 (directory bind-mounted read-only, gitignored, files mode 0600).
 
-- **PagerDuty**: `PAGERDUTY_ROUTING_KEY` -> `alertmanager-secrets/pagerduty_routing_key`
-  (the old `service_key` was removed in Alertmanager 0.25 and is no longer read)
-- **Slack**: `SLACK_WEBHOOK_URL` -> `alertmanager-secrets/slack_webhook_url`,
-  posting to `#alerts-critical`, `#alerts-warning`, `#alerts-info`, `#alerts-watchdog`
-- **Email**: `SMTP_USERNAME` / `SMTP_PASSWORD` -> `alertmanager-secrets/smtp_username`
-  and `smtp_password`. Note `smtp_username` has no `*_file` equivalent in the
-  receiver config, so it is set inline as `auth_username` in `alertmanager.yml`.
+- **Slack**: `SLACK_WEBHOOK_URL` -> `alertmanager-secrets/slack_webhook_url`.
+  Every receiver posts to this one webhook; the channel is the one selected when
+  the webhook was created in Slack, since Alertmanager's `channel` field is
+  commonly ignored for incoming webhooks.
 
 A receiver with no credential still starts but cannot deliver — verify with
 `amtool check-config prometheus/alertmanager.yml` and the setup script's warnings
