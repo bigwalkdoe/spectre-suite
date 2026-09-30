@@ -1,19 +1,21 @@
 #!/bin/bash
 # Business Metrics Exporter for Prometheus textfile collector
-# Place metrics in /var/lib/node_exporter/textfile_collector/
 #
-# Only values measured on this host are exported. The previous version also
-# emitted a dozen metrics that were hardcoded to 0 -- app_http_requests_total,
-# app_active_users, app_error_rate, app_response_time_seconds,
-# backup_duration_seconds and security_vulnerabilities_total -- which were
-# indistinguishable from real readings in a graph, and a
-# security_last_scan_timestamp set to the current time on every run, which
-# asserted that a security scan had just completed. None of them were consumed by
-# any alert rule or dashboard, so nothing depends on them.
+# Writes .prom files into prometheus/business-metrics/, which
+# docker-compose.monitoring.yml bind-mounts at /textfile into node-exporter and
+# prometheus.
+#
+# The default used to be /var/lib/node_exporter/textfile_collector, the
+# conventional node_exporter textfile path. That is wrong twice over here: the
+# directory is root-only, so an unprivileged cron run failed with "Permission
+# denied" and wrote nothing, and nothing in this stack reads that path anyway --
+# the metrics landed nowhere even if it had succeeded. Combined with the missing
+# executable bit, the exporter had never produced a single file.
 set -euo pipefail
 
-OUTPUT_DIR="${1:-/var/lib/node_exporter/textfile_collector}"
-BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/var/lib/backup-state}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_DIR="${1:-$SCRIPT_DIR/business-metrics}"
+BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/backups/backup-state}"
 mkdir -p "$OUTPUT_DIR"
 
 # Prints exactly one number: the count of non-empty lines on stdin, or 0.

@@ -19,6 +19,8 @@ PROMETHEUS="$PROJECT_ROOT/prometheus/prometheus.yml"
 NGINX_CONF="$PROJECT_ROOT/web-dashboard/nginx.conf"
 ALERTMANAGER="$PROJECT_ROOT/prometheus/alertmanager.yml"
 RULES="$PROJECT_ROOT/prometheus/alert_rules.yml"
+EXPORTER="$PROJECT_ROOT/prometheus/business-metrics-exporter.sh"
+BACKUP_DB="$PROJECT_ROOT/scripts/backups/backup-databases.sh"
 
 # Hosts that are legitimately not compose service names.
 ALLOWED_HOSTS="localhost 127.0.0.1 ::1 host.docker.internal"
@@ -309,6 +311,34 @@ stray=$(awk '
       echo "  the file resets the label:" >&2
       printf '%s\n' "$unlabelled" >&2
       fail=1
+  fi
+
+  # The exporter and the backup script must agree on where the backup markers
+  # live. They are separate files, each with its own default, and a mismatch is
+  # invisible: the exporter reports 0 for last success, BackupStale fires
+  # forever, and nothing says the two are looking in different directories. The
+  # default also has to be writable by whoever runs the cron jobs -- /var/lib is
+  # root-only, so a non-root exporter could never read a root-written marker.
+  if [ -f "$EXPORTER" ] && [ -f "$BACKUP_DB" ]; then
+      exporter_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$EXPORTER" | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
+      backup_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$BACKUP_DB" | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
+      if [ -z "$exporter_state" ] || [ -z "$backup_state" ]; then
+          echo "ERROR: could not read the BACKUP_STATE_DIR default from the exporter" >&2
+          echo "  or backup-databases.sh." >&2
+          fail=1
+      elif [ "$exporter_state" != "$backup_state" ]; then
+          echo "ERROR: BACKUP_STATE_DIR defaults disagree." >&2
+          echo "  exporter reads           : $exporter_state" >&2
+          echo "  backup-databases.sh writes: $backup_state" >&2
+          echo "  The exporter would report last-success 0 forever and BackupStale" >&2
+          echo "  would fire regardless of whether backups succeed." >&2
+          fail=1
+      elif [ "$exporter_state" = "/var/lib/backup-state" ]; then
+          echo "ERROR: BACKUP_STATE_DIR defaults to /var/lib/backup-state, which is" >&2
+          echo "  root-only. Backups run from cron as a normal user, so the marker" >&2
+          echo "  cannot be written or read and the metric stays 0." >&2
+          fail=1
+      fi
   fi
 
   if [ "$fail" -ne 0 ]; then

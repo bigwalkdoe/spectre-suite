@@ -73,6 +73,24 @@ arbitrary `.sh` files out of your home directory.
 | 10:00 | OPA policy evaluation | Weekly (Mon) |
 | Every 4h | Resource rightsizing | Continuous |
 | Every 6h | Audit trail generation | Continuous |
+| Every 5m | Metrics exporter (`prometheus/business-metrics-exporter.sh`) | Continuous |
+
+> **The exporter must actually be scheduled.** It is not a container: it is a
+> script that writes `.prom` files for the node-exporter textfile collector, and
+> nothing runs it unless a cron entry exists. Without it, `backup_last_success_timestamp`
+> and the system/docker gauges do not exist, and Prometheus does not fire a rule
+> whose series is absent — so `BackupStale` would silently never alert.
+> `MetricsExporterNotRunning` exists to make that condition visible.
+>
+> ```bash
+> crontab -l | grep -q business-metrics-exporter || \
+>   (crontab -l; echo "*/5 * * * * $PWD/prometheus/business-metrics-exporter.sh") | crontab -
+> ```
+>
+> The backup jobs must point at this repository. A stale copy of these scripts
+> elsewhere on the host will keep running on schedule while the repository is
+> fixed but unused, which is how 81 empty archives accumulated here while every
+> job reported success.
 
 ## Monitoring Stack
 
@@ -209,7 +227,7 @@ the following environment overrides:
 | `REDIS_CONTAINER` | `redis` | `backup-databases.sh` |
 | `NEO4J_CONTAINER` | `neo4j` | `backup-databases.sh` (skipped when absent) |
 | `BACKUP_DIR` | `/backups/databases` | all backup/restore scripts |
-| `BACKUP_STATE_DIR` | `/var/lib/backup-state` | `backup-databases.sh`, exporter |
+| `BACKUP_STATE_DIR` | `/backups/backup-state` | `backup-databases.sh`, exporter (must match: a mismatch reads 0 forever) |
 | `PROMETHEUS_CONTAINER` | `prometheus` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
 | `ALERTMANAGER_CONTAINER` | `alertmanager` | `setup-notification-channels.sh` |
 | `SECRETS_DIR` | `prometheus/alertmanager-secrets` | `setup-notification-channels.sh` |
