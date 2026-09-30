@@ -93,11 +93,31 @@ run_all_tests() {
     local passed=0
     local failed=0
     
-    test_backup_script_exists && ((passed+=1)) || ((failed+=1))
-    test_backup_script_executable && ((passed+=1)) || ((failed+=1))
-    test_backup_directories && ((passed+=1)) || ((failed+=1))
-    test_backup_script_syntax && ((passed+=1)) || ((failed+=1))
-    test_required_backup_scripts && ((passed+=1)) || ((failed+=1))
+    if test_backup_script_exists; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_backup_script_executable; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_backup_directories; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_backup_script_syntax; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_required_backup_scripts; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
     
     echo ""
     echo "Backup Script Tests Summary:"

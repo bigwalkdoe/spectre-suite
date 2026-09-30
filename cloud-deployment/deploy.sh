@@ -5,7 +5,6 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Colors for output
 RED='\033[0;31m'
@@ -189,7 +188,7 @@ wait_for_instances() {
             attempt=0
             
             while [ $attempt -lt $max_attempts ]; do
-                if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip "echo 'ready'" >/dev/null 2>&1; then
+                if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@"$ip" "echo 'ready'" >/dev/null 2>&1; then
                     log_info "Instance $ip is ready"
                     break
                 fi
@@ -229,7 +228,7 @@ verify_deployment() {
     
     # Test web dashboard
     if [ -n "$INSTANCE_IPS" ]; then
-        FIRST_IP=$(echo $INSTANCE_IPS | awk '{print $1}')
+        FIRST_IP=$(echo "$INSTANCE_IPS" | awk '{print $1}')
         log_info "Testing web dashboard at http://$FIRST_IP:8081"
         
         if curl -s "http://$FIRST_IP:8081" >/dev/null 2>&1; then
@@ -295,9 +294,9 @@ main() {
     log_info "Cloud deployment completed successfully!"
     log_info ""
     log_info "Access Information:"
-    log_info "  - Web Dashboard: http://$(echo $INSTANCE_IPS | awk '{print $1}'):8081"
-    log_info "  - Grafana: http://$(echo $INSTANCE_IPS | awk '{print $1}'):3002"
-    log_info "  - Prometheus: http://$(echo $INSTANCE_IPS | awk '{print $1}'):9090"
+    log_info "  - Web Dashboard: http://$(echo "$INSTANCE_IPS" | awk '{print $1}'):8081"
+    log_info "  - Grafana: http://$(echo "$INSTANCE_IPS" | awk '{print $1}'):3002"
+    log_info "  - Prometheus: http://$(echo "$INSTANCE_IPS" | awk '{print $1}'):9090"
     log_info ""
     log_info "Next Steps:"
     log_info "  1. Change default Grafana password"

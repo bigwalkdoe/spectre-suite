@@ -5,6 +5,7 @@ set -euo pipefail
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# shellcheck disable=SC1091  # resolved at runtime
 source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
@@ -21,6 +22,7 @@ $PKG_INSTALL python3 python3-pip python3-venv
 echo "Creating Python virtual environment..."
 cd "$SCRIPT_DIR"
 python3 -m venv venv
+# shellcheck disable=SC1091  # resolved at runtime
 source venv/bin/activate
 
 # Install Python packages
@@ -54,8 +56,8 @@ sudo mkdir -p /var/lib/ml-anomaly/metrics
 sudo mkdir -p /var/lib/ml-anomaly/remediation
 
 # Set permissions
-sudo chown -R $USER:$USER /var/log/ml-anomaly
-sudo chown -R $USER:$USER /var/lib/ml-anomaly
+sudo chown -R "$USER:$USER" /var/log/ml-anomaly
+sudo chown -R "$USER:$USER" /var/lib/ml-anomaly
 
 # Continuous detection service
 sudo tee /etc/systemd/system/ml-anomaly-detection.service >/dev/null <<EOF

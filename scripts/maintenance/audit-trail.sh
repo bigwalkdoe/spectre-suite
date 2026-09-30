@@ -10,7 +10,6 @@ else
     LOG_DIR="/tmp/audit"
 fi
 AUDIT_LOG="$LOG_DIR/audit.log"
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 TIMESTAMP_ISO=$(date -Iseconds)
 
 log() {
@@ -110,8 +109,10 @@ log_security() {
 # Generate audit report
 generate_report() {
     local report_type="${1:-daily}"
-    local start_date="${2:-$(date -d '1 day ago' +%Y-%m-%d)}"
-    local end_date="${3:-$(date +%Y-%m-%d)}"
+    local start_date
+    start_date="${2:-$(date -d '1 day ago' +%Y-%m-%d)}"
+    local end_date
+    end_date="${3:-$(date +%Y-%m-%d)}"
     
     log "=========================================="
     log "Audit Report Generated"
@@ -136,10 +137,17 @@ generate_report() {
     esac
     
     # Log summary statistics
-    local total_events=$(wc -l < "$AUDIT_LOG" 2>/dev/null || echo 0)
-    local auth_events=$(grep "^AUTH:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
-    local sudo_events=$(grep "^SUDO:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
-    local security_events=$(grep "^SECURITY:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
+    local total_events
+    total_events=$(wc -l < "$AUDIT_LOG" 2>/dev/null || echo 0)
+    local auth_events
+    # shellcheck disable=SC2126  # grep -c exits 1 on no match; would abort under set -e
+    auth_events=$(grep "^AUTH:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
+    local sudo_events
+    # shellcheck disable=SC2126  # grep -c exits 1 on no match; would abort under set -e
+    sudo_events=$(grep "^SUDO:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
+    local security_events
+    # shellcheck disable=SC2126  # grep -c exits 1 on no match; would abort under set -e
+    security_events=$(grep "^SECURITY:" "$AUDIT_LOG" 2>/dev/null | wc -l || true)
     
     log "Total Events: $total_events"
     log "Authentication Events: $auth_events"
@@ -155,7 +163,7 @@ rotate_logs() {
     
     log "Rotating audit logs (retention: $retention_days days)"
     
-    find "$LOG_DIR" -name "*.log.*" -type f -mtime +$retention_days -delete 2>/dev/null || true
+    find "$LOG_DIR" -name "*.log.*" -type f -mtime +"$retention_days" -delete 2>/dev/null || true
     log "Log rotation completed"
 }
 
