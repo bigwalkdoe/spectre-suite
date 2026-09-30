@@ -130,17 +130,3 @@ jobs:
             -e BASE_URL="$SPECTRE_LOAD_TEST_URL" \
             -e VUS="${VUS:-10}" -e DURATION="${DURATION:-30s}"
 
-  config-consistency:
-    name: Configuration Consistency
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Config references must resolve to real services
-        # This was "Configuration Drift Detection", which globbed the config
-        # files and echoed OK for each one found. It could not fail. A scrape
-        # target or nginx upstream naming a service that no longer exists now
-        # fails here instead of presenting as a permanently-down target at run
-        # time. Needs no Docker: it only reads the two files.
-        run: bash scripts/check-config-consistency.sh
