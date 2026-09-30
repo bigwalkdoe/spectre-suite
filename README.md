@@ -63,7 +63,7 @@ arbitrary `.sh` files out of your home directory.
 |------|------|-----------|
 | 01:00 | Database backup | Daily |
 | 02:00 | Full backup (Sat) / Docker volume backup | Daily/Weekly |
-| 02:30 | PostgreSQL vacuum & analyze | Daily |
+| 02:30 | PostgreSQL vacuum & analyze (`vacuum-databases.sh`) | Daily |
 | 04:30 | Off-site backup replication | Daily |
 | 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
 | 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
@@ -77,6 +77,12 @@ arbitrary `.sh` files out of your home directory.
 | Every 6h | Audit trail generation | Continuous |
 | Every 5m | Metrics exporter (`prometheus/business-metrics-exporter.sh`) | Continuous |
 
+> **All of these point at this repository.** A stale copy of these scripts
+> elsewhere on the host will keep running on schedule while the repository is
+> fixed but unused. That is not hypothetical: a fork under `/home/deon/scripts`
+> ran nightly for the life of the crontab, targeted containers from another
+> project, and reported success over empty files.
+>
 > **Backup health is verified against the archives, not a log.**
 > `scripts/backups/check-backup-health.sh` inspects each backup: a real
 > PostgreSQL dump must carry the `PostgreSQL database dump` header (a failed dump
