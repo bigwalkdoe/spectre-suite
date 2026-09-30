@@ -58,6 +58,20 @@ read_marker() {
 LAST_BACKUP=$(read_marker "$BACKUP_STATE_DIR/last-db-backup-success")
 LAST_ATTEMPT=$(read_marker "$BACKUP_STATE_DIR/last-db-backup-attempt")
 
+# Verdict of scripts/backups/check-backup-health.sh, which inspects the backup
+# archives themselves. Published so a failing health check can raise an alert
+# rather than only writing to a cron log nobody reads: a cron job that just exits
+# non-zero is still a silent failure, which is how 81 empty archives survived.
+HEALTH_LINE=$(cat "$BACKUP_STATE_DIR/last-backup-health" 2>/dev/null || true)
+case "$(printf '%s' "$HEALTH_LINE" | awk '{print $1}')" in
+    ok) HEALTH_OK=1 ;;
+    *) HEALTH_OK=0 ;;
+esac
+HEALTH_WHEN=$(printf '%s' "$HEALTH_LINE" | awk '{print $2}')
+case "$HEALTH_WHEN" in
+    ''|*[!0-9]*) HEALTH_WHEN=0 ;;
+esac
+
 cat > "$OUTPUT_DIR/backup_metrics.prom" << EOF
 # HELP backup_last_success_timestamp Unix timestamp of the last database backup that completed successfully, 0 if none recorded
 # TYPE backup_last_success_timestamp gauge
@@ -65,6 +79,12 @@ backup_last_success_timestamp $LAST_BACKUP
 # HELP backup_last_attempt_timestamp Unix timestamp of the last database backup run that started, 0 if none recorded
 # TYPE backup_last_attempt_timestamp gauge
 backup_last_attempt_timestamp $LAST_ATTEMPT
+# HELP backup_health_check_ok 1 if the last check-backup-health.sh run found every backup usable, 0 if it failed or has never run
+# TYPE backup_health_check_ok gauge
+backup_health_check_ok $HEALTH_OK
+# HELP backup_health_check_timestamp Unix timestamp of the last backup health check
+# TYPE backup_health_check_timestamp gauge
+backup_health_check_timestamp $HEALTH_WHEN
 EOF
 
 # System metrics
