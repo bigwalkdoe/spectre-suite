@@ -5,6 +5,7 @@ set -euo pipefail
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# shellcheck disable=SC1091  # resolved at runtime
 source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
@@ -102,7 +103,7 @@ echo "Creating Docker scan script..."
 create_docker_scan_script
 
 echo "Running Docker image vulnerability scan..."
-$SCRIPT_DIR/scan-docker-images.sh
+"$SCRIPT_DIR/scan-docker-images.sh"
 
 # Set up Docker security policies
 echo "Setting up Docker security policies..."

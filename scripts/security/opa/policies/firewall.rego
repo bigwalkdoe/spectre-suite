@@ -1,29 +1,26 @@
 package security.firewall
 
-# Firewall must be enabled
-firewall_enabled = true
+import rego.v1
 
-rule if {
-    input.firewall_enabled == true
+# Firewall and SSH
+deny contains msg if {
+    not input.firewall_enabled == true
+    msg := "firewall: firewalld is not active"
 }
 
-# SSH password authentication must be disabled
-ssh_password_auth_disabled = true
-
-rule if {
-    input.ssh_password_auth == false
+deny contains msg if {
+    not input.ssh_password_auth == false
+    msg := "firewall: SSH password authentication is enabled"
 }
 
-# Root login via SSH must be disabled
-ssh_root_login_disabled = true
-
-rule if {
-    input.ssh_root_login == false
+deny contains msg if {
+    not input.ssh_root_login == false
+    msg := "firewall: SSH root login is enabled"
 }
 
-# Fail2Ban must be active
-fail2ban_active = true
-
-rule if {
-    input.fail2ban_active == true
+deny contains msg if {
+    not input.fail2ban_active == true
+    msg := "firewall: fail2ban is not active"
 }
+
+# Total controls evaluated for security.firewall: 4

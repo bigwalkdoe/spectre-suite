@@ -17,42 +17,53 @@ log() {
 
 # Get CPU usage
 get_cpu_usage() {
-    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
+    local cpu_usage
+    cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
     echo "${cpu_usage:-0}"
 }
 
 # Get memory usage
 get_memory_usage() {
-    local mem_info=$(free | grep Mem)
-    local total=$(echo "$mem_info" | awk '{print $2}')
-    local used=$(echo "$mem_info" | awk '{print $3}')
-    local usage=$(echo "scale=2; $used * 100 / $total" | bc)
+    local mem_info
+    mem_info=$(free | grep Mem)
+    local total
+    total=$(echo "$mem_info" | awk '{print $2}')
+    local used
+    used=$(echo "$mem_info" | awk '{print $3}')
+    local usage
+    usage=$(echo "scale=2; $used * 100 / $total" | bc)
     echo "${usage:-0}"
 }
 
 # Get disk usage
 get_disk_usage() {
-    local disk_usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+    local disk_usage
+    disk_usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
     echo "${disk_usage:-0}"
 }
 
 # Get load average
 get_load_average() {
-    local load=$(cat /proc/loadavg | awk '{print $1}')
+    local load
+    load=$(cat /proc/loadavg | awk '{print $1}')
     echo "${load:-0}"
 }
 
 # Get active processes
 get_active_processes() {
-    local count=$(ps aux --no-headers | wc -l)
+    local count
+    count=$(ps aux --no-headers | wc -l)
     echo "${count:-0}"
 }
 
 # Check swap usage
 get_swap_usage() {
-    local swap_info=$(free | grep Swap)
-    local total=$(echo "$swap_info" | awk '{print $2}')
-    local used=$(echo "$swap_info" | awk '{print $3}')
+    local swap_info
+    swap_info=$(free | grep Swap)
+    local total
+    total=$(echo "$swap_info" | awk '{print $2}')
+    local used
+    used=$(echo "$swap_info" | awk '{print $3}')
     local usage=0
     if [[ "$total" -gt 0 ]]; then
         usage=$(echo "scale=2; $used * 100 / $total" | bc)
@@ -87,12 +98,18 @@ main() {
     log "=========================================="
     
     # Gather metrics
-    local cpu_usage=$(get_cpu_usage)
-    local memory_usage=$(get_memory_usage)
-    local disk_usage=$(get_disk_usage)
-    local load_avg=$(get_load_average)
-    local active_procs=$(get_active_processes)
-    local swap_usage=$(get_swap_usage)
+    local cpu_usage
+    cpu_usage=$(get_cpu_usage)
+    local memory_usage
+    memory_usage=$(get_memory_usage)
+    local disk_usage
+    disk_usage=$(get_disk_usage)
+    local load_avg
+    load_avg=$(get_load_average)
+    local active_procs
+    active_procs=$(get_active_processes)
+    local swap_usage
+    swap_usage=$(get_swap_usage)
     
     log "CPU Usage: ${cpu_usage}%"
     log "Memory Usage: ${memory_usage}%"

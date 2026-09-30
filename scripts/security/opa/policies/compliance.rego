@@ -1,36 +1,31 @@
 package security.compliance
 
-# System must comply with security baseline
-security_baseline_compliant = true
+import rego.v1
 
-rule if {
-    input.security_baseline_compliant == true
+# Compliance baseline
+deny contains msg if {
+    not input.security_baseline_compliant == true
+    msg := "compliance: system is not compliant with the security baseline"
 }
 
-# CIS benchmarks must be followed
-cis_benchmarks_followed = true
-
-rule if {
-    input.cis_benchmarks_followed == true
+deny contains msg if {
+    not input.cis_benchmarks_followed == true
+    msg := "compliance: CIS benchmarks are not being followed"
 }
 
-# PCI-DSS requirements must be met (if applicable)
-pci_dss_compliant = true
-
-rule if {
-    input.pci_dss_compliant == true
+deny contains msg if {
+    not input.pci_dss_compliant == true
+    msg := "compliance: PCI-DSS requirements are not met"
 }
 
-# Regular security assessments must be performed
-security_assessments_scheduled = true
-
-rule if {
-    input.security_assessments_scheduled == true
+deny contains msg if {
+    not input.security_assessments_scheduled == true
+    msg := "compliance: security assessments are not scheduled"
 }
 
-# Patch management must be active
-patch_management_active = true
-
-rule if {
-    input.patch_management_active == true
+deny contains msg if {
+    not input.patch_management_active == true
+    msg := "compliance: patch management is not active"
 }
+
+# Total controls evaluated for security.compliance: 5

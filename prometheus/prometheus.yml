@@ -75,20 +75,28 @@ scrape_configs:
     scrape_interval: 60s
 
   # Blackbox Exporter - TCP connectivity checks
+  # blackbox-exporter is on the `monitoring` network alongside every service, so
+  # these are addressed by Compose service name. That is the path real clients
+  # use, and it is the only one that works for services publishing no host port.
+  #
+  # Earlier revisions used "localhost" (the exporter's own loopback) and then
+  # "host.docker.internal" (the Docker gateway). Both failed permanently: the
+  # gateway cannot reach services that publish no host port, which postgres and
+  # redis do not, and the list carried ports this stack never serves -- 443 and
+  # 3100/Loki -- so all eight checks reported UptimeCheckFailed within minutes of
+  # a clean start.
   - job_name: 'blackbox-tcp'
     metrics_path: /probe
     params:
       module: [tcp_connect]
     static_configs:
       - targets:
-        - 'localhost:22'
-        - 'localhost:443'
-        - 'localhost:5432'
-        - 'localhost:6379'
-        - 'localhost:9090'
-        - 'localhost:3002'
-        - 'localhost:8081'
-        - 'localhost:3100'
+        - 'prometheus:9090'
+        - 'grafana:3000'
+        - 'alertmanager:9093'
+        - 'web-dashboard:80'
+        - 'postgres:5432'
+        - 'redis:6379'
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

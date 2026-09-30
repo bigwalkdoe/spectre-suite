@@ -15,14 +15,14 @@ echo "==========================================" >> "$BACKUP_LOG"
 # Run Guardrail-AI backup
 echo "Running Guardrail-AI backup..." >> "$BACKUP_LOG"
 set +e
-$REPO_ROOT/scripts/backups/backup-projects.sh >> "$BACKUP_LOG" 2>&1
+"$REPO_ROOT/scripts/backups/backup-projects.sh" >> "$BACKUP_LOG" 2>&1
 GUARDRAIL_STATUS=$?
 set -e
 
 # Run Modelink backup
 echo "Running Modelink backup..." >> "$BACKUP_LOG"
 set +e
-$REPO_ROOT/scripts/project-specific/backup-modelink.sh >> "$BACKUP_LOG" 2>&1
+"$REPO_ROOT/scripts/project-specific/backup-modelink.sh" >> "$BACKUP_LOG" 2>&1
 MODELINK_STATUS=$?
 set -e
 

@@ -5,6 +5,10 @@ on:
     - cron: '0 6 * * 0'  # Weekly on Sunday
   push:
     branches: [ main, develop ]
+  # The OPA compliance gate needs to run before merge; with only a main/develop
+  # push trigger and a weekly schedule, a policy that fails open could reach
+  # main unnoticed.
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -12,13 +16,20 @@ jobs:
     name: Trivy Container Scan
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        # Pinned to a released tag. This job holds security-events: write, so a
+        # mutable ref (it was @master) means whoever moves that branch runs
+        # arbitrary code with SARIF upload rights.
+        # Pinned to an immutable commit SHA of v0.36.0. This job holds
+        # security-events: write, so a mutable ref (it was @master) let whoever
+        # moved that branch run code with SARIF upload rights.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -41,6 +52,8 @@ jobs:
   opa-policy-check:
     name: OPA Policy Compliance Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,7 +61,7 @@ jobs:
       - name: Set up OPA
         uses: open-policy-agent/setup-opa@v2
         with:
-          version: latest
+          version: v0.68.0
 
       - name: Check Rego syntax
         run: |
@@ -56,23 +69,40 @@ jobs:
             opa check "$file"
           done
 
-      - name: Evaluate policies against live system state
+            # The previous version asserted every control as `true` and evaluated the
+      # policies against those constants. Worse, each policy file declared its
+      # own hardcoded `= true` constant, so `data.security` reported full
+      # compliance for any input at all -- the check could not fail. The policies
+      # now derive every control from input, and CI evaluates them against a
+      # committed, reviewable baseline (scripts/security/opa/baseline.json).
+      # Flipping any control there fails the job until the config is fixed.
+      - name: Evaluate policies against declared baseline
         run: |
-          bash scripts/maintenance/compliance-report.sh check-opa
-
-      - name: Evaluate policies
-        run: |
-          cat > /tmp/opa-input.json <<'EOF'
-          {"firewall_enabled": true, "ssh_password_auth": false, "audit_logging_enabled": true, "intrusion_detection_active": true, "file_integrity_monitoring": true, "security_scanning_enabled": true, "vpn_enabled": true}
-          EOF
-          opa eval --format pretty \
+          set -euo pipefail
+          denials=$(opa eval --format raw \
             --data scripts/security/opa/policies \
-            --input /tmp/opa-input.json \
-            "data.security"
+            --input scripts/security/opa/baseline.json \
+            '[m | data.security[k].deny[m]]' | tail -1)
+          echo "Policy denials: $denials"
+          if [ "$denials" != "[]" ]; then
+            echo "::error::OPA policy violations detected:"
+            echo "$denials"
+            exit 1
+          fi
+          echo "All OPA controls satisfied."
+
+      - name: Upload policy results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: opa-policy-results
+          path: scripts/security/opa/baseline.json
 
   load-test:
     name: Load Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
@@ -84,26 +114,19 @@ jobs:
           tar -xzf k6-v0.49.0-linux-amd64.tar.gz
           sudo mv k6-v0.49.0-linux-amd64/k6 /usr/local/bin/
 
+      # The previous version installed k6 and then only echoed what it would do.
+      # It now requires an explicit target and fails loudly if none is set, so
+      # this job cannot silently report success without running.
       - name: Run performance regression test
+        env:
+          SPECTRE_LOAD_TEST_URL: ${{ vars.SPECTRE_LOAD_TEST_URL }}
         run: |
-          echo "Load test configuration:"
-          echo "  - Script: scripts/performance/load-testing/k6-script.js"
-          echo "  - VUs: 10"
-          echo "  - Duration: 30s"
-          echo "Regression test would run against staging URL"
+          set -euo pipefail
+          if [ -z "${SPECTRE_LOAD_TEST_URL}" ]; then
+            echo "SPECTRE_LOAD_TEST_URL repository variable is not set; refusing to report a pass." >&2
+            exit 1
+          fi
+          k6 run scripts/performance/load-testing/k6-script.js \
+            -e BASE_URL="$SPECTRE_LOAD_TEST_URL" \
+            -e VUS="${VUS:-10}" -e DURATION="${DURATION:-30s}"
 
-  config-diff-check:
-    name: Configuration Drift Detection
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check for config file changes
-        run: |
-          echo "Checking configuration file consistency..."
-          for file in prometheus/*.yml docker-compose*.yml cloud-deployment/**/*.tf; do
-            if [ -f "$file" ]; then
-              echo "  OK: $file"
-            fi
-          done

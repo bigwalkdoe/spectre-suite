@@ -43,7 +43,7 @@ find_large_files() {
     local size="${1:-100M}"
     log "Finding files larger than $size..."
     
-    find /var/log -type f -size +$size -exec ls -lh {} \; 2>/dev/null | sort -k5 -r | head -10 || true
+    find /var/log -type f -size +"$size" -exec ls -lh {} \; 2>/dev/null | sort -k5 -r | head -10 || true
 }
 
 # Find large directories
@@ -55,26 +55,22 @@ find_large_directories() {
 }
 
 # Clean old logs
-clean_old_logs() {
-    log "Cleaning logs older than 7 days..."
-    
-    find /var/log -name "*.log.*" -type f -mtime +7 -delete 2>/dev/null || true
-    log "Log cleanup completed"
-}
 
 # Check Docker disk usage
 check_docker_disk() {
     log "Checking Docker disk usage..."
     
     if command -v docker &> /dev/null; then
-        local docker_usage=$(docker system df 2>/dev/null | tail -5)
+        local docker_usage
+        docker_usage=$(docker system df 2>/dev/null | tail -5)
         log "$docker_usage"
         
         # Check for unused images
-        local unused_images=$(docker images -f "dangling=true" -q 2>/dev/null)
+        local unused_images
+        unused_images=$(docker images -f "dangling=true" -q 2>/dev/null)
         if [[ -n "$unused_images" ]]; then
             log "WARNING: Found unused Docker images:"
-            echo "$unused_images" | while read img; do
+            echo "$unused_images" | while read -r img; do
                 log "  - $img"
             done
         fi
@@ -90,9 +86,12 @@ main() {
     log "=========================================="
     
     # Check root filesystem
-    local root_usage=$(get_disk_usage "/")
-    local root_available=$(get_available_space "/")
-    local root_human=$(get_disk_usage_human "/")
+    local root_usage
+    root_usage=$(get_disk_usage "/")
+    local root_available
+    root_available=$(get_available_space "/")
+    local root_human
+    root_human=$(get_disk_usage_human "/")
     
     log "Root filesystem: ${root_human} (${root_usage}% used, ${root_available} available)"
     
@@ -111,9 +110,12 @@ main() {
     
     for mount_point in /boot /var /home /tmp; do
         if mountpoint -q "$mount_point" 2>/dev/null; then
-            local usage=$(get_disk_usage "$mount_point")
-            local available=$(get_available_space "$mount_point")
-            local human=$(get_disk_usage_human "$mount_point")
+            local usage
+            usage=$(get_disk_usage "$mount_point")
+            local available
+            available=$(get_available_space "$mount_point")
+            local human
+            human=$(get_disk_usage_human "$mount_point")
             
             log "  $mount_point: ${human} (${usage}% used, ${available} available)"
             
@@ -126,7 +128,8 @@ main() {
     done
     
     # Check inode usage
-    local root_inodes=$(get_inode_usage "/")
+    local root_inodes
+    root_inodes=$(get_inode_usage "/")
     log ""
     log "Root inode usage: ${root_inodes}%"
     

@@ -1,7 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Modelink Project Backup Script
 # Custom backup configuration for Modelink project

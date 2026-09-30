@@ -32,8 +32,10 @@ verify_checksum() {
         return 0
     fi
     
-    local current_checksum=$(sha256sum "$file" | awk '{print $1}')
-    local stored_checksum=$(cat "$checksum_file" | awk '{print $1}')
+    local current_checksum
+    current_checksum=$(sha256sum "$file" | awk '{print $1}')
+    local stored_checksum
+    stored_checksum=$(cat "$checksum_file" | awk '{print $1}')
     
     if [[ "$current_checksum" == "$stored_checksum" ]]; then
         log "OK: Checksum verified for $file"
@@ -83,7 +85,8 @@ verify_backup_age() {
     local backup_file="$1"
     local max_age_hours="${2:-26}"  # Default: 26 hours (1 day)
     
-    local file_age_hours=$(( ($(date +%s) - $(stat -c %Y "$backup_file")) / 3600 ))
+    local file_age_hours
+    file_age_hours=$(( ($(date +%s) - $(stat -c %Y "$backup_file")) / 3600 ))
     
     if [[ $file_age_hours -le $max_age_hours ]]; then
         log "OK: Backup age OK (${file_age_hours}h <= ${max_age_hours}h): $backup_file"
@@ -99,8 +102,10 @@ verify_backup_size() {
     local backup_file="$1"
     local min_size="${2:-1}"  # Default: 1KB
     
-    local file_size=$(stat -c %s "$backup_file" 2>/dev/null || echo 0)
-    local min_size_bytes=$((min_size * 1024))
+    local file_size
+    file_size=$(stat -c %s "$backup_file" 2>/dev/null || echo 0)
+    local min_size_bytes
+    min_size_bytes=$((min_size * 1024))
     
     if [[ $file_size -ge $min_size_bytes ]]; then
         log "OK: Backup size OK (${file_size} bytes >= ${min_size_bytes} bytes): $backup_file"
@@ -174,15 +179,6 @@ verify_docker_volume_backup() {
 }
 
 # Generate checksum for backup
-generate_checksum() {
-    local backup_file="$1"
-    local checksum_file="${backup_file}.sha256"
-    
-    log "Generating checksum for: $backup_file"
-    
-    sha256sum "$backup_file" > "$checksum_file"
-    log "Checksum saved to: $checksum_file"
-}
 
 # Main verification function
 main() {

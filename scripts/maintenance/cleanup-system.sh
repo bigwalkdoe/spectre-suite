@@ -6,6 +6,7 @@ set -euo pipefail
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091  # resolved at runtime
 source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
@@ -76,7 +77,10 @@ case "$DISTRO" in
             sudo pacman -Sc --noconfirm
             # Remove orphan packages
             if pacman -Qtdq >/dev/null 2>&1; then
-                sudo pacman -Rns --noconfirm $(pacman -Qtdq)
+                mapfile -t ORPHANS < <(pacman -Qtdq 2>/dev/null || true)
+                if [ "${#ORPHANS[@]}" -gt 0 ]; then
+                    sudo pacman -Rns --noconfirm -- "${ORPHANS[@]}"
+                fi
             fi
         fi
         ;;

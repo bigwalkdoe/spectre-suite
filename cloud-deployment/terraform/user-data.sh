@@ -2,11 +2,23 @@
 # User data script for cloud instance initialization
 # This script sets up the system maintenance suite on cloud instances
 
-set -e
+set -euo pipefail
 
-# Variables from Terraform
+# Variables from Terraform. These are substituted by templatefile() (see
+# user_data in main.tf), so they arrive already expanded and must keep the bare
+# variable-reference form -- Terraform's template language has no default-value
+# operator, so shell-style fallbacks here would be a template parse error.
+# shellcheck disable=SC2154
 ENVIRONMENT="${environment}"
+# shellcheck disable=SC2154
 PROJECT_NAME="${project_name}"
+# shellcheck disable=SC2154
+REPO_URL="${repo_url}"
+
+if [ -z "$ENVIRONMENT" ] || [ -z "$PROJECT_NAME" ] || [ -z "$REPO_URL" ]; then
+    echo "Error: environment/project_name/repo_url were not substituted by Terraform." >&2
+    exit 1
+fi
 
 echo "Starting initialization for $PROJECT_NAME in $ENVIRONMENT environment..."
 
@@ -42,10 +54,13 @@ echo "Installing Ansible..."
 pip3 install ansible
 
 # Clone system maintenance repository
-echo "Cloning system maintenance repository..."
+# Substituted by templatefile(). This was previously the literal placeholder
+# YOUR_USERNAME/spectre-system-maintenance, so provisioning failed at the `cd`
+# immediately below.
+echo "Cloning $REPO_URL..."
 cd /opt
-git clone https://github.com/YOUR_USERNAME/spectre-system-maintenance.git
-cd spectre-system-maintenance
+git clone "$REPO_URL"
+cd "$(basename "$REPO_URL" .git)"
 
 # Run installation script
 echo "Running system maintenance installation..."
@@ -205,21 +220,21 @@ if command -v aws >/dev/null 2>&1; then
     aws cloudwatch put-metric-data \
         --namespace SpectreSystemMaintenance \
         --metric-name CPUUsage \
-        --value $CPU_USAGE \
+        --value "$${CPU_USAGE}" \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
     
     aws cloudwatch put-metric-data \
         --namespace SpectreSystemMaintenance \
         --metric-name MemoryUsage \
-        --value $MEMORY_USAGE \
+        --value "$${MEMORY_USAGE}" \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
     
     aws cloudwatch put-metric-data \
         --namespace SpectreSystemMaintenance \
         --metric-name DiskUsage \
-        --value $DISK_USAGE \
+        --value "$${DISK_USAGE}" \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
 fi
@@ -236,10 +251,11 @@ echo "*/5 * * * * ubuntu /usr/local/bin/cloud-monitor.sh" >> /etc/cron.d/cloud-m
 echo "Initialization completed successfully!"
 echo "Spectre System Maintenance Suite is ready for use in $ENVIRONMENT environment."
 echo ""
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || echo "<instance-ip>")
 echo "Access Points:"
-echo "  - Web Dashboard: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8081"
-echo "  - Grafana: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3002"
-echo "  - Prometheus: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9090"
+echo "  Grafana, Prometheus and the dashboard bind to loopback only. Reach them via SSH tunnel:"
+printf '    ssh -L 3000:127.0.0.1:3000 -L 9090:127.0.0.1:9090 -L 8081:127.0.0.1:8081 ubuntu@%s\n' "$PUBLIC_IP"
+echo "  then open http://127.0.0.1:3002, :9090 and :8081 locally"
 echo ""
 echo "Next steps:"
 echo "  1. Change default Grafana password"

@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # System Performance Optimization Script
 
@@ -67,9 +66,9 @@ EOF'
 
 # Create performance monitoring dashboard alerts
 echo "Setting up performance alerts..."
-mkdir -p $SCRIPT_DIR/performance
+mkdir -p "$SCRIPT_DIR/performance"
 
-cat > $SCRIPT_DIR/check-performance.sh << 'EOF'
+cat > "$SCRIPT_DIR/check-performance.sh" << 'EOF'
 #!/bin/bash
 # Performance monitoring script
 
@@ -98,7 +97,7 @@ fi
 echo "Performance check completed - CPU: ${CPU_USAGE}%, MEM: ${MEM_USAGE}%, DISK: ${DISK_USAGE}%"
 EOF
 
-chmod +x $SCRIPT_DIR/check-performance.sh
+chmod +x "$SCRIPT_DIR/check-performance.sh"
 
 # Create systemd timer for performance monitoring
 sudo bash -c 'cat > /etc/systemd/system/performance-check.service << "EOF"

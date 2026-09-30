@@ -20,21 +20,23 @@
 ```bash
 # 1. Check database status
 docker ps | grep postgres
-docker logs --tail 50 guardrail-ai-postgres-1
+docker logs --tail 50 postgres
 
 # 2. Verify backup exists
 ls -la /backups/databases/
 find /backups/databases -name "postgres_*" -mtime -1
 
 # 3. Restore from latest backup
-LATEST_BACKUP=$(ls -t /backups/databases/postgres_guardrail_*.gz | head -1)
-gunzip -c "$LATEST_BACKUP" | docker exec -i guardrail-ai-postgres-1 psql -U postgres -d guardrail
+# Archives are postgres_<database>_<YYYYmmdd>_<HHMMSS>.sql.gz
+LATEST_BACKUP=$(ls -t /backups/databases/postgres_*.sql.gz | head -1)
+# Read the role from the container: POSTGRES_USER is not "postgres" here
+gunzip -c "$LATEST_BACKUP" | docker exec -i postgres psql -U "$(docker exec postgres sh -c 'printf %s "${POSTGRES_USER:-postgres}"')" -d postgres
 
 # 4. Verify data integrity
-docker exec guardrail-ai-postgres-1 psql -U postgres -d guardrail -c "SELECT count(*) FROM information_schema.tables;"
+docker exec postgres psql -U "$(docker exec postgres sh -c 'printf %s "${POSTGRES_USER:-postgres}"')" -d postgres -c "SELECT count(*) FROM information_schema.tables;"
 
 # 5. If backup restoration fails, promote replica (if configured):
-# docker exec guardrail-ai-postgres-replica-1 psql -U postgres -c "SELECT pg_promote();"
+# docker exec <replica-container> psql -U "$POSTGRES_USER" -c "SELECT pg_promote();"
 ```
 
 ### 2. Server/System Failure
@@ -53,7 +55,7 @@ ansible-playbook -i inventory/production.yml playbook.yml
 scripts/backups/restore-from-remote.sh
 
 # 4. Verify services
-scripts/healthcheck.sh
+scripts/maintenance/system-health-check.sh
 ```
 
 ### 3. Docker Daemon Failure
@@ -82,19 +84,24 @@ sudo iptables -A INPUT -s <attacker_ip> -j DROP
 sudo fail2ban-client set sshd banip <attacker_ip>
 
 # 2. Run security scan
-scripts/security/run-trivy-scan.sh
-scripts/security/check-file-integrity.sh
+# Container scanning is a CI job, not a local script. Scan an image directly:
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy image --severity HIGH,CRITICAL <image>
+scripts/security/scan-docker-images.sh
 
 # 3. Review logs
 sudo journalctl -u docker --since "24 hours ago" | grep -i error
 tail -100 /var/log/auth.log | grep -i "failed\|error\|unauthorized"
 
 # 4. Rotate credentials
-scripts/security/inject-secrets.sh
+# There is no secrets-injection script. Rotate by editing .env (database and
+# Redis credentials) and re-running scripts/setup-notification-channels.sh for
+# the Alertmanager receivers, then restart the stack.
 sudo systemctl restart all services
 
 # 5. Generate incident report
-scripts/security/generate-security-report.sh
+# No report generator is provided. The inputs are: the scan output above, the
+# journal/auth log greps, and scripts/maintenance/audit-trail.sh.
 ```
 
 ### 5. Disk Space Exhaustion
@@ -168,7 +175,7 @@ scripts/backups/restore-docker-volumes.sh
 docker-compose -f docker-compose.monitoring.yml up -d
 
 # Step 6: Verify
-scripts/healthcheck.sh
+scripts/maintenance/system-health-check.sh
 ```
 
 ### Backup Verification Procedure
@@ -192,16 +199,31 @@ done
 
 | Severity | Notification Method | Response Time | Escalation |
 |----------|-------------------|---------------|------------|
-| Critical | PagerDuty + Slack + Email | 15 minutes | Manager + On-call team |
-| High | Slack + Email | 1 hour | On-call team |
-| Medium | Email | 4 hours | Next business day |
+| Critical | Slack (`danger` attachment) | 15 minutes | Manager + On-call team |
+| High | Slack (`warning` attachment) | 1 hour | On-call team |
+| Medium | Slack (`good` attachment) | 4 hours | Next business day |
 | Low | Dashboard alert | 24 hours | Next sprint |
+
+Slack is the only configured channel, so all severities land in the one channel
+the webhook was created for; the attachment colour and title prefix carry the
+severity. Absence of the `Watchdog Alive` message is itself an incident: it means
+notification itself is broken.
 
 ### Notification Contacts
 
-- **PagerDuty**: Configured in alertmanager.yml (routing_key)
-- **Slack**: #alerts-critical, #alerts-warning channels
-- **Email**: Configured in alertmanager.yml (smtp)
+Credentials are **not** edited into `prometheus/alertmanager.yml`; Alertmanager
+does no `${VAR}` substitution. They are written as one-value files to
+`prometheus/alertmanager-secrets/` by `scripts/setup-notification-channels.sh`
+(directory bind-mounted read-only, gitignored, files mode 0600).
+
+- **Slack**: `SLACK_WEBHOOK_URL` -> `alertmanager-secrets/slack_webhook_url`.
+  Every receiver posts to this one webhook; the channel is the one selected when
+  the webhook was created in Slack, since Alertmanager's `channel` field is
+  commonly ignored for incoming webhooks.
+
+A receiver with no credential still starts but cannot deliver — verify with
+`amtool check-config prometheus/alertmanager.yml` and the setup script's warnings
+rather than by waiting for a page.
 
 ---
 

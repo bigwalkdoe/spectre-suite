@@ -11,7 +11,6 @@ else
 fi
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 TIMESTAMP_ISO=$(date -Iseconds)
 
 log() {
@@ -110,7 +109,8 @@ check_system_compliance() {
     
     # Check disk usage
     total=$((total + 1))
-    local disk_usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+    local disk_usage
+    disk_usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
     if [[ $disk_usage -lt 85 ]]; then
         log "OK: Disk usage within limits (${disk_usage}%)"
         passed=$((passed + 1))
@@ -146,7 +146,9 @@ check_docker_compliance() {
     
     # Check for privileged containers
     total=$((total + 1))
-    local privileged_count=$(docker ps --format '{{.Name}} {{.Mode}}' 2>/dev/null | grep "privileged" | wc -l || true)
+    local privileged_count
+    # shellcheck disable=SC2126  # grep -c exits 1 on no match; would abort under set -e
+    privileged_count=$(docker ps --format '{{.Name}} {{.Mode}}' 2>/dev/null | grep "privileged" | wc -l || true)
     if [[ $privileged_count -eq 0 ]]; then
         log "OK: No privileged containers running"
         passed=$((passed + 1))
@@ -157,7 +159,9 @@ check_docker_compliance() {
     
     # Check container resource limits
     total=$((total + 1))
-    local unlimited_count=$(docker ps --format '{{.Name}} {{.NanoCpus}} {{.NanoMemory}}' 2>/dev/null | grep -E "^[^ ]+ 0 " | wc -l || true)
+    local unlimited_count
+    # shellcheck disable=SC2126  # grep -c exits 1 on no match; would abort under set -e
+    unlimited_count=$(docker ps --format '{{.Name}} {{.NanoCpus}} {{.NanoMemory}}' 2>/dev/null | grep -E "^[^ ]+ 0 " | wc -l || true)
     if [[ $unlimited_count -eq 0 ]]; then
         log "OK: All containers have resource limits"
         passed=$((passed + 1))
@@ -189,10 +193,15 @@ check_backup_compliance() {
     
     # Check for recent backups
     total=$((total + 1))
-    local backup_age=$(find /backups -name "*.gz" -o -name "*.tar.gz" 2>/dev/null | xargs stat -c %Y 2>/dev/null | sort -rn | head -1)
+    local backup_age
+    local newest
+    newest=$(find /backups -type f \( -name "*.gz" -o -name "*.tar.gz" \) -printf "%T@\n" 2>/dev/null | sort -rn | head -1)
+    backup_age=${newest%%.*}
     if [[ -n "$backup_age" ]]; then
-        local current_time=$(date +%s)
-        local age_hours=$(( (current_time - backup_age) / 3600 ))
+        local current_time
+        current_time=$(date +%s)
+        local age_hours
+        age_hours=$(( (current_time - backup_age) / 3600 ))
         if [[ $age_hours -lt 24 ]]; then
             log "OK: Recent backup exists (${age_hours}h old)"
             passed=$((passed + 1))
@@ -428,7 +437,8 @@ except Exception:
 
 # Generate compliance report
 generate_report() {
-    local report_file="$REPORT_DIR/compliance_report_$(date +%Y%m%d_%H%M%S).txt"
+    local report_file
+    report_file="$REPORT_DIR/compliance_report_$(date +%Y%m%d_%H%M%S).txt"
     
     log "=========================================="
     log "Compliance Report Generated"

@@ -106,14 +106,30 @@ groups:
           summary: "Redis exporter is down"
           description: "Redis exporter has been down for more than 5 minutes"
 
-      - alert: GuardrailAPIDown
-        expr: up{job="guardrail-api"} == 0
+  # Dead-man's switch. alertmanager.yml routes alertname="Watchdog" to
+  # watchdog-receiver, but no rule ever produced a Watchdog alert, so that
+  # receiver and route were dead configuration.
+  #
+  # This alert is meant to fire constantly and resolve just before it would. If
+  # you receive it, the delivery path itself has failed -- which is the one
+  # condition no other alert in this file can report, because if notification is
+  # broken nothing can tell you. `vector(1)` is always present, so the alert
+  # resolves on the next evaluation after Prometheus stops; with repeat_interval
+  # of 24h in the route, silence means the watchman still works.
+  - name: watchdog
+    interval: 60s
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
         for: 5m
         labels:
-          severity: critical
+          severity: info
         annotations:
-          summary: "Guardrail API is down"
-          description: "Guardrail API has been down for more than 5 minutes"
+          summary: "Watchdog alive"
+          description: >-
+            If you can read this, notification delivery is working. This alert
+            fires continuously and is expected; ignore it. Its absence is the
+            signal that alerting is broken.
 
   - name: uptime_alerts
     interval: 30s
@@ -177,7 +193,7 @@ groups:
           description: "PostgreSQL has {{ $value }} active connections"
 
       - alert: SlowPostgresQueries
-        expr: pg_stat_statements_mean_exec_time_ms > 1000
+        expr: rate(pg_stat_statements_seconds_total[5m]) > 1
         for: 10m
         labels:
           severity: warning
@@ -205,7 +221,8 @@ groups:
           description: "Redis has {{ $value }} connected clients"
 
       - alert: LowRedisCacheHitRate
-        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100 < 80
+        expr: (rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100) < 80
+              and on(instance) (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]) > 0)
         for: 10m
         labels:
           severity: warning
@@ -225,11 +242,162 @@ groups:
           summary: "High container CPU usage"
           description: "Container {{ $labels.name }} is using {{ $value }} CPU"
 
+      # The container!="" filter mirrors HighContainerCPU above and is not
+      # optional. Without it this rule matched every systemd cgroup cAdvisor
+      # reported (/system.slice/auditd.service and 133 others), which have no
+      # container name. The `and on(instance, name)` join then matched on an
+      # empty `name`, divided by an absent limit, and paged 134 critical-looking
+      # instances reading "Container  is using +Inf of its memory limit" -- none
+      # of them containers, and none actionable.
       - alert: HighContainerMemory
-        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8
+        expr: (container_memory_usage_bytes{container!=""} / container_spec_memory_limit_bytes{container!=""} > 0.8)
+              and on(instance, name) (container_spec_memory_limit_bytes{container!=""} > 0)
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "High container memory usage"
           description: "Container {{ $labels.name }} is using {{ $value }} of its memory limit"
+
+  # The textfile exporter is not a container: it is a script that
+  # scripts/deploy-enhanced-monitoring.sh installs into crontab every 5 minutes.
+  # When that cron entry is missing -- the state on any host where the deploy
+  # script was never run -- no .prom files are written, the metrics it produces
+  # do not exist, and BackupStale has nothing to evaluate. Prometheus does not
+  # fire a rule whose series is absent, so the backup alerting silently does
+  # nothing at all, which is the worst possible failure mode for the rule meant
+  # to report failed backups.
+  #
+  # absent() turns that blind spot into a firing alert.
+  - name: exporter_alerts
+    interval: 60s
+    rules:
+      - alert: MetricsExporterNotRunning
+        expr: absent(backup_last_success_timestamp) or absent(system_uptime_seconds)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Metrics exporter is producing no output"
+          description: >-
+            No .prom files have appeared in the node-exporter textfile directory,
+            so backup_last_success_timestamp and the system/docker gauges do not
+            exist. BackupStale cannot evaluate while this holds, meaning failed
+            or missing backups are currently invisible. Check the cron entry
+            installed by scripts/deploy-enhanced-monitoring.sh, and run
+            prometheus/business-metrics-exporter.sh manually to confirm.
+
+  # check-backup-health.sh inspects the backup archives themselves: it verifies
+  # each one is a real dump rather than a valid archive of nothing, that it is
+  # recent, and that a success marker exists. 54 archives left by the previous
+  # backup script were 45-59 byte shells, and the check that used to consume its
+  # output only grepped a log for the string "FAILED", so it reported healthy the
+  # whole time.
+  #
+  # A cron job that merely exits non-zero is still silent, so the health check
+  # records its verdict where this exporter can publish it.
+  - name: backup_health_alerts
+    interval: 60s
+    rules:
+      - alert: BackupHealthCheckFailed
+        expr: backup_health_check_ok == 0
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup health check is failing"
+          description: >-
+            scripts/backups/check-backup-health.sh last reported failure. It
+            verifies that each backup archive is a real dump rather than a valid
+            archive of nothing, that it is recent, and that a success marker
+            exists. Run it directly for the specific problem:
+            scripts/backups/check-backup-health.sh
+
+  # Security findings from the Spectre agent, published by
+  # prometheus/security-metrics-exporter.sh from GET /api/security/summary.
+  #
+  # Every value is read from the agent. The exporter that previously carried these
+  # names emitted hardcoded zeros plus a security_last_scan_timestamp set to the
+  # current time on every run, so a scan that never happened was reported as
+  # having just completed, and "no findings" was indistinguishable from "no data".
+  # The exporter now omits the finding counts entirely when the agent is
+  # unreachable, which is why SecurityAgentDown is a separate alert rather than
+  # being inferred from a count of zero.
+  - name: security_alerts
+    interval: 60s
+    rules:
+      - alert: SecurityAgentDown
+        expr: spectre_agent_up == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cannot read security findings from the Spectre agent"
+          description: >-
+            The exporter has been unable to reach the agent's security summary for
+            10 minutes, so no finding counts are being published at all. Absence of
+            findings in Prometheus means absence of data, not absence of problems.
+            Check the agent is running, that SPECTRE_API_KEY_FILE is readable, and
+            that the API key still matches SPECTRE_API_KEY.
+
+      - alert: SecurityScanNeverRun
+        expr: spectre_security_ever_scanned == 0
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The security agent has never recorded a scan"
+          description: >-
+            No security MaintenanceRecord exists, so the host has never been
+            audited by the security agent. Run the security-audit workflow.
+
+      - alert: SecurityScanStale
+        # Only meaningful once a scan has happened. Without the guard this would
+        # fire on a never-scanned host, duplicating SecurityScanNeverRun and
+        # reporting a scan time of epoch 0 as if it were merely old.
+        expr: (spectre_security_ever_scanned == 1)
+              and on() (time() - security_last_scan_timestamp > 86400)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last security scan is over 24 hours old"
+          description: >-
+            The most recent scan the agent recorded was at
+            {{ $value | humanizeDuration }} ago. Findings recorded since then are
+            not reflected in the counts.
+
+      - alert: CriticalSecurityFindings
+        expr: security_findings_unresolved_by_severity{severity="critical"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Unresolved critical security finding"
+          description: >-
+            The security agent has {{ $value }} unresolved critical finding(s).
+            These are conditions such as SELinux disabled or a firewalld service
+            that is not running.
+
+      - alert: HighSecurityFindings
+        expr: security_findings_unresolved_by_severity{severity="high"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unresolved high-severity security findings"
+          description: >-
+            The security agent has {{ $value }} unresolved high-severity finding(s).
+
+      - alert: SecurityFindingsNotAged
+        expr: security_oldest_unresolved_timestamp > 0
+              and on() (time() - security_oldest_unresolved_timestamp > 604800)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "A security finding has been unresolved for over 7 days"
+          description: >-
+            The oldest unresolved finding was recorded
+            {{ $value | humanizeDuration }} ago. Findings that are never resolved
+            make the unresolved counts less useful as a signal.

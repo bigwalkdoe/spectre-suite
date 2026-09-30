@@ -48,13 +48,14 @@ generate_server_keys() {
     chmod 644 "$SERVER_PUBLIC_KEY_FILE"
     
     SERVER_PRIVATE_KEY=$(cat "$SERVER_PRIVATE_KEY_FILE")
-    SERVER_PUBLIC_KEY=$(cat "$SERVER_PUBLIC_KEY_FILE")
 }
 
 create_server_config() {
     log "Creating server config..."
-    local server_ip=$(echo "$WG_SUBNET" | cut -d'/' -f1 | sed 's/\.[0-9]*$/.1/')
-    local cidr=$(echo "$WG_SUBNET" | cut -d'/' -f2)
+    local server_ip
+    server_ip=$(echo "$WG_SUBNET" | cut -d'/' -f1 | sed 's/\.[0-9]*$/.1/')
+    local cidr
+    cidr=$(echo "$WG_SUBNET" | cut -d'/' -f2)
     
     cat > "${WG_DIR}/${WG_INTERFACE}.conf" <<EOF
 [Interface]
@@ -78,14 +79,14 @@ enable_ip_forwarding() {
 configure_firewall() {
     log "Configuring firewall..."
     if command -v ufw &>/dev/null; then
-        ufw allow ${WG_PORT}/udp
+        ufw allow "${WG_PORT}/udp"
         ufw reload
     elif command -v firewall-cmd &>/dev/null; then
-        firewall-cmd --permanent --add-port=${WG_PORT}/udp
+        firewall-cmd --permanent --add-port="${WG_PORT}/udp"
         firewall-cmd --permanent --add-masquerade
         firewall-cmd --reload
     else
-        iptables -A INPUT -p udp --dport ${WG_PORT} -j ACCEPT
+        iptables -A INPUT -p udp --dport "${WG_PORT}" -j ACCEPT
         iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
     fi
 }
@@ -107,9 +108,12 @@ add_client() {
     
     log "Adding client: $client_name with IP: $client_ip"
     
-    local client_private_key=$(wg genkey)
-    local client_public_key=$(echo "$client_private_key" | wg pubkey)
-    local client_preshared_key=$(wg genpsk)
+    local client_private_key
+    client_private_key=$(wg genkey)
+    local client_public_key
+    client_public_key=$(echo "$client_private_key" | wg pubkey)
+    local client_preshared_key
+    client_preshared_key=$(wg genpsk)
     
     cat >> "${WG_DIR}/${WG_INTERFACE}.conf" <<EOF
 
@@ -120,8 +124,10 @@ PresharedKey = ${client_preshared_key}
 AllowedIPs = ${client_ip}/32
 EOF
     
-    local server_public_key=$(cat "$SERVER_PUBLIC_KEY_FILE")
-    local server_endpoint=$(curl -s ifconfig.me || curl -s icanhazip.com):${WG_PORT}
+    local server_public_key
+    server_public_key=$(cat "$SERVER_PUBLIC_KEY_FILE")
+    local server_endpoint
+    server_endpoint=$(curl -s ifconfig.me || curl -s icanhazip.com):${WG_PORT}
     
     cat > "${WG_DIR}/${client_name}.conf" <<EOF
 [Interface]
