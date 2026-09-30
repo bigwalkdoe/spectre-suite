@@ -106,15 +106,6 @@ groups:
           summary: "Redis exporter is down"
           description: "Redis exporter has been down for more than 5 minutes"
 
-      - alert: GuardrailAPIDown
-        expr: up{job="guardrail-api"} == 0
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Guardrail API is down"
-          description: "Guardrail API has been down for more than 5 minutes"
-
   - name: uptime_alerts
     interval: 30s
     rules:
@@ -177,7 +168,7 @@ groups:
           description: "PostgreSQL has {{ $value }} active connections"
 
       - alert: SlowPostgresQueries
-        expr: pg_stat_statements_mean_exec_time_ms > 1000
+        expr: rate(pg_stat_statements_seconds_total[5m]) > 1
         for: 10m
         labels:
           severity: warning
@@ -205,7 +196,8 @@ groups:
           description: "Redis has {{ $value }} connected clients"
 
       - alert: LowRedisCacheHitRate
-        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100 < 80
+        expr: (rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100) < 80
+              and on(instance) (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]) > 0)
         for: 10m
         labels:
           severity: warning
@@ -226,7 +218,8 @@ groups:
           description: "Container {{ $labels.name }} is using {{ $value }} CPU"
 
       - alert: HighContainerMemory
-        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8)
+              and on(instance, name) (container_spec_memory_limit_bytes > 0)
         for: 10m
         labels:
           severity: warning

@@ -75,20 +75,24 @@ scrape_configs:
     scrape_interval: 60s
 
   # Blackbox Exporter - TCP connectivity checks
+  # These targets are resolved inside the Prometheus container, so "localhost"
+  # meant the container's own loopback, not the host. Every check failed
+  # permanently. host.docker.internal is defined via extra_hosts in
+  # docker-compose.monitoring.yml.
   - job_name: 'blackbox-tcp'
     metrics_path: /probe
     params:
       module: [tcp_connect]
     static_configs:
       - targets:
-        - 'localhost:22'
-        - 'localhost:443'
-        - 'localhost:5432'
-        - 'localhost:6379'
-        - 'localhost:9090'
-        - 'localhost:3002'
-        - 'localhost:8081'
-        - 'localhost:3100'
+        - 'host.docker.internal:22'
+        - 'host.docker.internal:443'
+        - 'host.docker.internal:5432'
+        - 'host.docker.internal:6379'
+        - 'host.docker.internal:9090'
+        - 'host.docker.internal:3002'
+        - 'host.docker.internal:8081'
+        - 'host.docker.internal:3100'
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
