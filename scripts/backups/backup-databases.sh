@@ -5,8 +5,21 @@ set -euo pipefail
 # Backs up PostgreSQL, Redis, and Neo4j databases
 
 BACKUP_DIR="${BACKUP_DIR:-/backups/databases}"
+# Kept outside BACKUP_DIR on purpose: the retention step below deletes every
+# file in that directory older than the retention window, so a marker stored
+# there would be swept away and look like "no successful backup" on day 8.
+BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/var/lib/backup-state}"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=7
+
+mkdir -p "$BACKUP_DIR" "$BACKUP_STATE_DIR"
+
+# Record that a run started. The exporter reports this alongside the success
+# marker so a failed or never-run backup is distinguishable from a stale one,
+# which a single "last success" metric cannot express.
+date +%s > "$BACKUP_STATE_DIR/last-db-backup-attempt.tmp" \
+    && mv -f "$BACKUP_STATE_DIR/last-db-backup-attempt.tmp" "$BACKUP_STATE_DIR/last-db-backup-attempt" \
+    || true
 
 # Container names are environment-specific; override per deployment.
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-guardrail-ai-postgres-1}"
@@ -41,4 +54,11 @@ echo "Cleaning up old backups (older than $RETENTION_DAYS days)..."
 find "$BACKUP_DIR" -type f -mtime +$RETENTION_DAYS -delete
 
 echo "Database backup completed: $DATE"
+# Written only after every dump and the retention step have succeeded, and only
+# reached because the script runs under `set -e`. The exporter reads this instead
+# of the mtime of $BACKUP_DIR: the directory mtime also advances when retention
+# deletes an old file, so it reported "recent successful backup" even when
+# nothing had been backed up.
+date +%s > "$BACKUP_STATE_DIR/last-db-backup-success.tmp" \
+    && mv -f "$BACKUP_STATE_DIR/last-db-backup-success.tmp" "$BACKUP_STATE_DIR/last-db-backup-success"
 logger -p user.info "Database backup completed successfully"
