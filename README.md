@@ -30,9 +30,16 @@ cd spectre-system-maintenance
 # Full automated setup (recommended)
 sudo ./install.sh
 
-# Or deploy all enhancements at once
-bash scripts/setup-all-enhancements.sh
+# Also apply the system performance tuning and network hardening, which
+# mutate live system state (sysctl, firewall rules, docker daemon) and are
+# therefore opt-in rather than an automatic side effect of installing:
+sudo APPLY_HARDENING=1 ./install.sh
 ```
+
+The installer backs up `/etc/docker/daemon.json` before rewriting it, creates
+`/backups` with mode `700` (it holds database dumps), and installs only the
+scripts from this repository into `/usr/local/bin`. It does **not** copy
+arbitrary `.sh` files out of your home directory.
 
 ## System Architecture
 
@@ -56,8 +63,10 @@ bash scripts/setup-all-enhancements.sh
 |------|------|-----------|
 | 01:00 | Database backup | Daily |
 | 02:00 | Full backup (Sat) / Docker volume backup | Daily/Weekly |
-| 02:30 | PostgreSQL vacuum & analyze | Daily |
+| 02:30 | PostgreSQL vacuum & analyze (`vacuum-databases.sh`) | Daily |
 | 04:30 | Off-site backup replication | Daily |
+| 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
+| 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
 | 05:00 | AIDE file integrity check | Daily |
 | 06:00 | Trivy container scan | Weekly (Sun) |
 | 07:00 | OWASP ZAP scan | Weekly (Sun) |
@@ -66,14 +75,57 @@ bash scripts/setup-all-enhancements.sh
 | 10:00 | OPA policy evaluation | Weekly (Mon) |
 | Every 4h | Resource rightsizing | Continuous |
 | Every 6h | Audit trail generation | Continuous |
+| Every 5m | Metrics exporter (`prometheus/business-metrics-exporter.sh`) | Continuous |
+
+> **All of these point at this repository.** A stale copy of these scripts
+> elsewhere on the host will keep running on schedule while the repository is
+> fixed but unused. That is not hypothetical: a fork under `/home/deon/scripts`
+> ran nightly for the life of the crontab, targeted containers from another
+> project, and reported success over empty files.
+>
+> **Backup health is verified against the archives, not a log.**
+> `scripts/backups/check-backup-health.sh` inspects each backup: a real
+> PostgreSQL dump must carry the `PostgreSQL database dump` header (a failed dump
+> gzips to ~50 bytes), an RDB must start with the `REDIS` magic, a volume tarball
+> must list a member, and a success marker must exist and be recent. It exits
+> non-zero listing what is wrong, and records its verdict where the exporter
+> publishes it as `backup_health_check_ok`, so `BackupHealthCheckFailed` can
+> alert. Run it directly at any time — it reads only.
+>
+> **The exporter must actually be scheduled.** It is not a container: it is a
+> script that writes `.prom` files for the node-exporter textfile collector, and
+> nothing runs it unless a cron entry exists. Without it, `backup_last_success_timestamp`
+> and the system/docker gauges do not exist, and Prometheus does not fire a rule
+> whose series is absent — so `BackupStale` would silently never alert.
+> `MetricsExporterNotRunning` exists to make that condition visible.
+>
+> ```bash
+> crontab -l | grep -q business-metrics-exporter || \
+>   (crontab -l; echo "*/5 * * * * $PWD/prometheus/business-metrics-exporter.sh") | crontab -
+> ```
+>
+> The backup jobs must point at this repository. A stale copy of these scripts
+> elsewhere on the host will keep running on schedule while the repository is
+> fixed but unused, which is how 81 empty archives accumulated here while every
+> job reported success.
 
 ## Monitoring Stack
 
-```bash
-docker-compose -f docker-compose.monitoring.yml up -d
+Credentials are **required**. `docker compose` refuses to start without them
+rather than falling back to a default password, so populate them first:
 
-# Access points:
-#   Grafana:      http://localhost:3002   (admin/changeme)
+```bash
+cp .env.example .env
+$EDITOR .env          # GRAFANA_ADMIN_PASSWORD, POSTGRES_PASSWORD,
+                      # REDIS_PASSWORD, POSTGRES_EXPORTER_DSN
+
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+```bash
+# Access points (all bound to 127.0.0.1, so reach them from the host or over an
+# SSH tunnel -- they are not exposed on any other interface):
+#   Grafana:      http://localhost:3002   (user + GRAFANA_ADMIN_PASSWORD)
 #   Prometheus:   http://localhost:9090
 #   Alertmanager: http://localhost:9093
 #   Blackbox:     http://localhost:9115
@@ -81,50 +133,100 @@ docker-compose -f docker-compose.monitoring.yml up -d
 #   Loki:         http://localhost:3100   (logging stack)
 ```
 
+Redis and PostgreSQL are **not** published to the host at all; they are reachable
+only on the internal `monitoring` network by the exporters.
+
+> **Upgrading an existing deployment:** `POSTGRES_PASSWORD` only takes effect when
+> the `postgres-data` volume is first initialised. Changing it in `.env` will not
+> change the password in an existing volume, and the postgres exporter will then
+> fail to authenticate. Either run
+> `docker compose exec postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<new>'"`
+> or destroy the volume (this discards the data).
+
 ### Alertmanager Integrations
-- **Slack**: Channels for critical, warning, info, watchdog alerts
-- **Email**: SMTP-based notifications with HTML templates
-- **PagerDuty**: Critical alert routing with severity mapping
-- **Webhook**: Custom endpoint integration
+
+**Slack is the only notification channel.** The webhook URL is **not** read from
+`.env` — Alertmanager performs no `${VAR}` substitution in its config file.
+Supply it via:
+
+```bash
+SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
+  scripts/setup-notification-channels.sh --test
+```
+
+That writes the URL to `prometheus/alertmanager-secrets/slack_webhook_url` at mode
+`0600` (the directory is bind-mounted read-only and gitignored), restarts
+Alertmanager, waits for readiness, and confirms Prometheus still points at it.
+
+`--test` posts a self-resolving critical alert and reads the dispatcher log to
+confirm it was actually **delivered**, not merely accepted. This matters because
+`amtool check-config` is not a delivery test: `*_file` options are not
+existence-checked, so it reports success with the webhook missing. The script also
+reads the secret back from inside the container, since a permissions mismatch
+there fails only at notification time while `/-/ready` still returns 200. It exits
+non-zero while no webhook is configured.
+
+Severity is expressed by the message's attachment colour and title prefix
+(`danger` / `warning` / `good`) rather than by separate channels: Slack routes an
+incoming webhook to the channel it was created for and commonly ignores the
+`channel`, `username` and `icon_emoji` fields, so per-severity channel names in
+`alertmanager.yml` would be decorative. Pick the channel when you create the
+webhook.
+
+`Watchdog` is a continuous informational alert routed to its own receiver. It is
+the dead-man's switch: its **absence** means alerting itself is broken, which is
+the one condition no other alert in this stack can report.
+
+See `prometheus/alertmanager-secrets/README.md` for details.
 
 ## Security Tools
 
+Everything below is present in this repository. Vulnerability scanning runs in
+CI via the Trivy and OPA jobs; the local scripts complement that.
+
 ```bash
 # Intrusion Detection
-sudo systemctl start fail2ban          # Brute force protection
-scripts/security/check-file-integrity.sh  # AIDE check
+sudo scripts/security/install-ids-ips.sh      # Suricata + fail2ban
+sudo scripts/security/run-security-hardening.sh
 
 # Vulnerability Scanning
-scripts/security/run-trivy-scan.sh
+scripts/security/scan-docker-images.sh
+scripts/security/scan-dependencies.sh
 
-# Code Analysis
-docker-compose -f security/sonarqube/docker-compose.yml up -d
-scripts/security/run-sonarqube-analysis.sh
+# Docker daemon and API hardening
+sudo scripts/security/docker-security-hardening.sh
+scripts/security/api-security-hardening.sh
 
-# Web App Testing
-docker-compose -f security/zap/docker-compose.yml up -d
-scripts/security/run-zap-scan.sh http://localhost:3000
-
-# Policy Enforcement
-scripts/security/opa/evaluate-policies.sh
+# Audit policy against Docker and the host (same checks CI runs)
+opa check scripts/security/opa/policies/
+opa eval --format raw --data scripts/security/opa/policies \
+  --input <(echo '{}') 'count([m | data.security[k].deny[m]])'
 ```
+
+> **Not implemented here.** This repository does not contain AIDE/file-integrity
+> checking, a standalone Trivy wrapper, SonarQube or OWASP ZAP orchestration, or
+> a compliance report generator. The Trivy scan is the CI job in
+> `.github/workflows/security-scanning.yml`; run it locally with
+> `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+> aquasec/trivy image --severity HIGH,CRITICAL <image>`.
 
 ## Secrets Management
 
+Notification credentials are the secrets this stack consumes, and they are
+written to files rather than interpolated into the Alertmanager config (which
+performs no `${VAR}` substitution):
+
 ```bash
-# Edit your secrets
-vim /home/deon/.secrets/environment
-
-# Source into environment
-source /home/deon/.secrets/environment
-
-# Inject into project files
-scripts/security/inject-secrets.sh
-
-# Or use Vault
-scripts/security/vault-secrets.sh store database/postgres password mypass
-scripts/security/vault-secrets.sh get database/postgres password
+SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
+  scripts/setup-notification-channels.sh
 ```
+
+Database credentials come from `.env`, which the Compose stack requires and will
+refuse to start without. See `.env.example`.
+
+> **Not implemented here.** There is no Vault integration and no script that
+> injects secrets into project files. Only the `.env` file and the Alertmanager
+> secret files described above are supported.
 
 ## Configuration & Portability
 
@@ -138,11 +240,16 @@ the following environment overrides:
 | `PROJECTS_DIR` | `/home/deon/projects` | `backup-configurations.sh` (project config backup) |
 | `BACKUP_DIR` | `/backups/<type>` | All backup/restore scripts |
 | `LOG_FILE` | `/var/log/...` (falls back to `$TMPDIR`/`/tmp` if unwritable) | `restore-databases.sh` |
-| `POSTGRES_CONTAINER` | `guardrail-ai-postgres-1` | `backup-databases.sh` |
-| `REDIS_CONTAINER` | `guardrail-ai-redis-1` | `backup-databases.sh` |
-| `NEO4J_CONTAINER` | `guardrail-ai-neo4j-1` | `backup-databases.sh` |
-| `PROMETHEUS_CONTAINER` | `guardrail-ai-prometheus-1` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
-| `ALERTMANAGER_CONTAINER` | `guardrail-alertmanager` | `setup-notification-channels.sh` |
+| `POSTGRES_CONTAINER` | `postgres` | `backup-databases.sh`, `restore-databases.sh` (only honoured when set explicitly) |
+| `REDIS_CONTAINER` | `redis` | `backup-databases.sh` |
+| `NEO4J_CONTAINER` | `neo4j` | `backup-databases.sh` (skipped when absent) |
+| `BACKUP_DIR` | `/backups/databases` | all backup/restore scripts |
+| `BACKUP_STATE_DIR` | `/backups/backup-state` | `backup-databases.sh`, exporter (must match: a mismatch reads 0 forever) |
+| `PROMETHEUS_CONTAINER` | `prometheus` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
+| `ALERTMANAGER_CONTAINER` | `alertmanager` | `setup-notification-channels.sh` |
+| `SECRETS_DIR` | `prometheus/alertmanager-secrets` | `setup-notification-channels.sh` |
+| `READY_TIMEOUT` | `60` (seconds to wait for `/-/ready`) | `setup-notification-channels.sh` |
+| `TEST_TIMEOUT` | `90` (seconds to wait for the `--test` delivery attempt) | `setup-notification-channels.sh` |
 
 `REPO_ROOT` is derived automatically from the script location and should not
 normally need overriding. Orchestrator scripts (`run-maintenance.sh`,
@@ -157,45 +264,41 @@ material are deliberately excluded from `backup-configurations.sh`,
 ## VPN & Network
 
 ```bash
-# Start WireGuard VPN
-sudo systemctl start wg-quick@wg0
+# WireGuard VPN
+sudo scripts/network/setup-vpn.sh
 
-# Add a client
-scripts/network/add-vpn-client.sh my-laptop 10.0.0.2
-
-# Check DDoS status
-scripts/network/ddos-mitigation.sh
+# Hardening and inspection
+sudo scripts/network/network-security-hardening.sh
+scripts/network/optimize-network-config.sh
+scripts/network/network-monitor.sh
 ```
+
+> **Not implemented here.** There is no client-management helper
+> (`add-vpn-client`) and no DDoS mitigation script. Configure clients in
+> `/etc/wireguard/wg0.conf` directly.
 
 ## Database Optimization
 
 ```bash
-# Run vacuum manually
-scripts/performance/pg-vacuum.sh
+# Host and container performance
+sudo scripts/performance/optimize-system-performance.sh
+sudo scripts/performance/optimize-docker-resources.sh
+scripts/performance/check-performance.sh
 
-# Start PgBouncer connection pool
-docker-compose -f performance/pgbouncer/docker-compose.yml up -d
-# Connect: psql -h localhost -p 6432 -U postgres -d guardrail
-
-# Set up read replica
-scripts/performance/setup-read-replica.sh
+# Reclaim space and inspect the host
+sudo scripts/maintenance/cleanup-system.sh
+scripts/maintenance/check-disk-space.sh
 ```
+
+> **Not implemented here.** There is no `pg_vacuum` helper, no PgBouncer Compose
+> file under `performance/`, and no read-replica setup. Manage vacuum and
+> replication with the PostgreSQL tooling appropriate to your deployment.
 
 ## Load Testing
 
-```bash
-# k6 test (10 VUs, 30s)
-bash scripts/performance/load-testing/run-k6-test.sh http://localhost:3000 10 30s
-
-# Locust test
-bash scripts/performance/load-testing/run-locust-test.sh http://localhost:3000 10 1 60s
-
-# Performance regression
-bash scripts/performance/load-testing/run-performance-regression.sh
-
-# Capacity planning
-bash scripts/performance/load-testing/capacity-planning.sh
-```
+> **Not implemented here.** This repository ships no k6, Locust, or
+> performance-regression harness, and no capacity-planning tooling. Use the load
+> tooling of your choice against your own environment.
 
 ## Disaster Recovery
 
@@ -223,7 +326,7 @@ spectre-system-maintenance/
 │   ├── DISASTER_RECOVERY.md #    RTO/RPO + runbooks
 │   └── RUNBOOKS.md          #    10 incident runbooks
 ├── prometheus/              # Monitoring configs
-│   ├── alertmanager.yml     #    Slack/Email/PagerDuty
+│   ├── alertmanager.yml     #    Slack
 │   ├── blackbox-exporter.yml#    External monitoring
 │   └── business-metrics*    #    Custom metrics
 ├── grafana-*/               # Grafana dashboards
@@ -269,32 +372,36 @@ scripts/
 
 ## Quick Commands Reference
 
+Every path below exists in this repository.
+
 ```bash
-# Backup
+# Backup and restore
 scripts/backups/backup-all.sh                    # Full backup
-scripts/backups/replicate-to-remote.sh           # Off-site sync
+scripts/backups/backup-verification.sh           # Verify existing backups
+scripts/backups/restore-databases.sh             # Restore databases
+scripts/backups/restore-from-remote.sh           # Restore from off-site copy
+sudo scripts/backups/setup-offsite-backup.sh     # Configure off-site + cron
 
 # Security
-scripts/security/run-trivy-scan.sh               # Container scan
-scripts/security/check-file-integrity.sh          # AIDE check
-scripts/security/opa/evaluate-policies.sh         # Policy audit
+scripts/security/scan-docker-images.sh            # Container scan
+scripts/security/scan-dependencies.sh            # Dependency scan
+sudo scripts/security/docker-security-hardening.sh
+opa check scripts/security/opa/policies/         # Policy audit
 
 # Monitoring
-docker-compose -f docker-compose.monitoring.yml up -d        # Start stack
-spectre-system-maintenance/prometheus/business-metrics-exporter.sh   # Export metrics
+docker compose -f docker-compose.monitoring.yml up -d   # Start stack
+prometheus/business-metrics-exporter.sh           # Export host metrics
+scripts/check-config-consistency.sh               # Config references resolve
 
 # Maintenance
 scripts/maintenance/audit-trail.sh                # Generate audit
 scripts/maintenance/compliance-report.sh          # Compliance check
-scripts/maintenance/cleanup-unused-resources.sh   # Cleanup
-
-# Database
-scripts/performance/pg-vacuum.sh                 # Vacuum DB
-scripts/performance/resource-rightsizing.sh      # Analyze usage
-
-# Load test
-bash scripts/performance/load-testing/run-k6-test.sh
+sudo scripts/maintenance/cleanup-system.sh        # Cleanup
+scripts/maintenance/system-health-check.sh        # Host health
 ```
+
+Container vulnerability scanning is the Trivy job in
+`.github/workflows/security-scanning.yml`; it is not wrapped in a local script.
 
 ## Documentation
 

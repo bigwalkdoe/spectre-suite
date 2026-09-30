@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Main Security Orchestration Script
 
@@ -13,33 +12,34 @@ echo "Security Hardening - $DATE" >> "$SECURITY_LOG"
 echo "==========================================" >> "$SECURITY_LOG"
 
 # Make scripts executable
+# shellcheck disable=SC2086  # intentional glob
 chmod +x $SCRIPT_DIR/*.sh
 
 # Run dependency vulnerability scanning
 echo "Running dependency vulnerability scanning..." >> "$SECURITY_LOG"
 set +e
-$SCRIPT_DIR/scan-dependencies.sh >> "$SECURITY_LOG" 2>&1
+"$SCRIPT_DIR/scan-dependencies.sh" >> "$SECURITY_LOG" 2>&1
 DEP_STATUS=$?
 set -e
 
 # Run Docker security hardening
 echo "Running Docker security hardening..." >> "$SECURITY_LOG"
 set +e
-sudo $SCRIPT_DIR/docker-security-hardening.sh >> "$SECURITY_LOG" 2>&1
+sudo "$SCRIPT_DIR/docker-security-hardening.sh" 2>&1 | sudo tee -a "$SECURITY_LOG" >/dev/null || true
 DOCKER_STATUS=$?
 set -e
 
 # Run API security hardening
 echo "Running API security hardening..." >> "$SECURITY_LOG"
 set +e
-$SCRIPT_DIR/api-security-hardening.sh >> "$SECURITY_LOG" 2>&1
+"$SCRIPT_DIR/api-security-hardening.sh" >> "$SECURITY_LOG" 2>&1
 API_STATUS=$?
 set -e
 
 # Run API security monitoring
 echo "Running API security monitoring..." >> "$SECURITY_LOG"
 set +e
-$SCRIPT_DIR/monitor-api-security.sh >> "$SECURITY_LOG" 2>&1
+"$SCRIPT_DIR/monitor-api-security.sh" >> "$SECURITY_LOG" 2>&1
 MONITOR_STATUS=$?
 set -e
 

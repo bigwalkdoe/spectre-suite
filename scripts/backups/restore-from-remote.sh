@@ -7,9 +7,7 @@ set -euo pipefail
 REMOTE_BACKUP_SERVER="${REMOTE_BACKUP_SERVER:-backup.example.com}"
 REMOTE_BACKUP_PORT="${REMOTE_BACKUP_PORT:-2222}"
 REMOTE_BACKUP_USER="${REMOTE_BACKUP_USER:-backup}"
-BACKUP_DIR="/backups"
 LOG_FILE="/var/log/remote-restore.log"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE" || true
@@ -68,7 +66,8 @@ restore_from_s3() {
     fi
     
     # Download backup
-    local temp_dir=$(mktemp -d)
+    local temp_dir
+    temp_dir=$(mktemp -d)
     aws s3 sync "s3://$bucket/$prefix/" "$temp_dir/" \
         --exclude '*.gz' \
         --exclude '*.tar.gz' \
@@ -80,7 +79,8 @@ restore_from_s3() {
     }
     
     # Find and restore latest backup
-    local backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
+    local backup_file
+    backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
     
     if [[ -z "$backup_file" ]]; then
         backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*.gz" | sort -r | head -1)
@@ -88,7 +88,8 @@ restore_from_s3() {
     
     if [[ -n "$backup_file" ]]; then
         log "Found backup: $backup_file"
-        local dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
+        local dest_dir
+        dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
         mkdir -p "$dest_dir"
         gunzip -c "$backup_file" > "$dest_dir/restore.sql"
         
@@ -123,8 +124,9 @@ restore_from_b2() {
     fi
     
     # Download backup
-    local temp_dir=$(mktemp -d)
-    b2 sync ftp://$bucket_name "$temp_dir/$prefix" \
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    b2 sync "ftp://$bucket_name" "$temp_dir/$prefix" \
         --exclude '*.gz' \
         --exclude '*.tar.gz' \
         || {
@@ -134,7 +136,8 @@ restore_from_b2() {
     }
     
     # Find and restore latest backup
-    local backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
+    local backup_file
+    backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*$(date +%Y%m%d)*.gz" | sort -r | head -1)
     
     if [[ -z "$backup_file" ]]; then
         backup_file=$(find "$temp_dir" -maxdepth 1 -name "*$restore_type*.gz" | sort -r | head -1)
@@ -142,7 +145,8 @@ restore_from_b2() {
     
     if [[ -n "$backup_file" ]]; then
         log "Found backup: $backup_file"
-        local dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
+        local dest_dir
+        dest_dir="/tmp/restore_$(basename "$backup_file" .gz)"
         mkdir -p "$dest_dir"
         gunzip -c "$backup_file" > "$dest_dir/restore.sql"
         
@@ -172,19 +176,44 @@ restore_database_from_sql() {
     local restore_target="${RESTORE_TARGET:-docker}"
     
     if [[ "$restore_target" == "docker" ]]; then
-        # Get database name from SQL file or use default
-        local db_name=$(grep -m1 "CREATE DATABASE" "$sql_file" 2>/dev/null | sed 's/.*CREATE DATABASE \([^ ]*\).*/\1/' || echo "guardrail")
-        
-        log "Restoring to Docker container: $db_name"
-        
-        # Check if container exists
-        if ! docker ps | grep -q "$db_name"; then
-            error "Database container '$db_name' not found"
+        # Get the database name from the SQL file. The previous fallback was
+        # "guardrail", a database from another project that does not exist here,
+        # so a dump without an explicit CREATE DATABASE header restored into
+        # nothing. Fall back to the container's own POSTGRES_DB instead.
+        local db_name
+        db_name=$(grep -m1 "CREATE DATABASE" "$sql_file" 2>/dev/null | sed 's/.*CREATE DATABASE \([^ ]*\).*/\1/' || true)
+        if [ -z "$db_name" ]; then
+            db_name=$(docker exec "${POSTGRES_CONTAINER:-postgres}" \
+                sh -c 'printf %s "${POSTGRES_DB:-postgres}"' 2>/dev/null || printf 'postgres')
+        fi
+
+        # A database name is not a container name. Resolve the container the way
+        # restore-databases.sh does rather than assuming the two match, and use
+        # `docker inspect` so a stopped server is still recognised.
+        local pg_container="${POSTGRES_CONTAINER:-}"
+        if [ -n "$pg_container" ] && ! docker inspect "$pg_container" >/dev/null 2>&1; then
+            pg_container=""
+        fi
+        if [ -z "$pg_container" ] && docker inspect "$db_name" >/dev/null 2>&1; then
+            pg_container="$db_name"
+        fi
+        if [ -z "$pg_container" ]; then
+            pg_container=$(docker ps -a --format '{{.Names}}' | grep -ix "postgres" | head -1)
+        fi
+        if [ -z "$pg_container" ]; then
+            error "No PostgreSQL container found for database '$db_name'"
             return 1
         fi
-        
+
+        # Read the role from the container: POSTGRES_USER is not "postgres" here,
+        # and assuming it fails with 'role postgres does not exist'.
+        local pg_user
+        pg_user=$(docker exec "$pg_container" sh -c 'printf %s "${POSTGRES_USER:-postgres}"' 2>/dev/null || printf 'postgres')
+
+        log "Restoring database '$db_name' into container '$pg_container' as role '$pg_user'"
+
         # Restore data
-        gunzip -c "$sql_file" | docker exec -i "$db_name" psql -U postgres -d "$db_name"
+        gunzip -c "$sql_file" | docker exec -i "$pg_container" psql -U "$pg_user" -d "$db_name"
         
         log "Database restore completed"
     else
@@ -194,7 +223,7 @@ restore_database_from_sql() {
             return 1
         fi
         
-        gunzip -c "$sql_file" | psql -U postgres
+        gunzip -c "$sql_file" | psql -U "${PGUSER:-postgres}"
         log "Local database restore completed"
     fi
 }
@@ -206,12 +235,14 @@ restore_docker_volumes_from_tar() {
     log "Restoring Docker volumes from tar archive"
     
     # Extract tar archive
-    local extract_dir=$(mktemp -d)
+    local extract_dir
+    extract_dir=$(mktemp -d)
     tar -xzf "$tar_dir/volumes.tar.gz" -C "$extract_dir"
     
     # Restore each volume
     for volume_path in "$extract_dir"/*/; do
-        local volume_name=$(basename "$volume_path")
+        local volume_name
+        volume_name=$(basename "$volume_path")
         log "Restoring volume: $volume_name"
         
         # Stop and remove existing container

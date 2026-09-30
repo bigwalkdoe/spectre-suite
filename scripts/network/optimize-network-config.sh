@@ -5,6 +5,7 @@ set -euo pipefail
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# shellcheck disable=SC1091  # resolved at runtime
 source "$PROJECT_ROOT/detect-distribution.sh"
 
 # Initialize distribution settings
