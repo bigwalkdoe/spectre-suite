@@ -20,21 +20,23 @@
 ```bash
 # 1. Check database status
 docker ps | grep postgres
-docker logs --tail 50 guardrail-ai-postgres-1
+docker logs --tail 50 postgres
 
 # 2. Verify backup exists
 ls -la /backups/databases/
 find /backups/databases -name "postgres_*" -mtime -1
 
 # 3. Restore from latest backup
-LATEST_BACKUP=$(ls -t /backups/databases/postgres_guardrail_*.gz | head -1)
-gunzip -c "$LATEST_BACKUP" | docker exec -i guardrail-ai-postgres-1 psql -U postgres -d guardrail
+# Archives are postgres_<database>_<YYYYmmdd>_<HHMMSS>.sql.gz
+LATEST_BACKUP=$(ls -t /backups/databases/postgres_*.sql.gz | head -1)
+# Read the role from the container: POSTGRES_USER is not "postgres" here
+gunzip -c "$LATEST_BACKUP" | docker exec -i postgres psql -U "$(docker exec postgres sh -c 'printf %s "${POSTGRES_USER:-postgres}"')" -d postgres
 
 # 4. Verify data integrity
-docker exec guardrail-ai-postgres-1 psql -U postgres -d guardrail -c "SELECT count(*) FROM information_schema.tables;"
+docker exec postgres psql -U "$(docker exec postgres sh -c 'printf %s "${POSTGRES_USER:-postgres}"')" -d postgres -c "SELECT count(*) FROM information_schema.tables;"
 
 # 5. If backup restoration fails, promote replica (if configured):
-# docker exec guardrail-ai-postgres-replica-1 psql -U postgres -c "SELECT pg_promote();"
+# docker exec <replica-container> psql -U "$POSTGRES_USER" -c "SELECT pg_promote();"
 ```
 
 ### 2. Server/System Failure

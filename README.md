@@ -205,9 +205,11 @@ the following environment overrides:
 | `PROJECTS_DIR` | `/home/deon/projects` | `backup-configurations.sh` (project config backup) |
 | `BACKUP_DIR` | `/backups/<type>` | All backup/restore scripts |
 | `LOG_FILE` | `/var/log/...` (falls back to `$TMPDIR`/`/tmp` if unwritable) | `restore-databases.sh` |
-| `POSTGRES_CONTAINER` | `guardrail-ai-postgres-1` | `backup-databases.sh` |
-| `REDIS_CONTAINER` | `guardrail-ai-redis-1` | `backup-databases.sh` |
-| `NEO4J_CONTAINER` | `guardrail-ai-neo4j-1` | `backup-databases.sh` |
+| `POSTGRES_CONTAINER` | `postgres` | `backup-databases.sh`, `restore-databases.sh` (only honoured when set explicitly) |
+| `REDIS_CONTAINER` | `redis` | `backup-databases.sh` |
+| `NEO4J_CONTAINER` | `neo4j` | `backup-databases.sh` (skipped when absent) |
+| `BACKUP_DIR` | `/backups/databases` | all backup/restore scripts |
+| `BACKUP_STATE_DIR` | `/var/lib/backup-state` | `backup-databases.sh`, exporter |
 | `PROMETHEUS_CONTAINER` | `prometheus` | `setup-notification-channels.sh`, `setup-prometheus-alerts.sh` |
 | `ALERTMANAGER_CONTAINER` | `alertmanager` | `setup-notification-channels.sh` |
 | `SECRETS_DIR` | `prometheus/alertmanager-secrets` | `setup-notification-channels.sh` |

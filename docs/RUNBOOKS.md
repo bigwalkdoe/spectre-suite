@@ -134,7 +134,7 @@ df -h /backups
 docker ps
 
 # Check database connectivity
-docker exec guardrail-ai-postgres-1 pg_isready
+docker exec postgres pg_isready
 
 # Fix and re-run
 scripts/backups/backup-all.sh
