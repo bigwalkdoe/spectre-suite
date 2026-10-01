@@ -71,18 +71,15 @@ fi
 # /etc/systemd/system is root-owned and unreadable to a non-root CI runner, so
 # these assertions skip rather than fail off-host. On the real host they are the
 # only thing covering these units.
-for unit_dir in /etc/systemd/system; do
-    [ -d "$unit_dir" ] || continue
-    for unit in "$unit_dir"/*.service; do
-        [ -r "$unit" ] || continue
-        base=$(basename "$unit" .service)
-        if ! systemctl list-timers --all --no-legend 2>/dev/null \
-             | grep -qE "(^|[[:space:]])${base}\.timer([[:space:]]|$)"; then
-            continue
-        fi
-        exec_line=$(grep -oE '^ExecStart=.*' "$unit" | head -1)
-        [ -n "$exec_line" ] && scheduled="$scheduled"$'\n'"$exec_line"
-    done
+for unit in /etc/systemd/system/*.service; do
+    [ -r "$unit" ] || continue
+    base=$(basename "$unit" .service)
+    if ! systemctl list-timers --all --no-legend 2>/dev/null \
+         | grep -qE "(^|[[:space:]])${base}\.timer([[:space:]]|$)"; then
+        continue
+    fi
+    exec_line=$(grep -oE '^ExecStart=.*' "$unit" | head -1)
+    [ -n "$exec_line" ] && scheduled="$scheduled"$'\n'"$exec_line"
 done
 
 # Strip the "ExecStart=" prefix systemd lines carry, or the token never matches
