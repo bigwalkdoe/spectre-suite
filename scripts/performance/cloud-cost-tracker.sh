@@ -2,7 +2,10 @@
 # Track cloud resource costs
 set -euo pipefail
 
-REPORT_DIR="/home/deon/scripts/performance/reports"
+# Data output, not code: /home/deon/scripts was the untracked fork this repo
+# superseded, and writing reports back into it was a coupling that kept the
+# fork alive. Same pattern as the other reporters (/var/log, /tmp).
+REPORT_DIR="${CLOUD_COST_REPORT_DIR:-/var/log/cloud-cost}"
 mkdir -p "$REPORT_DIR"
 DATE=$(date +%Y%m%d)
 
