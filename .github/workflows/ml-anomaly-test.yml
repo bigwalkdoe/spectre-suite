@@ -122,8 +122,32 @@ jobs:
 
       - name: Pull a small free model
         run: |
-          sleep 5
-          ollama pull tinyllama
+          # This job declares an `ollama` service container, which provides the
+          # Ollama *server* on localhost:11434 but not the `ollama` CLI on the
+          # runner. So `ollama pull tinyllama` failed with "command not found"
+          # (exit 127) and the job went red on every run -- and because the job is
+          # marked continue-on-error, nobody noticed.
+          #
+          # Pull over the HTTP API, which is what the server actually exposes, and
+          # wait for it to answer rather than sleeping a fixed 5s and hoping.
+          # stream=false makes the call synchronous, so the step cannot return
+          # before the model is present.
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Ollama server did not become ready on localhost:11434" >&2
+            exit 1
+          fi
+          curl -fsS -X POST http://localhost:11434/api/pull \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"tinyllama","stream":false}' >/dev/null
+          echo "tinyllama pulled"
 
       - name: Run fix engine dry-run
         run: |
