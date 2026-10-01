@@ -49,11 +49,41 @@ scan_project() {
     fi
 }
 
-# Scan Guardrail-AI project
-scan_project "$PROJECTS_ROOT/Guardrail-AI"
+# Scan every project under PROJECTS_ROOT instead of two hardcoded names.
+#
+# The list was Guardrail-AI and Modelink. Neither is at those paths any more:
+# only `modelink` exists (lowercase), and Guardrail-AI is gone entirely. So
+# scan_project returned 1 for a missing directory, `set -e` propagated it, and the
+# security scan reported "Dependency scanning: FAILED" on every run -- which reads
+# as "vulnerabilities found" rather than "we looked in the wrong place". The
+# weekly security scan has been reporting a hardcoded path failure as its result.
+#
+# Discovering the directories also means a new project is scanned without editing
+# this script, and PROJECTS_ROOT is honoured as the single override point.
+projects_found=0
+projects_failed=0
+for project_dir in "$PROJECTS_ROOT"/*/; do
+    [ -d "$project_dir" ] || continue
+    # Skip dot-directories; the glob would otherwise pick up .cache and friends.
+    case "$(basename "$project_dir")" in
+        .*) continue ;;
+    esac
+    projects_found=$((projects_found + 1))
+    if ! scan_project "${project_dir%/}"; then
+        projects_failed=$((projects_failed + 1))
+    fi
+done
 
-# Scan Modelink project
-scan_project "$PROJECTS_ROOT/Modelink"
+if [ "$projects_found" -eq 0 ]; then
+    echo "No project directories found under $PROJECTS_ROOT"
+    echo "Nothing scanned -- this is not the same as 'no vulnerabilities found'."
+    exit 1
+fi
+
+echo "Scanned $projects_found project(s), $projects_failed without a recognised manifest."
+# A project with no package.json/requirements.txt/go.mod is not a failure: there
+# was nothing to audit. Only a scan that could not run at all should fail.
+exit 0
 
 
 
