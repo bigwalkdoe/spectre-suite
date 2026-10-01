@@ -23,6 +23,30 @@ MAX_AGE_SECONDS="${MAX_AGE_SECONDS:-86400}"
 # backups as broken. Real emptiness is established structurally, by validate_archive.
 MIN_ARCHIVE_BYTES="${MIN_ARCHIVE_BYTES:-32}"
 
+# --purge-hollow deletes the archives this check has identified as carrying no
+# data. It uses the same structural validation as the report, never a size
+# threshold: a legitimate 396-byte dump and a 59-byte empty shell differ by their
+# contents, not their length, and a size-based purge would take the real backup
+# with it. Explicit flag because it is irreversible.
+PURGE_HOLLOW=0
+for arg in "$@"; do
+    case "$arg" in
+        --purge-hollow) PURGE_HOLLOW=1 ;;
+        --dry-run) PURGE_HOLLOW=1; DRY_RUN=1 ;;
+        -h|--help)
+            cat <<EOF
+Usage: $(basename "$0") [--purge-hollow] [--dry-run]
+
+  --purge-hollow  Delete archives that are valid but carry no backup data.
+  --dry-run       Report what --purge-hollow would delete, and delete nothing.
+EOF
+            exit 0
+            ;;
+        *) echo "unknown argument: $arg" >&2; exit 2 ;;
+    esac
+done
+DRY_RUN=${DRY_RUN:-0}
+
 problems=0
 problem() { echo "  FAIL: $*"; problems=$((problems + 1)); }
 ok()      { echo "  ok:   $*"; }
@@ -161,6 +185,7 @@ fi
 # them at 45-59 bytes each.
 hollow=0
 checked=0
+purged=0
 for pattern_label in \
     "$BACKUP_DIR:postgres_*.sql.gz" \
     "$BACKUP_DIR:redis_backup_*.rdb" \
@@ -172,6 +197,21 @@ for pattern_label in \
         [ -n "$f" ] || continue
         checked=$((checked + 1))
         if [ "$(stat -c %s "$f")" -lt "$MIN_ARCHIVE_BYTES" ] || ! validate_archive "$f"; then
+            # validate_archive has already proven this carries no backup data, so
+            # removing it cannot destroy a backup that merely looks small -- which
+            # a size-based purge would, since a legitimate schema-only dump is
+            # 396 bytes and a hollow one is 59.
+            if [ "$PURGE_HOLLOW" -eq 1 ]; then
+                if [ "$DRY_RUN" -eq 1 ]; then
+                    echo "  would purge $f ($(stat -c %s "$f")B, no backup data)"
+                elif rm -f "$f"; then
+                    echo "  purged $f"
+                    purged=$((purged + 1))
+                else
+                    problem "could not remove hollow archive: $f"
+                fi
+                continue
+            fi
             problem "hollow archive: $f ($(stat -c %s "$f")B, not a usable backup)"
             hollow=$((hollow + 1))
         fi
@@ -183,6 +223,23 @@ done
 # is exactly how 81 empty archives went unnoticed. This is what lets
 # BackupHealthCheckFailed alert on it.
 mkdir -p "$BACKUP_STATE_DIR"
+if [ "$PURGE_HOLLOW" -eq 1 ]; then
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "DRY RUN: nothing was deleted"
+    else
+        echo "  purged $purged hollow archive(s) of $checked checked"
+    fi
+    # Re-check, so the verdict reflects the state after a purge rather than the
+    # census that motivated it.
+    if "$0" >/dev/null 2>&1; then
+        echo "ok $now" > "$BACKUP_STATE_DIR/last-backup-health"
+        echo "BACKUP HEALTH: OK after purge"
+        exit 0
+    fi
+    echo "failed $now purge-incomplete" > "$BACKUP_STATE_DIR/last-backup-health"
+    echo "BACKUP HEALTH: still failing after purge"
+    exit 1
+fi
 if [ "$problems" -ne 0 ]; then
     echo "failed $now $problems" > "$BACKUP_STATE_DIR/last-backup-health"
     echo "BACKUP HEALTH: FAILED ($problems problem(s), $hollow hollow of $checked archive(s) checked)"
