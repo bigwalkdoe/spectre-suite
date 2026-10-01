@@ -24,14 +24,42 @@ echo "=========================================="
 # the system interpreter. And the chosen interpreter is checked for the
 # dependencies before the tests run, so a gap is named with its fix instead of
 # surfacing as a stack trace.
+# Candidates are ordered by preference but every one is *verified* before being
+# accepted, because the first executable on PATH is not necessarily usable.
+#
+# The bare `command -v python3` fallback picked up ~/.local/bin/python3, a
+# symlink to /usr/bin/python3.12 that has no pandas, while /usr/bin/python3
+# (3.14) does. Picking the first match and only then discovering the dependency
+# was missing is what made this fail confusingly, so the search now keeps looking
+# until it finds one that actually imports them.
+#
+# On CI the workflow installs into the system interpreter, so the first hit works.
+# On this host the system interpreter is what gets selected, which is correct.
 PY=""
-for candidate in "${ML_PYTHON:-}" "$ML_DIR/venv/bin/python" "$PROJECT_ROOT/.venv/bin/python"; do
-    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+for candidate in     "${ML_PYTHON:-}"     "$ML_DIR/venv/bin/python"     "$PROJECT_ROOT/.venv/bin/python"     /usr/bin/python3     "$(command -v python3 2>/dev/null || true)"; do
+    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    if "$candidate" - <<'PROBE' >/dev/null 2>&1
+import importlib
+for m in ("numpy", "sklearn", "pandas", "requests"):
+    importlib.import_module(m)
+PROBE
+    then
         PY="$candidate"
         break
     fi
 done
-[ -n "$PY" ] || PY="$(command -v python3)"
+
+# Reaching here with no PY means every candidate was executable but none could
+# import the dependencies. That is a different problem from "no interpreter found",
+# so it is reported differently rather than as an empty interpreter path.
+if [ -z "$PY" ]; then
+    echo "ML Unit Tests: FAILED"
+    echo "  no Python interpreter with the required dependencies was found"
+    echo "  tried: \$ML_PYTHON, scripts/ml-anomaly/venv, .venv, /usr/bin/python3, PATH"
+    echo "  install with: /usr/bin/python3 -m pip install -r $PROJECT_ROOT/scripts/ml-anomaly/requirements.txt"
+    echo "=========================================="
+    exit 1
+fi
 
 echo "Python interpreter: $PY"
 
