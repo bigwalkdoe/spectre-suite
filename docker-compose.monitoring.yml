@@ -215,6 +215,12 @@ services:
     command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?set REDIS_PASSWORD}']
     expose:
       - "6379"
+    # Without this, every recreate or image update started Redis from an empty
+    # dataset, so anything cached was silently lost and the nightly RDB backup
+    # captured a cache that no longer backed anything. Redis writes its dataset to
+    # /data; mount a named volume there.
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
     networks:
       - monitoring
@@ -287,3 +293,4 @@ volumes:
   grafana-data:
   alertmanager-data:
   postgres-data:
+  redis-data:
