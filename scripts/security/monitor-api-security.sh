@@ -1,11 +1,9 @@
 #!/bin/bash
-set -euo pipefail
-PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # API Security Monitoring Script
 
 SECURITY_LOG="$HOME/.local/share/api-security.log"
 DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p "$HOME/.local/share"
+mkdir -p $HOME/.local/share
 
 echo "==========================================" >> "$SECURITY_LOG"
 echo "API Security Monitor - $DATE" >> "$SECURITY_LOG"

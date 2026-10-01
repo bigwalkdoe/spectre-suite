@@ -57,6 +57,34 @@ else
     echo "note: systemd user units unavailable, checking crontab only"
 fi
 
+# System units are a third scheduler, and the one that hid the longest.
+#
+# disk-space-check and security-scan live in /etc/systemd/system and run on
+# timers as root. The first two versions of this guard read crontab, then
+# crontab plus user units -- and passed while those two system units were
+# failing every single run with status=217/USER, because `User=$USER_NAME` is
+# not expanded by systemd without an EnvironmentFile. security-scan had never
+# succeeded at all: one journal line, and it was the failure itself. A weekly
+# security scan that reports success because the check never looks at it is the
+# worst outcome this suite has produced.
+#
+# /etc/systemd/system is root-owned and unreadable to a non-root CI runner, so
+# these assertions skip rather than fail off-host. On the real host they are the
+# only thing covering these units.
+for unit_dir in /etc/systemd/system; do
+    [ -d "$unit_dir" ] || continue
+    for unit in "$unit_dir"/*.service; do
+        [ -r "$unit" ] || continue
+        base=$(basename "$unit" .service)
+        if ! systemctl list-timers --all --no-legend 2>/dev/null \
+             | grep -qE "(^|[[:space:]])${base}\.timer([[:space:]]|$)"; then
+            continue
+        fi
+        exec_line=$(grep -oE '^ExecStart=.*' "$unit" | head -1)
+        [ -n "$exec_line" ] && scheduled="$scheduled"$'\n'"$exec_line"
+    done
+done
+
 # Strip the "ExecStart=" prefix systemd lines carry, or the token never matches
 # the fork-root prefix test and a fork script slips through under any name the
 # repository does not also provide.
@@ -106,6 +134,63 @@ else
     fail "scheduled scripts are copies of repository scripts, living elsewhere:"
     printf '%s' "$offenders" | sed 's/^/     /'
     echo "     Point the unit or crontab entry at $PROJECT_ROOT"
+fi
+
+# 1b. A systemd unit that cannot start is a silent failure, and it is invisible
+# to every other check here. This is the assertion that would have caught
+# security-scan never running at all.
+#
+# `User=$USER_NAME` reads as a literal username to systemd; it is not a shell
+# variable, so nothing expands it and the unit dies 217/USER before ExecStart is
+# ever reached. Both system units here had that, and both had been failing while
+# the suite reported healthy.
+unstartable=""
+for unit in /etc/systemd/system/*.service; do
+    [ -r "$unit" ] || continue
+    base=$(basename "$unit" .service)
+    if ! systemctl list-timers --all --no-legend 2>/dev/null \
+         | grep -qE "(^|[[:space:]])${base}\.timer([[:space:]]|$)"; then
+        continue
+    fi
+    if grep -qE '^(User|Group)=\$[A-Za-z_]' "$unit" 2>/dev/null; then
+        unstartable="$unstartable$(basename "$unit") ($(grep -oE '^(User|Group)=\$[A-Za-z_]+' "$unit" | head -1))"$'\n'
+    fi
+done
+if [ -z "$unstartable" ]; then
+    pass "no timer-triggered system unit uses an unexpanded \$VAR for User/Group"
+else
+    fail "timer-triggered system units cannot start -- systemd does not expand shell variables:"
+    printf '%s' "$unstartable" | sed 's/^/     /'
+    echo "     Use a literal username, or supply the value via EnvironmentFile="
+fi
+
+# 1c. Every scheduled unit must point at a script that exists. A path under a
+# system location can be truncated or mangled by a bad edit and still look
+# plausible in review; asserting the target is a real file catches it. This is
+# the check that would have caught a broken ExecStart=/performance/... left
+# behind by a variable that failed to expand.
+missing_targets=""
+for path in $outside; do
+    [ -n "$path" ] || continue
+    case "$path" in
+        /usr/bin/*|/usr/sbin/*|/bin/*|/sbin/*|/usr/local/sbin/*) continue ;;
+    esac
+    # systemd's %h specifier is expanded at runtime, not by us. A path written
+    # this way is a real, working target -- treating it as missing would fail on
+    # a unit that runs fine, which is how a guard gets ignored.
+    case "$path" in
+        %h/*|~/*|%i/*) continue ;;
+    esac
+    if [ ! -e "$path" ]; then
+        missing_targets="$missing_targets$path"$'\n'
+    fi
+done
+if [ -z "$missing_targets" ]; then
+    pass "every scheduled script target exists on this host"
+else
+    fail "scheduled script targets do not exist:"
+    printf '%s' "$missing_targets" | sed 's/^/     /'
+    echo "     A scheduled path that does not exist fails on every run"
 fi
 
 if [ -n "$foreign" ]; then
