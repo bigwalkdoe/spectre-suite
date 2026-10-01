@@ -190,6 +190,24 @@ else
     echo "     A scheduled path that does not exist fails on every run"
 fi
 
+# 1d. A scheduled *system* unit execs its script from PID 1's domain, not the
+# caller's. A script labelled for user execution works from a user unit and
+# still fails 203/EXEC from a system unit, which is why the user-level checks
+# above all passed while disk-space-check and security-scan failed every run.
+# This delegates to the label script's own --check, which reports the exact
+# paths and stays quiet where SELinux is not enforcing.
+if [ -x "$PROJECT_ROOT/scripts/systemd/label-exec-context.sh" ]; then
+    if "$PROJECT_ROOT/scripts/systemd/label-exec-context.sh" --check >/tmp/spectre-label-check.$$ 2>&1; then
+        pass "repository scripts carry an exec label a system unit can use"
+    else
+        fail "scheduled repository scripts are not executable by system units:"
+        rg -A1 'NOT EXECUTABLE' /tmp/spectre-label-check.$$ 2>/dev/null | rg -o '/home/[^ ]+\.sh' | head -5 | sed 's/^/     /' \
+            || head -5 /tmp/spectre-label-check.$$ | sed 's/^/     /'
+        echo "     Fix: sudo $PROJECT_ROOT/scripts/systemd/label-exec-context.sh"
+    fi
+    rm -f /tmp/spectre-label-check.$$
+fi
+
 if [ -n "$foreign" ]; then
     # Informational: these belong to other projects installed on this host.
     echo "  note: ignoring scheduled scripts belonging to other projects:"
