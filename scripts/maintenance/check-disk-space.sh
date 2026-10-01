@@ -4,14 +4,24 @@ set -euo pipefail
 # Disk Space Check Script
 # Monitors disk usage and alerts on low space
 
-LOG_FILE="/var/log/disk-space-check.log"
 CRITICAL_THRESHOLD=90
 WARNING_THRESHOLD=80
-LOG_FILE="/var/log/disk-space-check.log"
+# This unit runs as deon, which cannot write /var/log, so every single log line
+# came back as "tee: /var/log/disk-space-check.log: Permission denied" and the
+# real output was buried in it. And the assignment was duplicated verbatim, which
+# is why the wrong value survived the first one being wrong.
+#
+# Under a root-run unit /var/log would be right, so this stays overridable rather
+# than hardcoding a home-directory path.
+LOG_FILE="${DISK_SPACE_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/disk-space-check.log}"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 log() {
-    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" || true
+    # tee -a fails when the log directory is missing or unwritable. That is not a
+    # reason to abandon the run: the caller's output has already gone to stdout
+    # and is collected by journald, which is where this is actually read from.
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    echo "[$TIMESTAMP] $1" | tee -a "$LOG_FILE" 2>/dev/null || echo "[$TIMESTAMP] $1"
 }
 
 # Get disk usage for a mount point
@@ -33,9 +43,20 @@ get_available_space() {
 }
 
 # Get inode usage
+# btrfs does not track inode counts, so `df -i` prints "-" in the IUse% column
+# rather than a number. The original version took $5 unfiltered and ran
+# `[[ "" -ge 80 ]]`, so every scheduled run died on an arithmetic error -- under
+# `set -euo pipefail` that aborted the script before the large-file scan, which
+# is why the inode check silently never contributed anything.
+#
+# Return 0 for "-" and for anything non-numeric: on a filesystem that does not
+# report inodes, inode exhaustion is not a real risk, so "0% used" is honest
+# rather than a guess. The numeric comparison downstream is then always valid.
 get_inode_usage() {
     local mount_point="$1"
-    df -i "$mount_point" | tail -1 | awk '{print $5}' | sed 's/%//g'
+    df -Pi "$mount_point" 2>/dev/null | tail -1 | awk '{print $5}' \
+        | tr -dc '0-9' \
+        | { read -r n || true; echo "${n:-0}"; }
 }
 
 # Find large files
