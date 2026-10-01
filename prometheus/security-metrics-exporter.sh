@@ -24,7 +24,12 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/business-metrics}"
 
-AGENT_URL="${SPECTRE_AGENT_URL:-http://127.0.0.1:8000}"
+# 8106, not the agent's shipped 8000. 8000 is held by arcaden-labs-api-edge-1,
+# and that stack occupies 8001-8110 as well, so the agent runs on 8106 via
+# spectre-api.service. Pointing this at 8000 produced a 404 from a completely
+# unrelated service on every scrape, which read as "the agent has no such
+# endpoint" rather than "you are talking to the wrong application".
+AGENT_URL="${SPECTRE_AGENT_URL:-http://127.0.0.1:8106}"
 API_KEY_FILE="${SPECTRE_API_KEY_FILE:-$SCRIPT_DIR/../.spectre-api-key}"
 TIMEOUT="${SPECTRE_TIMEOUT:-10}"
 
