@@ -29,18 +29,90 @@ fail() { echo "❌ $1"; FAILED=$((FAILED + 1)); }
 cron=$(crontab -l 2>/dev/null | grep -vE '^\s*#')
 
 # 1. No scheduled script may live outside this repository.
-outside=$(printf '%s\n' "$cron" \
-    | grep -oE '(^|[[:space:]])[^[:space:]]+\.sh' \
-    | tr -d ' ' \
-    | grep -v "^$PROJECT_ROOT/" \
-    | sort -u || true)
-if [ -z "$outside" ]; then
-    pass "every scheduled script lives in this repository"
+#
+# This has to check systemd user units as well as crontab. The first version only
+# read crontab, so it passed while six systemd timers were still running the fork:
+# backup.service was writing 58-byte hollow archives over the real database and
+# copying other projects' volumes every night at 02:00, and docker-cleanup.service
+# was running an unscoped host-wide `docker volume prune -f`. Both logged success.
+# A guard that only inspects one of the two schedulers is worse than none, because
+# it reads as coverage.
+scheduled=$(printf '%s\n' "$cron")
+
+if systemctl --user list-unit-files --no-legend >/dev/null 2>&1; then
+    for unit in "$HOME"/.config/systemd/user/*.service; do
+        [ -f "$unit" ] || continue
+        # Only units a timer can actually trigger.
+        base=$(basename "$unit" .service)
+        # Not anchored: list-timers lines start with the next-run timestamp, so
+        # "^${base}\.timer" matched nothing and the guard passed vacuously.
+        if ! systemctl --user list-timers --all --no-legend 2>/dev/null \
+             | grep -qE "(^|[[:space:]])${base}\.timer([[:space:]]|$)"; then
+            continue
+        fi
+        exec_line=$(grep -oE '^ExecStart=.*' "$unit" | head -1)
+        [ -n "$exec_line" ] && scheduled="$scheduled"$'\n'"$exec_line"
+    done
 else
-    fail "scheduled scripts exist outside the repository:"
-    printf '%s\n' "$outside" | sed 's/^/     /'
+    echo "note: systemd user units unavailable, checking crontab only"
 fi
 
+# Strip the "ExecStart=" prefix systemd lines carry, or the token never matches
+# the fork-root prefix test and a fork script slips through under any name the
+# repository does not also provide.
+outside=$(printf '%s\n' "$scheduled" \
+    | grep -oE '(^|[[:space:]])[^[:space:]]+\.sh' \
+    | tr -d ' ' \
+    | sed 's/^ExecStart=//' \
+    | grep -v "^$PROJECT_ROOT/" \
+    | sort -u || true)
+
+# Two distinct things can appear here, and only one is our problem.
+#
+#   1. A copy of a script this repository provides, living somewhere else. That
+#      is the drift that let a fork keep running: backup-all.sh wrote hollow
+#      archives over the real database nightly and docker-cleanup.sh ran unscoped
+#      host-wide volume prunes, both from /home/deon/scripts.
+#   2. Another project's tool entirely -- this host also runs arcaden-labs'
+#      docker-gc and a KDE helper. Those are not ours to relocate, and failing the
+#      build over them would train everyone to ignore the check.
+#
+# So: fail on the fork root, and on any basename this repo also provides.
+# Everything else is reported and allowed.
+FORK_ROOTS="/home/deon/scripts/"
+repo_scripts=$(cd "$PROJECT_ROOT" && find scripts prometheus -name '*.sh' -printf '%f\n' 2>/dev/null | sort -u)
+
+offenders=""
+foreign=""
+for path in $outside; do
+    if [ -z "$path" ]; then continue; fi
+    case "$path" in
+        "$FORK_ROOTS"*)
+            offenders="$offenders$path"$'\n'
+            continue
+            ;;
+    esac
+    base=$(basename "$path")
+    if printf '%s\n' "$repo_scripts" | grep -qx "$base"; then
+        offenders="$offenders$path"$'\n'
+    else
+        foreign="$foreign$path"$'\n'
+    fi
+done
+
+if [ -z "$offenders" ]; then
+    pass "no scheduled script is a stale copy of one this repository provides"
+else
+    fail "scheduled scripts are copies of repository scripts, living elsewhere:"
+    printf '%s' "$offenders" | sed 's/^/     /'
+    echo "     Point the unit or crontab entry at $PROJECT_ROOT"
+fi
+
+if [ -n "$foreign" ]; then
+    # Informational: these belong to other projects installed on this host.
+    echo "  note: ignoring scheduled scripts belonging to other projects:"
+    printf '%s' "$foreign" | sed 's/^/     /'
+fi
 # 2. Every script this repository schedules must exist and be executable.
 missing=0
 while read -r script; do
@@ -59,7 +131,7 @@ while read -r script; do
         fail "cron references a script that is not executable: $script"
         missing=1
     fi
-done < <(printf '%s\n' "$cron" | grep -oE '[^[:space:]]+\.sh' | sort -u || true)
+done < <(printf '%s\n' "$scheduled" | grep -oE '[^[:space:]]+\.sh' | sort -u || true)
 [ "$missing" -eq 0 ] && pass "every scheduled repository script exists and is executable"
 
 # 3. The destructive maintenance scripts must accept --dry-run. Their whole
