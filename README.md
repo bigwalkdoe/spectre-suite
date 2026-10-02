@@ -210,6 +210,77 @@ opa eval --format raw --data scripts/security/opa/policies \
 > `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
 > aquasec/trivy image --severity HIGH,CRITICAL <image>`.
 
+## Security Metrics from the Spectre Agent
+
+`prometheus/security-metrics-exporter.sh` publishes security findings from the
+Spectre agent into Prometheus. It is a cron-driven script writing `.prom` files
+for the node-exporter textfile collector, so **nothing publishes these metrics
+unless the cron entry exists**:
+
+```bash
+crontab -l | grep -q security-metrics-exporter || \
+  (crontab -l; echo "*/5 * * * * $PWD/prometheus/security-metrics-exporter.sh") | crontab -
+```
+
+### Configuration
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SPECTRE_AGENT_URL` | `http://127.0.0.1:8106` | Base URL of the agent's API. |
+| `SPECTRE_API_KEY_FILE` | `<repo>/.spectre-api-key` | Agent API key, mode `0600`. |
+| `SPECTRE_TIMEOUT` | `10` | Per-request timeout, seconds. |
+
+The API key is mandatory because the agent's API is fail-closed: without a valid
+`X-API-Key` every endpoint returns `401`, and with `SPECTRE_API_KEY` unset in the
+agent it returns `503`. Create it with `install -m 600 /dev/null
+.spectre-api-key`. It is gitignored (`.gitignore`) and must never be committed.
+
+> **Why the port is 8106 and not the agent's shipped 8000.** 8000 is held by
+> `arcaden-labs-api-edge-1` on this host, and that stack occupies 8001–8110 as
+> well. Pointing the exporter at 8000 produced a `404` from that unrelated
+> service on every scrape, which read as "the agent has no
+> `/api/security/summary`" — so the suite reported the agent down while the
+> exporter was the broken half. The agent is bound to 8106 on loopback via
+> `spectre-api.service` (unit and `SPECTRE_API_HOST`/`SPECTRE_API_PORT` handling
+> live in the agent repository). **If you move the agent's port, change
+> `SPECTRE_AGENT_URL` to match, or this file publishes nothing.**
+
+### Distinguishing a collision from an outage
+
+The exporter verifies the identity of whatever is on the port before trusting
+it, because "the agent is down" and "something else has the port" need opposite
+remedies. It reads `/openapi.json` — which FastAPI serves ahead of the API-key
+guard — and refuses to publish unless the service names itself `Spectre API`.
+
+`404` on `/openapi.json` proves nothing: a proxy, a stripped path, or an older
+agent all legitimately lack it. That case falls through to the summary request,
+whose own response shape is the fallback test, so a missing `openapi.json` never
+fails a healthy agent. A `3xx` or a `200` naming a *different* application is
+conclusive and is refused.
+
+Published state:
+
+| Condition | `spectre_agent_up` | `spectre_agent_up_reason` | `spectre_agent_identifies_as` |
+|-----------|--------------------|---------------------------|-------------------------------|
+| Agent answered | `1` | — | — |
+| Nothing listening | `0` | `connection_refused` | *(absent)* |
+| Timed out | `0` | `timed_out` | *(absent)* |
+| Wrong/revoked key | `0` | `api_key_rejected` | *(absent)* |
+| `SPECTRE_API_KEY` unset in agent | `0` | `agent_serving_unauthenticated` | *(absent)* |
+| Different app on the port | `0` | `wrong_service_on_port` | set to what it actually is |
+| Agent predates the expected route | `0` | `endpoint_not_found` | *(absent)* |
+
+Finding counts are **omitted entirely** in every `0` state rather than published
+as zero, because a zero is indistinguishable from "the agent scanned and found
+nothing". `SecurityAgentDown` is a separate alert for that reason. A collision
+additionally fires `SecurityAgentWrongServiceOnPort`, which is a configuration
+error rather than an outage.
+
+`security_last_scan_timestamp` is always the agent's recorded scan time, never
+the moment the exporter polled. A stale database therefore reports a stale scan
+instead of asserting that one just completed — an earlier version of this
+exporter hardcoded the current time and reported scans that never happened.
+
 ## Secrets Management
 
 Notification credentials are the secrets this stack consumes, and they are
