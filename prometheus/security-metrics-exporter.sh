@@ -54,30 +54,198 @@ fi
 
 api_key=$(head -c 4096 "$API_KEY_FILE" | tr -d '\n')
 
-body=$(curl -fsS --max-time "$TIMEOUT" \
+# publish_down <reason> <detail> [identified_as]
+#
+# Writes the "agent not usable" state and stops. Finding counts are deliberately
+# absent here rather than zero: a zero is indistinguishable from "the agent
+# scanned and found nothing", which is the exact confusion this file exists to
+# avoid.
+#
+# identified_as is emitted only when the identity check actually reached a
+# service that is not the agent. Emitting it for every other failure would make
+# SecurityAgentWrongServiceOnPort fire on a plain outage, which is the opposite
+# of what that separate alert is for.
+publish_down() {
+    {
+        echo "# HELP spectre_agent_up 1 if the Spectre agent answered the security summary request with a valid API key, 0 otherwise"
+        echo "# TYPE spectre_agent_up gauge"
+        echo "spectre_agent_up 0"
+        echo "# HELP spectre_agent_up_reason 1 with a label describing why the agent could not be reached"
+        echo "# TYPE spectre_agent_up_reason gauge"
+        echo "spectre_agent_up_reason{reason=\"$1\"} 1"
+        if [ -n "${3:-}" ]; then
+            echo "# HELP spectre_agent_identifies_as 1 with a label naming what is actually listening on the configured port, when it is not the Spectre agent"
+            echo "# TYPE spectre_agent_identifies_as gauge"
+            echo "spectre_agent_identifies_as{identified_as=\"$3\"} 1"
+        fi
+    } > "$OUTPUT_DIR/security_metrics.prom"
+    echo "spectre agent not usable ($1: $2); published agent_up 0 and no finding counts" >&2
+    exit 0
+}
+
+# --- Identity check ------------------------------------------------------
+#
+# Before trusting anything on this port, confirm it is actually the Spectre
+# agent. This is not defensive paranoia: when AGENT_URL pointed at a port held
+# by an unrelated service, every scrape got that service's 404, which read as
+# "the agent has no /api/security/summary" and sent the debugging at the agent
+# instead of at the port. A port collision has to be distinguishable from the
+# agent being down, in the metric, not just in a human reading the log.
+#
+# The check is ADVISORY in one direction only. /openapi.json is served by
+# FastAPI ahead of the API-key guard, so a 200 naming a different application is
+# conclusive and enough to refuse. But its absence proves nothing: an older
+# agent, a reverse proxy that strips it, or a stub all legitimately answer 404
+# while /api/security/summary works perfectly. So "no openapi.json" leaves
+# identity UNKNOWN and the summary request below proceeds -- its own response
+# shape is the fallback identity test. Treating a missing openapi.json as a
+# collision would fail closed on a healthy agent.
+#
+#   confirmed -> 200 openapi.json whose info.title is "Spectre API"
+#   refused   -> something conclusively else answered
+#   unknown   -> not answerable; the summary response decides
+IDENTITY="unknown"
+
+openapi=$(curl -sS --max-time "$TIMEOUT" -w $'\n%{http_code}' "$AGENT_URL/openapi.json" 2>/dev/null || true)
+if [ -n "$openapi" ]; then
+    openapi_status=$(printf '%s' "$openapi" | tail -n1)
+    openapi_body=$(printf '%s' "$openapi" | sed '$d')
+
+    # 000 means the TCP connection never completed: no service to identify, so
+    # this is an outage rather than a collision. Fall through to the summary
+    # request, which reports the precise transport reason.
+    if [ "$openapi_status" != "000" ]; then
+        # A 3xx is conclusive in the same way a 200 is: a browser-facing UI
+        # cannot be the API. So are a 200 whose title is wrong, and a 401/403
+        # (a gated service is not this fail-closed local API).
+        case "$openapi_status" in
+            3*)
+                identified_as="HTTP $openapi_status redirect (a web UI, not the agent)"
+                publish_down "wrong_service_on_port" "$AGENT_URL answered $identified_as" "$identified_as"
+                ;;
+            401|403)
+                identified_as="HTTP $openapi_status on /openapi.json (a gated service, not the agent)"
+                publish_down "wrong_service_on_port" "$AGENT_URL answered $identified_as" "$identified_as"
+                ;;
+            200)
+                # Only a document that actually identifies itself is evidence.
+                # A 200 with no info.title is what a proxy, a stripped path, or
+                # a stub that answers every route produces -- it names nothing,
+                # so it cannot implicate or exonerate the agent. Concluding
+                # "wrong service" from it would refuse a perfectly healthy one.
+                #
+                # Verdict and title come back on separate lines rather than
+                # tab-joined: the title is attacker-influenced text (it comes
+                # from whatever happens to hold the port) and may contain any
+                # character, so it must not be recovered by delimiter surgery.
+                verdict_and_title=$(printf '%s' "$openapi_body" | python3 -c '
+import json, sys
+try:
+    doc = json.load(sys.stdin)
+except Exception:
+    print("UNKNOWN"); raise SystemExit
+if not isinstance(doc, dict):
+    print("UNKNOWN"); raise SystemExit
+title = (doc.get("info") or {}).get("title")
+if not title:
+    # Names nothing, so it proves nothing either way.
+    print("UNKNOWN"); raise SystemExit
+# Newlines would forge extra exposition lines, so they cannot survive into a
+# label value at all.
+if "\n" in title or "\r" in title:
+    print("MULTILINE"); raise SystemExit
+print("CONFIRMED" if title == "Spectre API" else "OTHER")
+if title != "Spectre API":
+    print(title)
+' 2>/dev/null)
+
+                identity_verdict=$(printf '%s' "$verdict_and_title" | head -1)
+                case "$identity_verdict" in
+                    CONFIRMED)
+                        IDENTITY="confirmed"
+                        ;;
+                    OTHER)
+                        identified_as=$(printf '%s' "$verdict_and_title" | sed -n '2p')
+                        # Escape for the exposition format: an unescaped quote or
+                        # backslash from an untrusted service would otherwise
+                        # corrupt the .prom file and take the scrape with it.
+                        identified_as=$(printf '%s' "$identified_as" |
+                            sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+                        publish_down "wrong_service_on_port" \
+                            "$AGENT_URL is serving \"$identified_as\", not the Spectre agent" \
+                            "$identified_as"
+                        ;;
+                    *)
+                        : # UNKNOWN or MULTILINE -- fall through to the summary
+                          # request, whose response shape is the real test
+                        ;;
+                esac
+                ;;
+            *)
+                # 404/5xx on openapi.json proves nothing either way. Stay unknown.
+                ;;
+        esac
+    fi
+fi
+
+# --- Summary request -----------------------------------------------------
+#
+# -f is deliberately dropped: it collapses every 4xx/5xx into curl exit 22,
+# which cannot distinguish a rejected key (401, fix the key) from a missing
+# route (404, wrong port or wrong service) from a broken agent (5xx).
+status=$(curl -sS --max-time "$TIMEOUT" \
+    -o "$OUTPUT_DIR/.security_summary.json" \
+    -w '%{http_code}' \
     -H "X-API-Key: $api_key" \
     -H 'Accept: application/json' \
     "$AGENT_URL/api/security/summary" 2>/dev/null)
 curl_status=$?
 
-if [ "$curl_status" -ne 0 ] || [ -z "$body" ]; then
-    reason="request failed"
-    [ "$curl_status" -eq 0 ] && reason="empty response"
+if [ "$curl_status" -ne 0 ]; then
+    reason="transport_error"
     case "$curl_status" in
-        22) reason="HTTP error (unauthorised or not found)" ;;
-        28) reason="timed out after ${TIMEOUT}s" ;;
-        7)  reason="connection refused" ;;
+        28) reason="timed_out" ;;
+        7)  reason="connection_refused" ;;
     esac
-    cat > "$OUTPUT_DIR/security_metrics.prom" << EOF
-# HELP spectre_agent_up 1 if the Spectre agent answered the security summary request with a valid API key, 0 otherwise
-# TYPE spectre_agent_up gauge
-spectre_agent_up 0
-# HELP spectre_agent_up_reason 1 with a label describing why the agent could not be reached
-# TYPE spectre_agent_up_reason gauge
-spectre_agent_up_reason{reason="$reason"} 1
-EOF
-    echo "spectre agent unreachable ($reason); published agent_up 0 and no finding counts" >&2
-    exit 0
+    rm -f "$OUTPUT_DIR/.security_summary.json"
+    publish_down "$reason" "curl exit $curl_status contacting $AGENT_URL"
+fi
+
+case "$status" in
+    200) ;;
+    401|403)
+        rm -f "$OUTPUT_DIR/.security_summary.json"
+        publish_down "api_key_rejected" \
+            "HTTP $status from $AGENT_URL -- the key in $API_KEY_FILE is wrong or revoked, not a port problem"
+        ;;
+    404)
+        rm -f "$OUTPUT_DIR/.security_summary.json"
+        # The two cases need opposite remedies, so they must not share a reason.
+        if [ "$IDENTITY" = "confirmed" ]; then
+            publish_down "endpoint_not_found" \
+                "HTTP 404 from $AGENT_URL -- identity confirmed as Spectre API, so this agent predates this exporter's expected route"
+        else
+            publish_down "wrong_service_on_port" \
+                "HTTP 404 from $AGENT_URL and identity could not be confirmed (no openapi.json on this port) -- almost certainly the wrong tenant on this port" \
+                "service returning 404 with no OpenAPI document"
+        fi
+        ;;
+    503)
+        rm -f "$OUTPUT_DIR/.security_summary.json"
+        publish_down "agent_serving_unauthenticated" \
+            "HTTP 503 from $AGENT_URL -- SPECTRE_API_KEY is unset in the agent, so it refuses to serve"
+        ;;
+    *)
+        rm -f "$OUTPUT_DIR/.security_summary.json"
+        publish_down "http_error" "HTTP $status from $AGENT_URL"
+        ;;
+esac
+
+body=$(cat "$OUTPUT_DIR/.security_summary.json")
+rm -f "$OUTPUT_DIR/.security_summary.json"
+
+if [ -z "$body" ]; then
+    publish_down "empty_response" "HTTP 200 with an empty body from $AGENT_URL"
 fi
 
 # Parse in python rather than with grep so a malformed or unexpected body cannot

@@ -337,8 +337,33 @@ groups:
             The exporter has been unable to reach the agent's security summary for
             10 minutes, so no finding counts are being published at all. Absence of
             findings in Prometheus means absence of data, not absence of problems.
-            Check the agent is running, that SPECTRE_API_KEY_FILE is readable, and
-            that the API key still matches SPECTRE_API_KEY.
+            The reason label on spectre_agent_up_reason says which of these applies:
+            api_key_rejected (key mismatch), endpoint_not_found (agent predates the
+            exporter), agent_serving_unauthenticated (SPECTRE_API_KEY unset in the
+            agent), connection_refused / timed_out (agent not running), or
+            http_error. If spectre_agent_identifies_as is also firing, the port is
+            wrong rather than the agent being broken.
+
+      - alert: SecurityAgentWrongServiceOnPort
+        # Distinct from SecurityAgentDown on purpose. The agent being down is an
+        # outage; something else answering on the agent's port is a configuration
+        # error, and the remedy is entirely different -- change SPECTRE_AGENT_URL
+        # rather than restart the agent. This exact collision happened when
+        # SPECTRE_AGENT_URL was left at 8000, which another stack already held.
+        expr: spectre_agent_identifies_as == 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The Spectre agent port is held by a different service"
+          description: >-
+            SPECTRE_AGENT_URL does not point at the Spectre agent. The exporter
+            verified identity via /openapi.json before publishing, so this is not a
+            misconfigured scrape -- something else is listening. Check the
+            identified_as label for what it actually is, then point SPECTRE_AGENT_URL
+            at the agent's real port (or the agent's SPECTRE_API_PORT at a free
+            port). Publishing was refused rather than reporting that service's
+            response as security data.
 
       - alert: SecurityScanNeverRun
         expr: spectre_security_ever_scanned == 0
