@@ -53,7 +53,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# start_stub <mode> -- modes: good, never_scanned, naive_ts, garbage, unauthorized, empty
+# start_stub <mode> -- modes: good, never_scanned, naive_ts, garbage, empty,
+#                           unauthorized, other_service, web_ui
 start_stub() {
     local mode="$1" port
     port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
@@ -84,6 +85,30 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if MODE == "unauthorized":
             self.send_response(401); self.end_headers(); return
+        if MODE == "other_service":
+            # The original failure: a different FastAPI app holds the port. It
+            # serves a valid OpenAPI document under its own name, so it is only
+            # distinguishable from the agent by what it says it is.
+            if self.path == "/openapi.json":
+                body = json.dumps({
+                    "openapi": "3.1.0",
+                    "info": {"title": "arcaden-labs-api-edge", "version": "1.0.0"},
+                    "paths": {},
+                }).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self.send_response(404); self.end_headers(); return
+        if MODE == "web_ui":
+            # A browser-facing app squatting on the port: redirect, no JSON.
+            self.send_response(302)
+            self.send_header("Location", "/login")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if MODE == "garbage":
             body = b"this is not json"
         elif MODE == "empty":
@@ -128,6 +153,14 @@ run_exporter() {
 
 metric() { grep "^$1 " "$OUT/security_metrics.prom" 2>/dev/null | awk '{print $2}'; }
 has_metric() { grep -q "^$1" "$OUT/security_metrics.prom" 2>/dev/null; }
+# reason_value <label-name> -- the value inside reason="..." of a labelled series.
+# `metric` cannot be reused here: a labelled series is
+#   spectre_agent_up_reason{reason="wrong_service_on_port"} 1
+# so field 2 is the whole {..} block, not the value.
+reason_value() {
+    grep "^$1{" "$OUT/security_metrics.prom" 2>/dev/null |
+        sed -n 's/.*="\([^"]*\)".*/\1/p' | head -1
+}
 
 # ---------------------------------------------------------------------------
 # 1. A healthy agent: values must come from the response, not from constants.
@@ -234,6 +267,61 @@ else
     fail "a missing API key file was not handled (exit=$rc)"
 fi
 
+# ---------------------------------------------------------------------------
+# 8. A port collision must be reported as a collision, not as the agent being
+#    down. This is the case that shipped: SPECTRE_AGENT_URL was left on a port
+#    another stack already held, every scrape got that service's 404, and the
+#    result read as "the agent has no such endpoint" -- pointing the debugging at
+#    the agent instead of at the port. A different FastAPI app is the hardest
+#    variant to catch, because it answers 200 to openapi.json and only a wrong
+#    info.title separates it from the agent.
+# ---------------------------------------------------------------------------
+port=$(start_stub other_service)
+run_exporter "$port"
+if [ "$(metric spectre_agent_up)" = "0" ] \
+   && [ "$(reason_value spectre_agent_up_reason)" = "wrong_service_on_port" ] \
+   && [ "$(reason_value spectre_agent_identifies_as)" = "arcaden-labs-api-edge" ] \
+   && ! has_metric security_findings_unresolved; then
+    pass "a different app on the port is refused and named, not reported as the agent being down"
+else
+    fail "port collision was not distinguished (up=$(metric spectre_agent_up) reason=$(reason_value spectre_agent_up_reason) identified=$(reason_value spectre_agent_identifies_as))"
+fi
+stop_stub
+
+# ---------------------------------------------------------------------------
+# 9. A web UI squatting on the port is the same class of error, and is caught by
+#    the redirect rather than by any JSON inspection.
+# ---------------------------------------------------------------------------
+port=$(start_stub web_ui)
+run_exporter "$port"
+if [ "$(metric spectre_agent_up)" = "0" ] \
+   && [ "$(reason_value spectre_agent_up_reason)" = "wrong_service_on_port" ] \
+   && ! has_metric security_findings_unresolved; then
+    pass "a web UI redirect on the port is refused as a collision"
+else
+    fail "web UI on the port was not distinguished (up=$(metric spectre_agent_up) reason=$(reason_value spectre_agent_up_reason))"
+fi
+stop_stub
+
+# ---------------------------------------------------------------------------
+# 10. A refused connection is an outage, not a collision, so it must NOT publish
+#     spectre_agent_identifies_as. If it did, SecurityAgentWrongServiceOnPort
+#     would fire on every time the agent is merely stopped, which is the exact
+#     confusion the split exists to prevent.
+# ---------------------------------------------------------------------------
+SPECTRE_AGENT_URL="http://127.0.0.1:1" \
+SPECTRE_API_KEY_FILE="$KEY_FILE" \
+SPECTRE_TIMEOUT=3 \
+    "$EXPORTER" "$OUT" >/dev/null 2>&1
+if [ "$(metric spectre_agent_up)" = "0" ] \
+   && [ "$(reason_value spectre_agent_up_reason)" = "connection_refused" ] \
+   && ! has_metric spectre_agent_identifies_as; then
+    pass "an unreachable agent is an outage, not a collision, and publishes no identifies_as"
+else
+    fail "an outage was misreported as a collision (reason=$(reason_value spectre_agent_up_reason) identifies_as=$(reason_value spectre_agent_identifies_as))"
+fi
+
 echo ""
 echo "Security exporter tests: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]
+
