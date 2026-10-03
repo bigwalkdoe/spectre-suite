@@ -6,8 +6,25 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
-      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro,z
+      # Mount the directory rather than the two config files individually.
+      #
+      # A Docker bind mount of a *file* is resolved to that file's inode, not to
+      # its path. An editor that saves by writing a temp file and renaming it
+      # therefore leaves the container reading the original inode, which is now
+      # unlinked from the host: the edit appears to apply, the container sees
+      # nothing, and no error is produced anywhere. Both prometheus.yml and
+      # alert_rules.yml were stale in-container this way, so every config change
+      # to this service had been a silent no-op until `docker restart`
+      # re-resolved the mounts. Writing the file in place (truncate + rewrite,
+      # same inode) does propagate, but that depends on the editor and is not
+      # something to rely on.
+      #
+      # The directory also holds alertmanager.yml and alertmanager-secrets/. The
+      # secrets stay unreadable here: that directory is mode 0700 owned by the
+      # host user and this container runs as nobody (uid 65534), matching the
+      # permission-denied note on the alertmanager service below. They are still
+      # better off not being mounted into a container that has no use for them.
+      - ./prometheus:/etc/prometheus:ro,z
       - ./prometheus/business-metrics:/textfile:ro,z
       - prometheus-data:/prometheus
     command:
@@ -16,6 +33,15 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+      # Lets `curl -X POST http://localhost:9090/-/reload` apply a config edit
+      # without a restart. Paired with the directory mount above, an edit now
+      # reaches the container as soon as it is saved. This matters more than the
+      # convenience suggests: a `docker restart` resets the `for` timer on every
+      # pending alert, so a condition that has been true for hours goes quiet
+      # and re-fires only after its full duration elapses again. A reload leaves
+      # alert state and scrape continuity untouched. The port is published to
+      # 127.0.0.1 only, so the endpoint is not reachable off-host.
+      - '--web.enable-lifecycle'
     # host.docker.internal is used by the blackbox jobs to reach host ports;
     # on Linux it is not provided by default.
     extra_hosts:
