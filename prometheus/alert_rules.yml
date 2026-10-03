@@ -313,6 +313,63 @@ groups:
             exists. Run it directly for the specific problem:
             scripts/backups/check-backup-health.sh
 
+      # --- Repository growth ---
+      #
+      # Added because nothing published the restic repo size, so an unbounded
+      # repo was invisible until HighDiskUsage fired on / at 93%. That alert
+      # cannot distinguish a backup-repo problem from an ordinary full disk, and
+      # by the time it fires there is no lead time left. The repo did carry real
+      # unpruned garbage -- a prune reclaimed 7.1 GiB -- so these watch a
+      # condition that genuinely occurred here, not a hypothetical one.
+      # backup_repo_size_bytes and the filesystem figures come from
+      # prometheus/business-metrics-exporter.sh.
+
+      - alert: BackupRepoFreeSpaceLow
+        # Absolute headroom rather than a percentage. node_filesystem_* already
+        # covers "/", but as a ratio: on a 236G disk, 17G and 3G free are both
+        # "under 8%", while the number of days remaining is what decides whether
+        # a prune fits before the next backup. Backups need room to run, so this
+        # warns with enough headroom to act.
+        expr: backup_repo_fs_free_bytes < 21474836480
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 20 GiB free on the restic repository filesystem"
+          description: >-
+            {{ $value | humanize1024 }}B free. At the roughly 7-9 GiB per week
+            this repo has been growing, that is on the order of two to three
+            weeks of headroom and the next backup may not complete. `restic
+            prune` reclaims data no snapshot references without touching any
+            retained snapshot, so it is the safe first move; note that
+            `restic forget --dry-run`'s retained total is logical content size
+            and will understate what is actually on disk.
+
+      - alert: BackupRepoWillFillIn7Days
+        # Early warning, so the disk-pressure alert above does not have to be the
+        # first notice. Projects the repo's own growth over the next 7 days and
+        # fires when that would consume all remaining space.
+        #
+        # Needs 24h of samples before it can evaluate at all, since it is built on
+        # predict_linear over a 24h window. It reports as inactive (not firing)
+        # until then -- that is expected for a newly added metric, not a fault.
+        expr: >-
+          predict_linear(backup_repo_size_bytes[24h], 604800)
+            > (backup_repo_fs_size_bytes - backup_repo_fs_free_bytes)
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The restic repository is projected to fill the disk within 7 days"
+          description: >-
+            Extrapolating the last 24h of growth, the repository reaches the
+            filesystem's capacity in under 7 days. Either retention is keeping
+            more snapshots than intended, or prune is not reclaiming
+            dereferenced data. Check what is actually being backed up before
+            tightening retention: a prune first reclaims anything unreferenced,
+            and only then is a keep-* policy change (or excluding re-cloneable
+            paths) the right lever.
+
   # Security findings from the Spectre agent, published by
   # prometheus/security-metrics-exporter.sh from GET /api/security/summary.
   #

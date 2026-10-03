@@ -16,6 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/business-metrics}"
 BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/backups/backup-state}"
+BACKUP_REPO_DIR="${BACKUP_REPO_DIR:-/backups/fedora-back-up/data}"
 mkdir -p "$OUTPUT_DIR"
 
 # Prints exactly one number: the count of non-empty lines on stdin, or 0.
@@ -72,6 +73,47 @@ case "$HEALTH_WHEN" in
     ''|*[!0-9]*) HEALTH_WHEN=0 ;;
 esac
 
+# Repository growth. Nothing published the repo size, so an unbounded restic repo
+# was invisible until HighDiskUsage fired on / at 93% -- which cannot tell a
+# backup-repo problem from an ordinary full disk, and by then there was no
+# warning left to act on. The repo did carry real unpruned garbage (a prune
+# reclaimed 7.1 GiB, leaving `unused size after prune: 0 B`), but note that
+# `restic forget`'s retained total is *logical* snapshot content, not physical
+# blob storage, so the apparent 61G-on-disk vs ~30G-retained gap overstates the
+# garbage badly. Do not infer reclaimable space that way; compare against an
+# actual `restic prune`.
+#
+# These are plain du/df reads: no restic invocation, so no password is needed and
+# the 5-minute cron stays cheap.
+#
+# Prints bytes for a du/df field, or 0 when the command fails. 0 is the safe
+# direction for every alert built on these: a repo size of 0 makes growth
+# negative (no page) and a free-space of 0 trips the low-space alert, so a
+# broken du fails loudly instead of reading as healthy.
+dir_bytes() {
+    local v
+    v=$(du -sb "$1" 2>/dev/null | awk '{print $1}') || v=""
+    case "$v" in
+        '' | *[!0-9]*) printf '0\n' ;;
+        *) printf '%s\n' "$v" ;;
+    esac
+}
+
+fs_field() {
+    local v
+    v=$(df -B1 --output="$2" "$1" 2>/dev/null | tail -1 | tr -d ' ') || v=""
+    case "$v" in
+        '' | *[!0-9]*) printf '0\n' ;;
+        *) printf '%s\n' "$v" ;;
+    esac
+}
+
+REPO_BYTES=$(dir_bytes "$BACKUP_REPO_DIR")
+REPO_FS=$(df -P "$BACKUP_REPO_DIR" 2>/dev/null | awk 'NR==2{print $6}' || true)
+[ -n "$REPO_FS" ] || REPO_FS="$BACKUP_REPO_DIR"
+REPO_FS_SIZE=$(fs_field "$REPO_FS" size)
+REPO_FS_FREE=$(fs_field "$REPO_FS" avail)
+
 cat > "$OUTPUT_DIR/backup_metrics.prom" << EOF
 # HELP backup_last_success_timestamp Unix timestamp of the last database backup that completed successfully, 0 if none recorded
 # TYPE backup_last_success_timestamp gauge
@@ -85,6 +127,15 @@ backup_health_check_ok $HEALTH_OK
 # HELP backup_health_check_timestamp Unix timestamp of the last backup health check
 # TYPE backup_health_check_timestamp gauge
 backup_health_check_timestamp $HEALTH_WHEN
+# HELP backup_repo_size_bytes Bytes on disk used by the restic repository data directory
+# TYPE backup_repo_size_bytes gauge
+backup_repo_size_bytes $REPO_BYTES
+# HELP backup_repo_fs_size_bytes Total bytes of the filesystem holding the restic repository
+# TYPE backup_repo_fs_size_bytes gauge
+backup_repo_fs_size_bytes $REPO_FS_SIZE
+# HELP backup_repo_fs_free_bytes Bytes available on the filesystem holding the restic repository
+# TYPE backup_repo_fs_free_bytes gauge
+backup_repo_fs_free_bytes $REPO_FS_FREE
 EOF
 
 # System metrics
