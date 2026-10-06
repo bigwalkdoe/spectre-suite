@@ -339,9 +339,9 @@ material are deliberately excluded from `backup-configurations.sh`,
 sudo scripts/network/setup-vpn.sh
 
 # Hardening and inspection
-sudo scripts/network/network-security-hardening.sh
+sudo scripts/network/harden-network-security.sh
 scripts/network/optimize-network-config.sh
-scripts/network/network-monitor.sh
+scripts/network/monitor-network.sh
 ```
 
 > **Not implemented here.** There is no client-management helper
