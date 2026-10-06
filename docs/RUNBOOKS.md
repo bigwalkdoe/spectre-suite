@@ -215,7 +215,7 @@ explicit version, so there is no `:latest` to pull for the monitoring stack.
 
 **Check:**
 ```bash
-scripts/network/network-monitor.sh
+scripts/network/monitor-network.sh
 ping -c 3 8.8.8.8
 curl -sf http://localhost:9090/-/healthy
 docker network ls
