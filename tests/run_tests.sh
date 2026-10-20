@@ -235,6 +235,7 @@ main() {
     # Run component tests
     run_test_suite "$SCRIPT_DIR/test_config_consistency.sh" "Config Consistency Gate Tests"
     run_test_suite "$SCRIPT_DIR/test_backup_health.sh" "Backup Health Check Tests"
+    run_test_suite "$SCRIPT_DIR/test_backup_catchup.sh" "Backup Catch-up Timer Tests"
     run_test_suite "$SCRIPT_DIR/test_security_metrics.sh" "Security Metrics Exporter Tests"
     run_test_suite "$SCRIPT_DIR/test_schedule_ownership.sh" "Scheduled Job Ownership Tests"
     run_test_suite "$SCRIPT_DIR/test_backup.sh" "Backup Script Tests"

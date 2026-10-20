@@ -120,12 +120,17 @@ docker exec -it <container_name> cat /app/config.yml
 tail -100 /var/log/backup.log
 ls -la /backups/databases/
 journalctl -u backup.service --since "1 hour ago"
+journalctl --user -u spectre-backup-catchup.service --since "1 hour ago"
+systemctl --user list-timers spectre-backup-catchup.timer
 ```
 
 **Resolution:**
 ```bash
 # Run backup manually
 scripts/backups/backup-databases.sh
+
+# Retry through the catch-up path, which only acts when health says stale
+scripts/backups/run-missed-backups.sh
 
 # Check disk space
 df -h /backups
