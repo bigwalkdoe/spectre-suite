@@ -125,7 +125,7 @@ def load_anomaly_report(path):
 def build_prompt(report, metrics_context):
     anomaly_summary = json.dumps(report, indent=2)
     ctx = json.dumps(metrics_context, indent=2) if metrics_context else "{}"
-    return f"""You are a senior Linux SRE operating the Linux System Maintenance Suite.
+    return f"""You are a senior Linux SRE operating Spectre Suite.
 A machine-learning anomaly detector flagged a system anomaly. Diagnose the root
 cause and propose a remediation plan.
 

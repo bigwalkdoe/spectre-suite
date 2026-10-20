@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide covers common issues and their solutions for the System Maintenance system.
+This guide covers common issues and their solutions for Spectre Suite.
 
 ## 🔧 Installation Issues
 

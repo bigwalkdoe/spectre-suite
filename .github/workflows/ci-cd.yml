@@ -1,4 +1,4 @@
-name: System Maintenance Suite CI/CD
+name: Spectre Suite CI/CD
 on: [push]
 jobs:
   security-scan:

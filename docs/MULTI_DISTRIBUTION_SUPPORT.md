@@ -1,6 +1,6 @@
 # Multi-Distribution Support
 
-The System Maintenance & Security Automation Suite now supports multiple Linux distributions with automatic detection and distribution-specific optimizations.
+The Spectre Suite now supports multiple Linux distributions with automatic detection and distribution-specific optimizations.
 
 ## Supported Distributions
 

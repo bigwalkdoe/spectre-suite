@@ -1,6 +1,6 @@
-# Contributing to System Maintenance
+# Contributing to Spectre Suite
 
-Thank you for your interest in contributing to the System Maintenance project! We welcome contributions from the community.
+Thank you for your interest in contributing to the Spectre Suite project! We welcome contributions from the community.
 
 ## 🤝 How to Contribute
 

@@ -61,7 +61,7 @@ docker system prune -af
 find /var/log -name "*.gz" -mtime +7 -delete
 
 # Check log rotation
-sudo logrotate -f /etc/logrotate.d/spectre-system-maintenance
+sudo logrotate -f /etc/logrotate.d/spectre-suite
 sudo logrotate -f /etc/logrotate.d/docker-containers
 
 # Archive old backups
@@ -329,17 +329,17 @@ a typo that breaks a scrape target or the dashboard proxy fails the build.
 **Resolution:**
 ```bash
 # Restore from version control
-cd spectre-system-maintenance
+cd spectre-suite
 git status
 git diff prometheus/prometheus.yml
 git checkout -- prometheus/prometheus.yml
 
 # Re-apply via Ansible
-cd spectre-system-maintenance/cloud-deployment/ansible
+cd spectre-suite/cloud-deployment/ansible
 ansible-playbook -i inventory/production.yml playbook.yml --tags config
 
 # Re-run installation script
-sudo spectre-system-maintenance/install.sh
+sudo spectre-suite/install.sh
 ```
 
 ---

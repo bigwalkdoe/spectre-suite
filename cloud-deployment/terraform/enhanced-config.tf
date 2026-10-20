@@ -1,4 +1,4 @@
-# Enhanced Terraform configuration for system maintenance
+# Enhanced Terraform configuration for Spectre Suite
 # Add network segmentation, VPC flow logs, and security enhancements
 
 # VPC Flow Logs for audit
@@ -219,7 +219,7 @@ resource "aws_wafv2_web_acl" "main" {
   count = var.deployment_target == "aws" ? 1 : 0
 
   name        = "${local.project_name}-waf"
-  description = "WAF for spectre-system-maintenance services"
+  description = "WAF for spectre-suite services"
   scope       = "REGIONAL"
 
   default_action {

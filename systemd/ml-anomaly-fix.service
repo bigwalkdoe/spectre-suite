@@ -5,6 +5,6 @@ After=network.target docker.service ml-anomaly-detection.service
 [Service]
 Type=oneshot
 User=root
-WorkingDirectory=/opt/spectre-system-maintenance/scripts/ml-anomaly
-Environment=PATH=/opt/spectre-system-maintenance/scripts/ml-anomaly/venv/bin
-ExecStart=/opt/spectre-system-maintenance/scripts/ml-anomaly/run_ml_pipeline.sh
+WorkingDirectory=/opt/spectre-suite/scripts/ml-anomaly
+Environment=PATH=/opt/spectre-suite/scripts/ml-anomaly/venv/bin
+ExecStart=/opt/spectre-suite/scripts/ml-anomaly/run_ml_pipeline.sh

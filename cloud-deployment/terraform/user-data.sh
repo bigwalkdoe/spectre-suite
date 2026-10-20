@@ -1,6 +1,6 @@
 #!/bin/bash
 # User data script for cloud instance initialization
-# This script sets up the system maintenance suite on cloud instances
+# This script sets up Spectre Suite on cloud instances
 
 set -euo pipefail
 
@@ -53,9 +53,9 @@ usermod -aG docker ubuntu
 echo "Installing Ansible..."
 pip3 install ansible
 
-# Clone system maintenance repository
+# Clone Spectre Suite repository
 # Substituted by templatefile(). This was previously the literal placeholder
-# YOUR_USERNAME/spectre-system-maintenance, so provisioning failed at the `cd`
+# YOUR_USERNAME/spectre-suite, so provisioning failed at the `cd`
 # immediately below.
 echo "Cloning $REPO_URL..."
 cd /opt
@@ -63,7 +63,7 @@ git clone "$REPO_URL"
 cd "$(basename "$REPO_URL" .git)"
 
 # Run installation script
-echo "Running system maintenance installation..."
+echo "Running Spectre Suite installation..."
 chmod +x install.sh
 ./install.sh
 
@@ -127,7 +127,7 @@ systemctl start security-scan.timer
 
 # Create cloud-specific configuration
 echo "Creating cloud-specific configuration..."
-cat > /etc/spectre-system-maintenance/cloud-config.yml << EOF
+cat > /etc/spectre-suite/cloud-config.yml << EOF
 cloud_deployment: true
 environment: $ENVIRONMENT
 provider: aws
@@ -138,8 +138,8 @@ EOF
 
 # Set up log rotation for cloud instances
 echo "Configuring log rotation..."
-cat > /etc/logrotate.d/spectre-system-maintenance << EOF
-/var/log/spectre-system-maintenance/*.log {
+cat > /etc/logrotate.d/spectre-suite << EOF
+/var/log/spectre-suite/*.log {
     daily
     rotate 7
     compress
@@ -159,7 +159,7 @@ if command -v aws >/dev/null 2>&1; then
     # Create backup script with S3 support
     cat > /usr/local/bin/backup-to-s3.sh << 'EOF'
 #!/bin/bash
-S3_BUCKET="s3://spectre-system-maintenance-backups-$(hostname)"
+S3_BUCKET="s3://spectre-suite-backups-$(hostname)"
 BACKUP_DIR="/backups"
 
 # Sync backups to S3
@@ -174,10 +174,10 @@ cat > /var/www/html/health.html << EOF
 <!DOCTYPE html>
 <html>
 <head>
-    <title>System Maintenance Health Check</title>
+    <title>Spectre Suite Health Check</title>
 </head>
 <body>
-    <h1>Spectre System Maintenance Suite - Health Check</h1>
+    <h1>Spectre Suite - Health Check</h1>
     <p>Status: <strong>OK</strong></p>
     <p>Environment: $ENVIRONMENT</p>
     <p>Instance: $(hostname)</p>
@@ -195,9 +195,9 @@ systemctl start nginx
 echo "Setting up cloud cron jobs..."
 cat > /etc/cron.d/cloud-maintenance << EOF
 # Cloud maintenance tasks
-0 2 * * * ubuntu /opt/spectre-system-maintenance/scripts/backups/backup-all.sh
-0 3 * * 0 ubuntu /opt/spectre-system-maintenance/scripts/maintenance/run-maintenance.sh
-0 4 * * 6 ubuntu /opt/spectre-system-maintenance/scripts/security/run-security-hardening.sh
+0 2 * * * ubuntu /opt/spectre-suite/scripts/backups/backup-all.sh
+0 3 * * 0 ubuntu /opt/spectre-suite/scripts/maintenance/run-maintenance.sh
+0 4 * * 6 ubuntu /opt/spectre-suite/scripts/security/run-security-hardening.sh
 0 5 * * * ubuntu /usr/local/bin/backup-to-s3.sh
 EOF
 
@@ -218,21 +218,21 @@ if command -v aws >/dev/null 2>&1; then
     INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
     
     aws cloudwatch put-metric-data \
-        --namespace SpectreSystemMaintenance \
+        --namespace SpectreSuite \
         --metric-name CPUUsage \
         --value "$${CPU_USAGE}" \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
     
     aws cloudwatch put-metric-data \
-        --namespace SpectreSystemMaintenance \
+        --namespace SpectreSuite \
         --metric-name MemoryUsage \
         --value "$${MEMORY_USAGE}" \
         --dimensions InstanceId=$INSTANCE_ID \
         --unit Percent 2>/dev/null || true
     
     aws cloudwatch put-metric-data \
-        --namespace SpectreSystemMaintenance \
+        --namespace SpectreSuite \
         --metric-name DiskUsage \
         --value "$${DISK_USAGE}" \
         --dimensions InstanceId=$INSTANCE_ID \
@@ -249,7 +249,7 @@ echo "*/5 * * * * ubuntu /usr/local/bin/cloud-monitor.sh" >> /etc/cron.d/cloud-m
 
 # Finalize
 echo "Initialization completed successfully!"
-echo "Spectre System Maintenance Suite is ready for use in $ENVIRONMENT environment."
+echo "Spectre Suite is ready for use in $ENVIRONMENT environment."
 echo ""
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || echo "<instance-ip>")
 echo "Access Points:"
