@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# System Maintenance Monitoring Stack Deployment Script
+# Spectre Suite Monitoring Stack Deployment Script
 # This script deploys Prometheus, Grafana, and related monitoring tools
 
 set -euo pipefail
@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "🚀 Deploying System Maintenance Monitoring Stack..."
+echo "🚀 Deploying Spectre Suite Monitoring Stack..."
 
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then

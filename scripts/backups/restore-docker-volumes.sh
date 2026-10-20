@@ -84,7 +84,7 @@ verify_archive() {
 #
 # `compose config` reports a named volume by its *declared* name ("postgres-data")
 # while the real Docker volume carries the project prefix
-# ("spectre-system-maintenance-suite_postgres-data"). Comparing the two directly
+# ("spectre-suite_postgres-data"). Comparing the two directly
 # silently matched nothing, which meant a restore would clear and rewrite a live
 # database directory without stopping the database first.
 services_using_volume() {

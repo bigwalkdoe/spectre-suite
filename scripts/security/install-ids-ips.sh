@@ -142,7 +142,7 @@ configure_suricata() {
     
     # Configure Suricata for IPS mode
     sudo bash -c 'cat > /etc/suricata/suricata.yaml << "EOF"
-# Suricata Configuration for System Maintenance
+# Suricata Configuration for Spectre Suite
 
 %YAML 1.1
 ---

@@ -1,4 +1,4 @@
-# Linux System Maintenance & Security Automation
+# Spectre Suite — Linux System Maintenance & Security Automation
 
 A comprehensive system maintenance, security, monitoring, and disaster recovery automation suite for Linux workstations and servers. Features automated backups, centralized logging, enhanced monitoring with alertmanager integrations, secrets management, intrusion detection, automated security scanning, VPN, CI/CD, load testing, database optimization, audit logging, policy enforcement, and cost optimization.
 
@@ -24,8 +24,8 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 ## Quick Start
 
 ```bash
-git clone https://github.com/bigwalkdoe/spectre-system-maintenance-suite.git
-cd spectre-system-maintenance
+git clone https://github.com/bigwalkdoe/spectre-suite.git
+cd spectre-suite
 
 # Full automated setup (recommended)
 sudo ./install.sh
@@ -45,7 +45,7 @@ arbitrary `.sh` files out of your home directory.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                spectre-system-maintenance                    │
+│                spectre-suite                                │
 ├────────────┬──────────┬──────────┬──────────┬───────────────┤
 │ Monitoring │ Security │ Backups  │ Logging  │ Automation    │
 ├────────────┼──────────┼──────────┼──────────┼───────────────┤
@@ -388,7 +388,7 @@ Three GitHub Actions workflows:
 ## Project Structure
 
 ```
-spectre-system-maintenance/
+spectre-suite/
 ├── .github/workflows/       # CI/CD pipelines
 ├── cloud-deployment/        # Terraform + Ansible
 │   ├── terraform/           #    Infrastructure as code

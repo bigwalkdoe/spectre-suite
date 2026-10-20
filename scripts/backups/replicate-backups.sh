@@ -28,7 +28,7 @@ LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/../logs}"
 DRY_RUN=0
 TARGETS=""
 
-PROJECT_PREFIX="${PROJECT_PREFIX:-spectre-system-maintenance-suite}"
+PROJECT_PREFIX="${PROJECT_PREFIX:-spectre-suite}"
 
 usage() {
     cat <<'EOF'
