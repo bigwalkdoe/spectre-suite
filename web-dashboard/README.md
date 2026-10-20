@@ -1,4 +1,4 @@
-# System Maintenance Web Dashboard
+# Spectre Suite Web Dashboard
 
 A custom web-based monitoring dashboard that provides real-time system metrics and monitoring capabilities.
 
@@ -59,7 +59,7 @@ A custom web-based monitoring dashboard that provides real-time system metrics a
 If you prefer manual deployment:
 
 ```bash
-cd /path/to/spectre-system-maintenance
+cd /path/to/spectre-suite
 docker-compose -f docker-compose.monitoring.yml up -d web-dashboard
 ```
 

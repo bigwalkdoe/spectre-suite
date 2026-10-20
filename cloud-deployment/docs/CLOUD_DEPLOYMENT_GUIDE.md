@@ -1,6 +1,6 @@
 # Cloud Deployment Guide
 
-The System Maintenance & Security Automation Suite supports deployment to multiple cloud providers using Terraform for infrastructure provisioning and Ansible for configuration management.
+The Spectre Suite supports deployment to multiple cloud providers using Terraform for infrastructure provisioning and Ansible for configuration management.
 
 ## Supported Cloud Providers
 
@@ -14,7 +14,7 @@ The System Maintenance & Security Automation Suite supports deployment to multip
 
 Complete infrastructure as code approach:
 - Use Terraform to provision cloud infrastructure
-- Use Ansible to configure instances with system maintenance suite
+- Use Ansible to configure instances with Spectre Suite
 
 ### 2. Ansible-Only
 

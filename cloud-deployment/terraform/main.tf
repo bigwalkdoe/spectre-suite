@@ -1,4 +1,4 @@
-# Terraform configuration for System Maintenance deployment
+# Terraform configuration for Spectre Suite deployment
 # Supports multiple cloud providers
 
 terraform {
@@ -133,9 +133,9 @@ variable "environment" {
 }
 
 variable "repo_url" {
-  description = "Git URL of the system-maintenance-suite repository cloned on boot"
+  description = "Git URL of the spectre-suite repository cloned on boot"
   type        = string
-  default     = "https://github.com/bigwalkdoe/spectre-system-maintenance-suite.git"
+  default     = "https://github.com/bigwalkdoe/spectre-suite.git"
 }
 
 variable "instance_count" {
@@ -146,10 +146,10 @@ variable "instance_count" {
 
 # Local variables
 locals {
-  project_name = "spectre-system-maintenance"
+  project_name = "spectre-suite"
   # Some AWS resource names are capped at 32 characters; this slug leaves room
-  # for the suffixes below (e.g. "-grafana-tg" = 26 chars).
-  project_slug = "spectre-maint"
+  # for the suffixes below.
+  project_slug = "spectre-suite"
   common_tags = {
     Project     = local.project_name
     Environment = var.environment

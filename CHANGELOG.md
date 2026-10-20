@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the spectre-system-maintenance project will be documented in this file.
+All notable changes to the spectre-suite project will be documented in this file.
 
 ## [1.0.0] - 2026-06-21
 
@@ -58,6 +58,12 @@ All notable changes to the spectre-system-maintenance project will be documented
 - Installation script for automated setup
 
 ## [Unreleased]
+
+### Changed
+- Renamed the project and repository to `spectre-suite`. Documentation,
+  deployment identifiers, runtime paths, and backup/replication prefixes now
+  use the new name. Existing deployments must move their configuration, logs,
+  and backup archives to the new paths and prefixes before upgrading.
 
 ### Planned
 - Web dashboard for system monitoring

@@ -1,6 +1,6 @@
 # Examples Directory
 
-This directory contains configuration examples and sample configurations for the Spectre System Maintenance Suite.
+This directory contains configuration examples and sample configurations for the Spectre Suite.
 
 ## Available Examples
 
@@ -37,9 +37,9 @@ This directory contains configuration examples and sample configurations for the
 
 ### Using Backup Configuration Example
 ```bash
-cp examples/backup-config-example.yml /etc/spectre-system-maintenance/backup-config.yml
+cp examples/backup-config-example.yml /etc/spectre-suite/backup-config.yml
 # Edit the configuration as needed
-nano /etc/spectre-system-maintenance/backup-config.yml
+nano /etc/spectre-suite/backup-config.yml
 ```
 
 ### Using Monitoring Configuration Example

@@ -1,6 +1,6 @@
 # Testing and CI/CD
 
-The System Maintenance Suite includes comprehensive testing infrastructure and CI/CD pipeline automation to ensure quality and reliability.
+The Spectre Suite includes comprehensive testing infrastructure and CI/CD pipeline automation to ensure quality and reliability.
 
 ## Testing Overview
 
