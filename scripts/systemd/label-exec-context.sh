@@ -1,5 +1,5 @@
 #!/bin/bash
-# Label the repository so a *system* systemd unit can execute its scripts.
+# Label repository scripts that a *system* systemd unit executes.
 #
 # Why this exists
 # ---------------
@@ -21,6 +21,13 @@
 # security-scan had never succeeded once, so a weekly security scan was
 # reporting nothing at all.
 #
+# Only scripts referenced by an installed /etc/systemd/system/*.service
+# ExecStart are labelled. Labelling every *.sh in the repository used to fight
+# Docker: compose mounts ./prometheus with :z, which relabels that directory
+# container_file_t, and the checker then failed even though the only scheduled
+# consumers of those exporter scripts are user-level cron jobs. Narrowing the
+# set makes the check describe what PID 1 actually needs to execute.
+#
 # Why `restorecon -R` is not enough
 # ---------------------------------
 # No SELinux fcontext rule covers a checkout under $HOME, so there is no policy
@@ -30,11 +37,12 @@
 # code.
 #
 # The user's own `.local/bin` and home files are untouched -- this only touches
-# the repository, and only shell scripts within it.
+# repository scripts referenced by system units.
 #
 # Usage:  sudo ./scripts/systemd/label-exec-context.sh [--check]
-#         --check reports the current labels and exits non-zero if any shell
-#         script is not executable by the system domain. Safe to run unprivileged.
+#         --check reports the current labels and exits non-zero if any
+#         system-unit script is not executable by the system domain. Safe to
+#         run unprivileged.
 
 set -euo pipefail
 
@@ -43,34 +51,44 @@ EXEC_TYPE="shell_exec_t"
 CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
 
-if ! command -v semanage >/dev/null 2>&1; then
-    echo "ERROR: semanage not found. Install policycoreutils-python-utils." >&2
-    exit 1
-fi
-
-# Only shell scripts. Labelling data files executable would be wrong in the
-# other direction, and the .git directory is skipped for the same reason.
+# Discover only scripts an installed system unit actually execs. User units do
+# not need this label, and labelling every *.sh would relabel scripts that
+# Docker mounts with :z (and are never run by PID 1).
 mapfile -t targets < <(
-    find "$REPO_ROOT" -path "$REPO_ROOT/.git" -prune -o \
-        -type f -name '*.sh' -print 2>/dev/null | sort
+    for unit in /etc/systemd/system/*.service; do
+        [ -r "$unit" ] || continue
+        while IFS= read -r line; do
+            path=${line#ExecStart=}
+            path=${path%% *}
+            case "$path" in
+                "$REPO_ROOT"/*.sh)
+                    [ -f "$path" ] && printf '%s\n' "$path"
+                    ;;
+            esac
+        done < <(grep -E '^ExecStart=' "$unit" 2>/dev/null || true)
+    done | sort -u
 )
 
 if [ "${#targets[@]}" -eq 0 ]; then
-    echo "No shell scripts found under $REPO_ROOT" >&2
-    exit 1
+    echo "No repository shell scripts are referenced by installed system units."
+    exit 0
 fi
 
-# Every shell script needs the exec type; the directories only need to be
-# traversable, which user_home_t already permits. Labelling directories was the
-# mistake that produced a half-applied state, so they are left alone.
+# The directories only need to be traversable, which user_home_t already
+# permits. Labelling directories was the mistake that produced a half-applied
+# state, so they are left alone.
 if [ "$CHECK_ONLY" -eq 0 ]; then
+    if ! command -v semanage >/dev/null 2>&1; then
+        echo "ERROR: semanage not found. Install policycoreutils-python-utils." >&2
+        exit 1
+    fi
     echo "Applying SELinux fcontext rule: $REPO_ROOT/**/*.sh -> $EXEC_TYPE"
     semanage fcontext -a -t "$EXEC_TYPE" "$REPO_ROOT(/.*)?\.sh" 2>/dev/null \
         || semanage fcontext -m -t "$EXEC_TYPE" "$REPO_ROOT(/.*)?\.sh"
-    restorecon -RFv "$REPO_ROOT" >/dev/null
-    echo "Applied."
+    restorecon -RFv "${targets[@]}" >/dev/null
+    echo "Applied to ${#targets[@]} system-unit script(s)."
 else
-    echo "Checking exec labels under $REPO_ROOT ..."
+    echo "Checking exec labels for system-unit scripts under $REPO_ROOT ..."
 fi
 
 # Report the SELinux user component too. `chcon -t` rewrites only the type and
@@ -93,7 +111,7 @@ for t in "${targets[@]}"; do
 done
 
 echo
-echo "SELinux users seen across shell scripts: ${!user_seen[*]}"
+echo "SELinux users seen across system-unit scripts: ${!user_seen[*]}"
 
 if [ "$bad" -ne 0 ]; then
     echo
@@ -102,6 +120,6 @@ if [ "$bad" -ne 0 ]; then
     exit 1
 fi
 
-echo "RESULT: all ${#targets[@]} shell script(s) labelled $EXEC_TYPE."
+echo "RESULT: all ${#targets[@]} system-unit script(s) labelled $EXEC_TYPE."
 echo "System units will now exec them. Verify with:"
 echo "  systemctl start disk-space-check.service security-scan.service"

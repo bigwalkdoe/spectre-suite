@@ -41,6 +41,14 @@ The installer backs up `/etc/docker/daemon.json` before rewriting it, creates
 scripts from this repository into `/usr/local/bin`. It does **not** copy
 arbitrary `.sh` files out of your home directory.
 
+On a workstation that sleeps, install the per-user catch-up timer as well. It
+runs at 05:00 and, if the health check says backups are stale, runs them after
+boot or resume:
+
+```bash
+./scripts/systemd/install-backup-catchup-timer.sh
+```
+
 ## System Architecture
 
 ```
@@ -67,6 +75,7 @@ arbitrary `.sh` files out of your home directory.
 | 04:30 | Off-site backup replication | Daily |
 | 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
 | 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
+| 05:00 | Missed-backup catch-up (`run-missed-backups.sh`) | Daily, plus after boot/resume |
 | 05:00 | AIDE file integrity check | Daily |
 | 06:00 | Trivy container scan | Weekly (Sun) |
 | 07:00 | OWASP ZAP scan | Weekly (Sun) |
@@ -82,6 +91,12 @@ arbitrary `.sh` files out of your home directory.
 > fixed but unused. That is not hypothetical: a fork under `/home/deon/scripts`
 > ran nightly for the life of the crontab, targeted containers from another
 > project, and reported success over empty files.
+>
+> **Cron does not catch up after sleep.** The 05:00 entry is a persistent
+> systemd user timer (`Persistent=true`) that runs
+> `scripts/backups/run-missed-backups.sh` after boot or resume. It checks
+> backup health first and runs a full backup only when something is stale, so
+> it does not duplicate a successful 01:00 run.
 >
 > **Backup health is verified against the archives, not a log.**
 > `scripts/backups/check-backup-health.sh` inspects each backup: a real
@@ -451,6 +466,8 @@ scripts/backups/backup-all.sh                    # Full backup
 scripts/backups/backup-verification.sh           # Verify existing backups
 scripts/backups/restore-databases.sh             # Restore databases
 scripts/backups/restore-from-remote.sh           # Restore from off-site copy
+scripts/backups/run-missed-backups.sh            # Catch up only if stale
+./scripts/systemd/install-backup-catchup-timer.sh # Install persistent catch-up timer
 sudo scripts/backups/setup-offsite-backup.sh     # Configure off-site + cron
 
 # Security
