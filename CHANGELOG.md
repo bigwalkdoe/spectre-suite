@@ -59,6 +59,17 @@ All notable changes to the spectre-suite project will be documented in this file
 
 ## [Unreleased]
 
+### Added
+- Persistent systemd user timer that runs at 05:00 and catches up backups
+  missed while the workstation was asleep or off. The timer runs
+  `scripts/backups/run-missed-backups.sh`, which checks backup health first and
+  only starts a full backup when something is stale.
+
+### Fixed
+- The SELinux exec-label check now targets only scripts referenced by installed
+  system unit `ExecStart` lines. This keeps system units working without
+  fighting Docker `:z` mounts that relabel the Prometheus directory.
+
 ### Changed
 - Renamed the project and repository to `spectre-suite`. Documentation,
   deployment identifiers, runtime paths, and backup/replication prefixes now
