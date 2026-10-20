@@ -1,6 +1,6 @@
 # Machine Learning Anomaly Detection
 
-The System Maintenance Suite includes machine learning-based anomaly detection to identify unusual patterns in system metrics and potential security threats.
+The Spectre Suite includes machine learning-based anomaly detection to identify unusual patterns in system metrics and potential security threats.
 
 ## Overview
 

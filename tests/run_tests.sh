@@ -1,5 +1,5 @@
 #!/bin/bash
-# Main Test Runner for System Maintenance Suite
+# Main Test Runner for the Spectre Suite
 
 set -e
 
@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo "=========================================="
-echo "System Maintenance Suite Test Suite"
+echo "Spectre Suite Tests"
 echo "=========================================="
 echo ""
 

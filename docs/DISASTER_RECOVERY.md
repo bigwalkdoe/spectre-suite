@@ -43,12 +43,12 @@ docker exec postgres psql -U "$(docker exec postgres sh -c 'printf %s "${POSTGRE
 
 ```bash
 # 1. Provision new instance via Terraform
-cd spectre-system-maintenance/cloud-deployment/terraform
+cd spectre-suite/cloud-deployment/terraform
 terraform plan
 terraform apply
 
 # 2. Run Ansible to reconfigure
-cd spectre-system-maintenance/cloud-deployment/ansible
+cd spectre-suite/cloud-deployment/ansible
 ansible-playbook -i inventory/production.yml playbook.yml
 
 # 3. Restore data from off-site backup
@@ -70,7 +70,7 @@ tar -xzf /tmp/docker_configs_*.tar.gz -C /tmp/
 sudo cp /tmp/etc/docker/daemon.json /etc/docker/daemon.json
 
 # 3. Restart all containers
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml up -d
+docker-compose -f spectre-suite/docker-compose.monitoring.yml up -d
 
 # 4. Restore volumes from backup
 scripts/backups/restore-docker-volumes.sh
@@ -119,7 +119,7 @@ scripts/maintenance/cleanup-logs.sh
 docker system prune -af --volumes 2>/dev/null || true
 
 # 4. Check if rotation is working
-sudo logrotate -d /etc/logrotate.d/spectre-system-maintenance
+sudo logrotate -d /etc/logrotate.d/spectre-suite
 
 # 5. Add alert if below threshold
 DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
@@ -133,21 +133,21 @@ fi
 
 ```bash
 # 1. Check container status
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml ps
+docker-compose -f spectre-suite/docker-compose.monitoring.yml ps
 
 # 2. Restart individual services
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml restart prometheus
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml restart grafana
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml restart alertmanager
+docker-compose -f spectre-suite/docker-compose.monitoring.yml restart prometheus
+docker-compose -f spectre-suite/docker-compose.monitoring.yml restart grafana
+docker-compose -f spectre-suite/docker-compose.monitoring.yml restart alertmanager
 
 # 3. If config is corrupted, restore from git
-cd spectre-system-maintenance
+cd spectre-suite
 git checkout -- prometheus/prometheus.yml
 git checkout -- docker-compose.monitoring.yml
 
 # 4. Full restart
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml down
-docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml up -d
+docker-compose -f spectre-suite/docker-compose.monitoring.yml down
+docker-compose -f spectre-suite/docker-compose.monitoring.yml up -d
 ```
 
 ---
@@ -158,7 +158,7 @@ docker-compose -f spectre-system-maintenance/docker-compose.monitoring.yml up -d
 
 ```bash
 # Step 1: Provision infrastructure
-cd spectre-system-maintenance/cloud-deployment
+cd spectre-suite/cloud-deployment
 ./deploy.sh aws production 2
 
 # Step 2: Restore configuration

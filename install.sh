@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-# System Maintenance Installation Script
+# Spectre Suite Installation Script
 
 echo "==================================="
-echo "Spectre System Maintenance Installation"
+echo "Spectre Suite Installation"
 echo "==================================="
 
 # Check if running as root

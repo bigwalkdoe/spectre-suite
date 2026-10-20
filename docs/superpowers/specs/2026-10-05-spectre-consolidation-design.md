@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-05
 **Status:** Draft for review
-**Canonical repo:** `spectre-system-maintenance-suite` (renaming to `spectre`)
+**Canonical repo:** `spectre-suite`
 
 ## 1. Intent
 
@@ -29,7 +29,7 @@ Three implementations of substantially the same jobs:
 
 | | contents | status |
 |---|---|---|
-| `spectre-system-maintenance-suite` | ~90 bash actions, systemd units, crontab, Prometheus/Grafana/OPA, Terraform/Ansible | **live** — owns all scheduling |
+| `spectre-suite` | ~90 bash actions, systemd units, crontab, Prometheus/Grafana/OPA, Terraform/Ansible | **live** — owns all scheduling |
 | `spectre-system-maintenance-agent` | ~5.8k LOC Python, 8 agents, 31 CLI commands, FastAPI, TUI, daemon, 317 tests | **live** |
 | `/home/deon/scripts` | 180 files, not a git repository | **dead fork** |
 
@@ -72,7 +72,7 @@ Their only implementations are in the untracked fork.
   `spectre-api.service`).
 - The repository's own `systemd/*.service` files → a third divergent copy,
   dispatching through `/usr/local/bin`. `ml-anomaly-fix.service` points at
-  `/opt/spectre-system-maintenance/scripts/ml-anomaly/run_ml_pipeline.sh`, **a path
+  `/opt/spectre-suite/scripts/ml-anomaly/run_ml_pipeline.sh`, **a path
   that does not exist on this host**. That unit is dead.
 - `/usr/local/bin` → 40+ scripts installed from a mix of suite and fork.
   `cleanup-downloads.sh` there is byte-identical to the fork's copy, not the

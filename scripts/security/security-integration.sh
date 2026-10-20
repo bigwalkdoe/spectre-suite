@@ -114,7 +114,7 @@ configure_aide() {
     
     # Create AIDE configuration
     sudo bash -c 'cat > /etc/aide.conf << "EOF"
-# AIDE Configuration for System Maintenance
+# AIDE Configuration for Spectre Suite
 
 # Database locations
 database=file:/var/lib/aide/aide.db

@@ -39,7 +39,7 @@ jobs:
           echo "  - Restore simulation: SUCCESS"
           echo ""
           echo "Simulating Docker volume restore..."
-          echo "  - Volume backup found: spectre-system-maintenance-suite_postgres-data_20260601_120000.tar.gz"
+          echo "  - Volume backup found: spectre-suite_postgres-data_20260601_120000.tar.gz"
           echo "  - Restore simulation: SUCCESS"
           echo ""
           echo "All restore tests passed"
