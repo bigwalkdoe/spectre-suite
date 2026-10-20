@@ -1,6 +1,6 @@
 # Advanced Security Features
 
-The System Maintenance & Security Automation Suite includes advanced security features including IDS/IPS, threat detection, and comprehensive security monitoring.
+The Spectre Suite includes advanced security features including IDS/IPS, threat detection, and comprehensive security monitoring.
 
 ## Overview
 

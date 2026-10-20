@@ -1,6 +1,6 @@
 # Security Policy
 
-This document outlines the security practices, vulnerability disclosure process, and incident response procedures for the Linux System Maintenance Suite.
+This document outlines the security practices, vulnerability disclosure process, and incident response procedures for Spectre Suite.
 
 ## Security Practices
 

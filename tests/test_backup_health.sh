@@ -56,7 +56,7 @@ make_fixture() {
         > "$DB/redis_backup_${stamp}.rdb"
 
     # A real volume tarball with one member.
-    tar -czf "$VOL/spectre-system-maintenance-suite_postgres-data_${stamp}.tar.gz" -C "$FIXTURE" payload.txt
+    tar -czf "$VOL/spectre-suite_postgres-data_${stamp}.tar.gz" -C "$FIXTURE" payload.txt
 
     date +%s > "$STATE/last-db-backup-success"
     date +%s > "$STATE/last-db-backup-attempt"
@@ -70,7 +70,7 @@ make_fixture() {
             hollow-tar)
                 # tar of an empty directory: a valid archive containing nothing.
                 mkdir -p "$FIXTURE/empty"
-                tar -czf "$VOL/spectre-system-maintenance-suite_redis-data_${stamp}.tar.gz" -C "$FIXTURE/empty" .
+                tar -czf "$VOL/spectre-suite_redis-data_${stamp}.tar.gz" -C "$FIXTURE/empty" .
                 ;;
             hollow-rdb)
                 # An RDB with no magic: a truncated or interrupted copy.

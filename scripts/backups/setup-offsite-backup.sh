@@ -4,7 +4,7 @@ set -euo pipefail
 # Off-Site Backup Setup Script
 # Configures rsync/S3/B2 remote backup destinations
 
-CONFIG_DIR="/etc/spectre-system-maintenance"
+CONFIG_DIR="/etc/spectre-suite"
 BACKUP_CONFIG="${CONFIG_DIR}/backup-config.yml"
 LOG_FILE="/var/log/backup-setup.log"
 
@@ -140,7 +140,7 @@ create_backup_script() {
 #!/bin/bash
 set -euo pipefail
 
-CONFIG_FILE="/etc/spectre-system-maintenance/backup-config.yml"
+CONFIG_FILE="/etc/spectre-suite/backup-config.yml"
 BACKUP_DIR="/backups"
 LOG_FILE="/var/log/backup-offsite.log"
 TIMESTAMP=$(date '+%Y-%m-%d_%H-%M-%S')

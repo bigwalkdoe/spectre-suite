@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Machine Learning Anomaly Detection for System Maintenance
+Machine Learning Anomaly Detection for Spectre Suite
 Detects anomalies in system metrics using various ML algorithms
 """
 

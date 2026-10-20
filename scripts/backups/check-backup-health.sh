@@ -163,7 +163,7 @@ if [ -d "$VOLUME_BACKUP_DIR" ]; then
     # Scoped to this project's volumes on purpose. The directory also holds
     # archives of other projects' volumes, copied here by an older script, and
     # their presence is not evidence that this project is being backed up.
-    pattern="spectre-system-maintenance-suite_*.tar.gz"
+    pattern="spectre-suite_*.tar.gz"
     newest=$(find "$VOLUME_BACKUP_DIR" -maxdepth 1 -name "$pattern" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
     if [ -z "$newest" ]; then
         problem "volumes: no archive matching $pattern in $VOLUME_BACKUP_DIR"
@@ -189,7 +189,7 @@ purged=0
 for pattern_label in \
     "$BACKUP_DIR:postgres_*.sql.gz" \
     "$BACKUP_DIR:redis_backup_*.rdb" \
-    "$VOLUME_BACKUP_DIR:spectre-system-maintenance-suite_*.tar.gz"; do
+    "$VOLUME_BACKUP_DIR:spectre-suite_*.tar.gz"; do
     dir="${pattern_label%%:*}"
     pattern="${pattern_label##*:}"
     [ -d "$dir" ] || continue

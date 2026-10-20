@@ -1,10 +1,10 @@
 #!/bin/bash
-# Cloud Monitoring Script for System Maintenance Suite
+# Cloud Monitoring Script for Spectre Suite
 # Collects and sends metrics to cloud provider monitoring services
 
 # Source configuration if available
-if [ -f /etc/spectre-system-maintenance/cloud-config.yml ]; then
-    yaml-to-bash /etc/spectre-system-maintenance/cloud-config.yml > /tmp/cloud-config.env
+if [ -f /etc/spectre-suite/cloud-config.yml ]; then
+    yaml-to-bash /etc/spectre-suite/cloud-config.yml > /tmp/cloud-config.env
     # shellcheck disable=SC1091  # generated at runtime
     . /tmp/cloud-config.env
 fi
@@ -63,35 +63,35 @@ send_to_cloudwatch() {
         
         # Send to CloudWatch
         aws cloudwatch put-metric-data \
-            --namespace SystemMaintenance \
+            --namespace SpectreSuite \
             --metric-name CPUUsage \
             --value "$CPU" \
             --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Percent 2>/dev/null
         
         aws cloudwatch put-metric-data \
-            --namespace SystemMaintenance \
+            --namespace SpectreSuite \
             --metric-name MemoryUsage \
             --value "$MEM" \
             --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Percent 2>/dev/null
         
         aws cloudwatch put-metric-data \
-            --namespace SystemMaintenance \
+            --namespace SpectreSuite \
             --metric-name DiskUsage \
             --value "$DISK" \
             --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Percent 2>/dev/null
         
         aws cloudwatch put-metric-data \
-            --namespace SystemMaintenance \
+            --namespace SpectreSuite \
             --metric-name NetworkInBytes \
             --value "$NET_IN" \
             --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \
             --unit Bytes 2>/dev/null
         
         aws cloudwatch put-metric-data \
-            --namespace SystemMaintenance \
+            --namespace SpectreSuite \
             --metric-name NetworkOutBytes \
             --value "$NET_OUT" \
             --dimensions "InstanceId=$INSTANCE_ID,Environment=$ENVIRONMENT" \

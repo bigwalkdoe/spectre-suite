@@ -1,12 +1,12 @@
 ---
-# Ansible playbook for System Maintenance Suite deployment
+# Ansible playbook for Spectre Suite deployment
 # Supports multiple cloud providers and on-premises deployments
 
-- name: Deploy System Maintenance Suite
+- name: Deploy Spectre Suite
   hosts: all
   become: yes
   vars:
-    project_name: "spectre-system-maintenance"
+    project_name: "spectre-suite"
     installation_dir: "/opt/{{ project_name }}"
     backup_dir: "/backups"
     monitoring_enabled: true
@@ -78,7 +78,7 @@
         state: directory
         mode: '0755'
 
-    - name: Clone system maintenance repository
+    - name: Clone Spectre Suite repository
       git:
         repo: "https://github.com/YOUR_USERNAME/{{ project_name }}.git"
         dest: "{{ installation_dir }}"
@@ -192,14 +192,14 @@
     - name: Create cloud configuration
       template:
         src: templates/cloud-config.j2
-        dest: /etc/spectre-system-maintenance/cloud-config.yml
+        dest: /etc/spectre-suite/cloud-config.yml
         mode: '0644'
       when: cloud_deployment
 
     - name: Configure log rotation
       copy:
         content: |
-          /var/log/spectre-system-maintenance/*.log {
+          /var/log/spectre-suite/*.log {
               daily
               rotate 7
               compress
@@ -208,14 +208,14 @@
               notifempty
               create 0640 {{ ansible_user }} {{ ansible_user }}
           }
-        dest: /etc/logrotate.d/spectre-system-maintenance
+        dest: /etc/logrotate.d/spectre-suite
         mode: '0644'
 
     - name: Create health check script
       copy:
         content: |
           #!/bin/bash
-          echo "System Maintenance Health Check"
+          echo "Spectre Suite Health Check"
           echo "Status: OK"
           echo "Environment: {{ environment }}"
           echo "Hostname: {{ ansible_hostname }}"
@@ -321,13 +321,13 @@
           cloud_deployment: {{ cloud_deployment }}
           ansible_hostname: {{ ansible_hostname }}
           ansible_os_family: {{ ansible_os_family }}
-        dest: /etc/spectre-system-maintenance/deployment-status.yml
+        dest: /etc/spectre-suite/deployment-status.yml
         mode: '0644'
 
     - name: Display deployment summary
       debug:
         msg:
-          - "System Maintenance Suite deployment completed!"
+          - "Spectre Suite deployment completed!"
           - "Environment: {{ environment }}"
           - "Installation directory: {{ installation_dir }}"
           - "Monitoring enabled: {{ monitoring_enabled }}"
