@@ -65,16 +65,19 @@ fi
 } >> "$BACKUP_LOG"
 
 # Send notification if any backup failed
-if [ $DB_STATUS -ne 0 ] || [ $VOL_STATUS -ne 0 ] || [ $CONFIG_STATUS -ne 0 ] || [ $PROJECT_STATUS -ne 0 ]; then
+if [ "$DB_STATUS" -ne 0 ] || [ "$VOL_STATUS" -ne 0 ] || [ "$CONFIG_STATUS" -ne 0 ] || [ "$PROJECT_STATUS" -ne 0 ]; then
     logger -p user.error "Backup completed with errors - check $BACKUP_LOG" 2>/dev/null || true
     if [ -n "${DISPLAY:-}" ]; then
         notify-send "Backup Error" "Some backups failed - check logs" -u critical
     fi
-else
-    logger -p user.info "All backups completed successfully" 2>/dev/null || true
-    if [ -n "${DISPLAY:-}" ]; then
-        notify-send "Backup Complete" "All backups completed successfully"
-    fi
+    echo "Backup orchestration completed with failures: $DATE"
+    exit 1
+fi
+
+logger -p user.info "All backups completed successfully" 2>/dev/null || true
+if [ -n "${DISPLAY:-}" ]; then
+    notify-send "Backup Complete" "All backups completed successfully"
 fi
 
 echo "Backup orchestration completed: $DATE"
+exit 0

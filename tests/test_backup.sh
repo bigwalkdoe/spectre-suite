@@ -88,6 +88,60 @@ test_required_backup_scripts() {
     fi
 }
 
+# Test 6: backup-all.sh must exit non-zero when any component fails
+test_backup_all_propagates_failure() {
+    echo "Test 6: backup-all.sh exits non-zero when a component fails"
+    local sandbox
+    sandbox="$(mktemp -d "${TMPDIR:-/tmp}/backup-fail-test.XXXXXX")"
+    trap 'rm -rf "$sandbox"' RETURN
+
+    mkdir -p "$sandbox/bin" "$sandbox/scripts/backups"
+
+    # Stub docker so stubbed component scripts that call it do not fail.
+    cat > "$sandbox/bin/docker" <<'EOF'
+#!/bin/bash
+exit 0
+EOF
+    chmod +x "$sandbox/bin/docker"
+
+    # One component fails; the others succeed.
+    cat > "$sandbox/scripts/backups/backup-databases.sh" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+    chmod +x "$sandbox/scripts/backups/backup-databases.sh"
+
+    cat > "$sandbox/scripts/backups/backup-docker-volumes.sh" <<'EOF'
+#!/bin/bash
+exit 0
+EOF
+    chmod +x "$sandbox/scripts/backups/backup-docker-volumes.sh"
+
+    cat > "$sandbox/scripts/backups/backup-configurations.sh" <<'EOF'
+#!/bin/bash
+exit 0
+EOF
+    chmod +x "$sandbox/scripts/backups/backup-configurations.sh"
+
+    cp "$PROJECT_ROOT/scripts/backups/backup-all.sh" "$sandbox/scripts/backups/backup-all.sh"
+    chmod +x "$sandbox/scripts/backups/backup-all.sh"
+
+    BACKUP_DIR="$sandbox/backups" \
+    BACKUP_STATE_DIR="$sandbox/state" \
+    PATH="$sandbox/bin:$PATH" \
+        "$sandbox/scripts/backups/backup-all.sh" >"$sandbox/out.log" 2>&1
+    local status=$?
+
+    if [ "$status" -ne 0 ]; then
+        echo "✅ backup-all.sh exited $status on component failure"
+        return 0
+    else
+        echo "❌ backup-all.sh exited $status despite a component failure (see $sandbox/out.log)"
+        cat "$sandbox/out.log" >&2 || true
+        return 1
+    fi
+}
+
 # Run all tests
 run_all_tests() {
     local passed=0
@@ -114,6 +168,11 @@ run_all_tests() {
         ((failed+=1))
     fi
     if test_required_backup_scripts; then
+        ((passed+=1))
+    else
+        ((failed+=1))
+    fi
+    if test_backup_all_propagates_failure; then
         ((passed+=1))
     else
         ((failed+=1))
