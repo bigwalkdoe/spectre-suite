@@ -69,6 +69,11 @@ All notable changes to the spectre-suite project will be documented in this file
 - The SELinux exec-label check now targets only scripts referenced by installed
   system unit `ExecStart` lines. This keeps system units working without
   fighting Docker `:z` mounts that relabel the Prometheus directory.
+- `scripts/backups/backup-all.sh` now exits non-zero when any component
+  (database, Docker volume, configuration, or project backup) fails. Previously
+  it logged failures but exited 0, so scheduled full backups could report
+  success while health was bad; the catch-up timer now correctly records those
+  failures.
 
 ### Changed
 - Renamed the project and repository to `spectre-suite`. Documentation,

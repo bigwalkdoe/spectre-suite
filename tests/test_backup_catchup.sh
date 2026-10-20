@@ -147,6 +147,28 @@ else
         pass "a failed catch-up exits non-zero"
     fi
 
+    # Backup-all.sh itself exits non-zero: the wrapper must fail so systemd
+    # records the failure rather than reporting success.
+    sandbox="$TMP_ROOT/backup-fails"
+    make_sandbox "$sandbox"
+    out="$TMP_ROOT/backup-fails.out"
+    TEST_HEALTH_MODE=becomes-healthy \
+    TEST_HEALTH_LOG="$TMP_ROOT/backup-fails.health" \
+    TEST_BACKUP_LOG="$TMP_ROOT/backup-fails.backup" \
+    TEST_BACKUP_MARKER="$TMP_ROOT/backup-fails.marker" \
+    TEST_BACKUP_EXIT=1 \
+    HOME="$sandbox/home" XDG_RUNTIME_DIR="$sandbox/run" XDG_STATE_HOME="$sandbox/state" \
+    PATH="$sandbox/bin:$PATH" \
+        "$sandbox/scripts/backups/run-missed-backups.sh" >"$out" 2>&1
+    backup_fails_status=$?
+    if [ "$backup_fails_status" -eq 0 ]; then
+        fail "catch-up exited success when backup-all.sh failed"
+    elif [ ! -f "$TMP_ROOT/backup-fails.backup" ]; then
+        fail "catch-up did not attempt a backup before failing"
+    else
+        pass "catch-up exits non-zero when backup-all.sh fails"
+    fi
+
     # Lock held by another catch-up: skip instead of starting a parallel run.
     sandbox="$TMP_ROOT/locked"
     make_sandbox "$sandbox"
