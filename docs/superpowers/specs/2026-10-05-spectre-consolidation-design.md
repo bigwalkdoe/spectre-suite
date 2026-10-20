@@ -30,7 +30,7 @@ Three implementations of substantially the same jobs:
 | | contents | status |
 |---|---|---|
 | `spectre-suite` | ~90 bash actions, systemd units, crontab, Prometheus/Grafana/OPA, Terraform/Ansible | **live** — owns all scheduling |
-| `spectre-system-maintenance-agent` | ~5.8k LOC Python, 8 agents, 31 CLI commands, FastAPI, TUI, daemon, 317 tests | **live** |
+| `spectre-agent` | ~5.8k LOC Python, 8 agents, 31 CLI commands, FastAPI, TUI, daemon, 317 tests | **live** |
 | `/home/deon/scripts` | 180 files, not a git repository | **dead fork** |
 
 ### 2.1 The fork is a fork
