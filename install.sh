@@ -59,7 +59,7 @@ mkdir -p /etc/systemd/system
 echo "Installing systemd services..."
 
 # Backup service
-cat > /etc/systemd/system/backup.service << 'EOF'
+cat > /etc/systemd/system/backup.service << EOF
 [Unit]
 Description=Comprehensive System Backup
 After=network.target docker.service
@@ -87,7 +87,7 @@ WantedBy=timers.target
 EOF
 
 # Maintenance service
-cat > /etc/systemd/system/maintenance.service << 'EOF'
+cat > /etc/systemd/system/maintenance.service << EOF
 [Unit]
 Description=System Maintenance Service
 After=network.target docker.service
@@ -115,7 +115,7 @@ WantedBy=timers.target
 EOF
 
 # Performance check service
-cat > /etc/systemd/system/performance-check.service << 'EOF'
+cat > /etc/systemd/system/performance-check.service << EOF
 [Unit]
 Description=Performance Monitoring Service
 
@@ -140,7 +140,7 @@ WantedBy=timers.target
 EOF
 
 # Network monitor service
-cat > /etc/systemd/system/network-monitor.service << 'EOF'
+cat > /etc/systemd/system/network-monitor.service << EOF
 [Unit]
 Description=Network Monitoring Service
 
@@ -165,7 +165,7 @@ WantedBy=timers.target
 EOF
 
 # Disk space check service
-cat > /etc/systemd/system/disk-space-check.service << 'EOF'
+cat > /etc/systemd/system/disk-space-check.service << EOF
 [Unit]
 Description=Disk Space Monitoring Service
 
@@ -190,7 +190,7 @@ WantedBy=timers.target
 EOF
 
 # Security scan service
-cat > /etc/systemd/system/security-scan.service << 'EOF'
+cat > /etc/systemd/system/security-scan.service << EOF
 [Unit]
 Description=Security Vulnerability Scanner
 After=network.target
