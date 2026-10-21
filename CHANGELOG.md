@@ -74,6 +74,11 @@ All notable changes to the spectre-suite project will be documented in this file
   it logged failures but exited 0, so scheduled full backups could report
   success while health was bad; the catch-up timer now correctly records those
   failures.
+- `install.sh` now expands `$USER_NAME` in systemd unit files. The service unit
+  templates used quoted heredocs (`<< 'EOF'`), so `User=$USER_NAME` was written
+  literally and systemd rejected it with `217/USER` on every scheduled run.
+  Templates now use unquoted heredocs (`<< EOF`) so the actual username is
+  substituted.
 
 ### Changed
 - Renamed the project and repository to `spectre-suite`. Documentation,
