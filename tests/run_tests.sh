@@ -238,6 +238,7 @@ main() {
     run_test_suite "$SCRIPT_DIR/test_backup_catchup.sh" "Backup Catch-up Timer Tests"
     run_test_suite "$SCRIPT_DIR/test_security_metrics.sh" "Security Metrics Exporter Tests"
     run_test_suite "$SCRIPT_DIR/test_schedule_ownership.sh" "Scheduled Job Ownership Tests"
+    run_test_suite "$SCRIPT_DIR/test_install_units.sh" "Installer Unit Expansion Tests"
     run_test_suite "$SCRIPT_DIR/test_backup.sh" "Backup Script Tests"
     run_test_suite "$SCRIPT_DIR/test_security.sh" "Security Script Tests"
     run_test_suite "$SCRIPT_DIR/test_ml.sh" "ML Anomaly + Fix Engine Tests"
