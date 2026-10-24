@@ -11,7 +11,7 @@ cd "$PROJECTS_ROOT/Guardrail-AI"
 # Check if current docker-compose has resource limits
 if ! grep -q "deploy:" docker-compose.yml; then
     echo "Adding resource limits to docker-compose.yml"
-    
+
     # Add resource limits to key services
     # This will be added as a separate optimization file
     cat > docker-compose.override.yml << 'EOF'
