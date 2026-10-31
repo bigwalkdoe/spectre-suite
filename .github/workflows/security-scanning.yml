@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.SPECTRE_LOAD_TEST_URL != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
