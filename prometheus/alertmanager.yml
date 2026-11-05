@@ -11,10 +11,11 @@ global:
   # under `global`, so each slack_config names the file explicitly.
   slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
 
-# Note: there is deliberately no `templates:` key. The previous value
-# ('/etc/alertmanager/templates/*.tmpl') had no corresponding bind mount, so the
-# glob never matched anything, and every receiver formats inline via html/text
-# rather than from a template file. Add a mount here when adding templates.
+# Slack formatting lives in templates mounted by docker-compose.monitoring.yml.
+# `{{ .GeneratorURL }}` is valid only inside `{{ range .Alerts }}` in the text
+# templates; do not use it in a single-value field like title_link.
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
 
 # Notification routes
 route:
@@ -54,54 +55,40 @@ route:
 # prometheus/alertmanager-secrets/README.md.
 receivers:
   # Slack is the only channel. Severity is carried by the attachment colour and
-  # the title prefix rather than by separate channels: Slack routes incoming
-  # webhooks to the channel the webhook was created for and commonly ignores the
-  # `channel`, `username` and `icon_emoji` fields, so per-severity channel names
-  # in this file were decorative. `color` is honoured.
-  #
-  # Every receiver posts to the same webhook, so there is one place to rotate the
-  # secret. There is deliberately no `channel:` field; the webhook decides.
-  #
-  # There is also deliberately no `title_link:`. `{{ .GeneratorURL }}` is a field
-  # of an *alert*, not of the alert group, so referencing it in a single-value
-  # field like title_link fails template execution -- and the failure is not
-  # confined to that field: color, text and fallback all came out empty while
-  # only the title rendered, so a Slack message arrived as a bare heading with no
-  # severity colour. Omitting title_link uses Alertmanager's default, which links
-  # to its own alert page. A per-alert Prometheus link is added inside
-  # `{{ range .Alerts }}` in the body instead, which is the only place
-  # .GeneratorURL exists.
+  # the title prefix. No `title_link:`: `{{ .GeneratorURL }}` is valid only inside
+  # `{{ range .Alerts }}` (see templates/*.tmpl). Slack commonly ignores
+  # `channel`/`username`/`icon_emoji` on incoming webhooks.
   - name: 'default-receiver'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
         color: '#d40d0d'
-        title: '[ALERT] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
+        title: '{{ template "slack.default.title" . }}'
+        text: '{{ template "slack.default.text" . }}'
 
   - name: 'critical-receiver'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
         color: '#d40d0d'
-        title: '[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n*Summary:* {{ .Annotations.summary }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
+        title: '{{ template "slack.critical.title" . }}'
+        text: '{{ template "slack.critical.text" . }}'
 
   - name: 'warning-receiver'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
         color: '#daa038'
-        title: '[WARNING] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}'
-        text: "{{ range .Alerts }}*Severity:* `{{ .Labels.severity }}`\n*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
+        title: '{{ template "slack.warning.title" . }}'
+        text: '{{ template "slack.warning.text" . }}'
 
   - name: 'info-receiver'
     slack_configs:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
         color: '#2eb886'
-        title: '[INFO] {{ .GroupLabels.alertname }}'
-        text: "{{ range .Alerts }}*Instance:* {{ .Labels.instance }}\n*Description:* {{ .Annotations.description }}\n<{{ .GeneratorURL }}|View in Prometheus>\n{{ end }}"
+        title: '{{ template "slack.info.title" . }}'
+        text: '{{ template "slack.info.text" . }}'
 
   # The dead-man's switch. The text says what to do, because the only time anyone
   # reads it is when it fires, which means delivery has already failed and
@@ -111,8 +98,8 @@ receivers:
       - api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
         send_resolved: true
         color: '#2eb886'
-        title: 'Watchdog Alive'
-        text: 'Alerting is working. This message repeats every 24h; its *absence* is the problem. If you are reading this and expected an outage alert, that alert could not be delivered.'
+        title: '{{ template "slack.watchdog.title" . }}'
+        text: '{{ template "slack.watchdog.text" . }}'
 
 # Inhibition rules
 inhibit_rules:

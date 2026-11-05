@@ -196,7 +196,7 @@ rm -rf "$TREE"
 #     running Alertmanager, but the mistake is statically visible.
 # ---------------------------------------------------------------------------
 TREE="$(stage)"
-sed -i "s|^        title: '\[CRITICAL\].*|&\n        title_link: '{{ .GeneratorURL }}'|" \
+sed -i "/slack\.critical\.title/a\\        title_link: '{{ .GeneratorURL }}'" \
     "$TREE/prometheus/alertmanager.yml"
 expect_fail "title_link using .GeneratorURL is rejected" "$TREE" "GeneratorURL"
 rm -rf "$TREE"
