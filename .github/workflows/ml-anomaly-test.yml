@@ -27,8 +27,7 @@ jobs:
 
       - name: Run ML unit tests
         run: |
-          cd tests
-          python3 -m unittest test_ml.py -v
+          bash tests/test_ml.sh
 
   ml-detection:
     name: ML Detection (no LLM)
