@@ -55,8 +55,19 @@ done
 if [ -z "$PY" ]; then
     echo "ML Unit Tests: FAILED"
     echo "  no Python interpreter with the required dependencies was found"
-    echo "  tried: \$ML_PYTHON, scripts/ml-anomaly/venv, .venv, /usr/bin/python3, PATH"
+    echo "  required: numpy sklearn pandas requests"
+    for candidate in     "${ML_PYTHON:-}"     "$ML_DIR/venv/bin/python"     "$PROJECT_ROOT/.venv/bin/python"     /usr/bin/python3     "$(command -v python3 2>/dev/null || true)"; do
+        [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+        miss=$("$candidate" - <<'DEPS' 2>/dev/null
+import importlib.util
+mods=("numpy","sklearn","pandas","requests")
+print(" ".join(m for m in mods if importlib.util.find_spec(m) is None))
+DEPS
+        ) || miss="(probe failed)"
+        [ -n "$miss" ] && echo "  - $candidate missing: $miss" || echo "  - $candidate: ok"
+    done
     echo "  install with: /usr/bin/python3 -m pip install -r $PROJECT_ROOT/scripts/ml-anomaly/requirements.txt"
+    echo "  or select a prepared interpreter: ML_PYTHON=/path/to/python"
     echo "=========================================="
     exit 1
 fi
