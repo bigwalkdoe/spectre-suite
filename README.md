@@ -1,6 +1,6 @@
 # Spectre Suite — Linux System Maintenance & Security Automation
 
-A comprehensive system maintenance, security, monitoring, and disaster recovery automation suite for Linux workstations and servers. Features automated backups, centralized logging, enhanced monitoring with alertmanager integrations, secrets management, intrusion detection, automated security scanning, VPN, CI/CD, load testing, database optimization, audit logging, policy enforcement, and cost optimization.
+A comprehensive system maintenance, security, monitoring, and disaster recovery automation suite for Linux workstations and servers. Features automated backups, enhanced monitoring with alertmanager integrations, secrets management, intrusion detection, automated security scanning, VPN, CI/CD, database optimization, audit logging, policy enforcement, and cost optimization.
 
 ## Features
 
@@ -8,14 +8,13 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 |----------|-------------|
 | **Backups** | Automated database, Docker volume, config, project backups with cron scheduling, off-site replication (rsync/S3/B2), encryption |
 | **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter (HTTP/TCP/ICMP/DNS), business metrics, uptime monitoring, custom dashboards |
-| **Logging** | Centralized Loki stack, container log rotation, retention policies, log shipping to remote destinations |
-| **Security** | Fail2Ban brute force protection, AIDE file integrity, Wazuh HIDS, Trivy container scanning, SonarQube code analysis, OWASP ZAP web testing, OPA policy enforcement |
-| **Secrets** | Environment-based secret injection, HashiCorp Vault support, .env template with secure permissions; **`.env`/secret files are excluded from all backup paths** |
+| **Logging** | Container log rotation, retention policies, log shipping to remote destinations |
+| **Security** | Fail2Ban brute force protection, OPA policy enforcement |
+| **Secrets** | Environment-based secret injection, .env template with secure permissions; **`.env`/secret files are excluded from all backup paths** |
 | **Network** | WireGuard VPN, network segmentation (internal/DMZ), DDoS protection, firewall hardening |
 | **CI/CD** | GitHub Actions workflows for syntax check, security scanning, DR test, load testing, multi-distro testing |
 | **DR** | RTO/RPO definitions, 10 incident runbooks, backup verification, DR testing schedule |
-| **Load Testing** | k6 and Locust scripts, performance regression testing, capacity planning |
-| **Database** | Automated vacuum/analyze, PgBouncer connection pooling, read replica setup |
+| **Database** | Automated vacuum/analyze |
 | **Audit** | auditd rules, centralized audit trail, compliance reports, sudo command logging, access reviews |
 | **Policy** | OPA policies for Docker security, backups, network, compliance; automated evaluation |
 | **Cost** | Cloud cost tracking, resource rightsizing, automated cleanup of unused resources |
@@ -57,11 +56,11 @@ boot or resume:
 ├────────────┬──────────┬──────────┬──────────┬───────────────┤
 │ Monitoring │ Security │ Backups  │ Logging  │ Automation    │
 ├────────────┼──────────┼──────────┼──────────┼───────────────┤
-│ Prometheus │ Fail2Ban │ Database │ Loki     │ Cron jobs     │
-│ Grafana    │ AIDE     │ Volumes  │ Promtail │ systemd timer │
-│ Alertmanag │ Wazuh    │ Configs  │ Logrotate│ CI/CD (GA)    │
-│ Blackbox   │ Trivy    │ Projects│ Shipping │ Ansible       │
-│ Node/PG/RE │ OPA      │ Off-site │          │ Terraform     │
+│ Prometheus │ Fail2Ban │ Database │ Logrotate│ Cron jobs     │
+│ Grafana    │ AIDE     │ Volumes  │ Shipping │ systemd timer │
+│ Alertmanag │ OPA      │ Configs  │          │ CI/CD (GA)    │
+│ Blackbox   │          │ Projects│          │ Ansible       │
+│ Node/PG/RE │          │ Off-site │          │ Terraform     │
 └────────────┴──────────┴──────────┴──────────┴───────────────┘
 ```
 
@@ -77,8 +76,6 @@ boot or resume:
 | 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
 | 05:00 | Missed-backup catch-up (`run-missed-backups.sh`) | Daily, plus after boot/resume |
 | 05:00 | AIDE file integrity check | Daily |
-| 06:00 | Trivy container scan | Weekly (Sun) |
-| 07:00 | OWASP ZAP scan | Weekly (Sun) |
 | 08:00 | Compliance report | Weekly (Mon) |
 | 09:00 | Access review | Weekly (Mon) |
 | 10:00 | OPA policy evaluation | Weekly (Mon) |
@@ -397,7 +394,7 @@ scripts/maintenance/check-disk-space.sh
 
 Three GitHub Actions workflows:
 - **ci-cd.yml**: Syntax check, tests, Trivy scan, Docker build, multi-distro test, deployment
-- **security-scanning.yml**: Weekly Trivy scan, OPA policy check, k6 load test
+- **security-scanning.yml**: Weekly Trivy scan, OPA policy check
 - **disaster-recovery-test.yml**: Weekly backup verification, DR documentation check
 
 ## Project Structure
@@ -427,7 +424,6 @@ scripts/
 │   ├── restore-*.sh         #   Database, volume, remote restore scripts
 │   ├── backup-encryption.sh #   AES-256-CBC backup encryption
 │   └── backup-verification.sh # Backup integrity verification
-├── logging/                 # Loki stack + logrotate
 ├── maintenance/             # Audit, cleanup, optimization
 │   ├── audit-trail.sh       #   Centralized audit logging
 │   ├── compliance-report.sh #   Compliance reporting
@@ -437,16 +433,11 @@ scripts/
 │   ├── network-security-hardening.sh # Network security hardening
 │   └── cleanup-*.sh         #   System + log cleanup
 ├── network/                 # WireGuard, DDoS, segmentation
-├── performance/             # Load testing, vacuum, rightsizing
-│   └── load-testing/        # k6, Locust, regression
+├── performance/             # Vacuum, rightsizing
 └── security/                # IDS, scanning, OPA, secrets
-    ├── opa/policies/        #   Rego policy files (firewall, audit, docker,
-    │                        #   network, backups, intrusion_detection,
-    │                        #   compliance, encryption)
-    ├── run-trivy-scan.sh    #   Trivy container scanning
+    ├── opa/policies/        #   Rego policy files
+    ├── run-trivy-scan.sh    #   Trivy container scanning (CI wrapper)
     └── check-file-integrity.sh # AIDE file integrity check
-    ├── sonarqube/           # Code analysis
-    └── zap/                 # Web app testing
 
 ## Requirements
 
