@@ -57,8 +57,8 @@ boot or resume:
 │ Monitoring │ Security │ Backups  │ Logging  │ Automation    │
 ├────────────┼──────────┼──────────┼──────────┼───────────────┤
 │ Prometheus │ Fail2Ban │ Database │ Logrotate│ Cron jobs     │
-│ Grafana    │ AIDE     │ Volumes  │ Shipping │ systemd timer │
-│ Alertmanag │ OPA      │ Configs  │          │ CI/CD (GA)    │
+│ Grafana    │ OPA      │ Volumes  │ Shipping │ systemd timer │
+│ Alertmanag │ IDS/IPS  │ Configs  │          │ CI/CD (GA)    │
 │ Blackbox   │          │ Projects│          │ Ansible       │
 │ Node/PG/RE │          │ Off-site │          │ Terraform     │
 └────────────┴──────────┴──────────┴──────────┴───────────────┘
@@ -75,8 +75,7 @@ boot or resume:
 | 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
 | 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
 | 05:00 | Missed-backup catch-up (`run-missed-backups.sh`) | Daily, plus after boot/resume |
-| 05:00 | AIDE file integrity check | Daily |
-| 08:00 | Compliance report | Weekly (Mon) |
+| 08:00 | Compliance report (`scripts/maintenance/compliance-report.sh`) | Weekly (Mon), if scheduled |
 | 09:00 | Access review | Weekly (Mon) |
 | 10:00 | OPA policy evaluation | Weekly (Mon) |
 | Every 4h | Resource rightsizing | Continuous |
@@ -215,11 +214,11 @@ opa eval --format raw --data scripts/security/opa/policies \
   --input <(echo '{}') 'count([m | data.security[k].deny[m]])'
 ```
 
-> **Not implemented here.** This repository does not contain AIDE/file-integrity
-> checking, a standalone Trivy wrapper, SonarQube or OWASP ZAP orchestration, or
-> a compliance report generator. The Trivy scan is the CI job in
-> `.github/workflows/security-scanning.yml`; run it locally with
-> `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+> **Not implemented here.** This repository does not provide a dedicated
+> AIDE/file-integrity script or scheduler (some scripts can report on system AIDE
+> if installed), a standalone Trivy wrapper, or SonarQube/OWASP ZAP orchestration.
+> The Trivy scan runs in `.github/workflows/security-scanning.yml`; run it locally
+> with `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
 > aquasec/trivy image --severity HIGH,CRITICAL <image>`.
 
 ## Security Metrics from the Spectre Agent
@@ -436,8 +435,7 @@ scripts/
 ├── performance/             # Vacuum, rightsizing
 └── security/                # IDS, scanning, OPA, secrets
     ├── opa/policies/        #   Rego policy files
-    ├── run-trivy-scan.sh    #   Trivy container scanning (CI wrapper)
-    └── check-file-integrity.sh # AIDE file integrity check
+    └── security-integration.sh # Optional host security tooling (fail2ban/rkhunter/AIDE if installed)
 
 ## Requirements
 

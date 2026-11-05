@@ -1,36 +1,49 @@
-{{/* Alertmanager notification templates */}}
+{{/* Slack notification templates (Slack is the only channel). */}}
 
-{{ define "slack.critical.title" }}:rotating_light: CRITICAL: {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}{{ end }}
+{{ define "slack.default.title" }}[ALERT] {{ .GroupLabels.alertname }}{{ end }}
 
-{{ define "slack.warning.title" }}:warning: WARNING: {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}{{ end }}
+{{ define "slack.critical.title" }}[CRITICAL] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}{{ end }}
 
-{{ define "slack.default.text" }}
-{{ range .Alerts }}
-*Description:* {{ .Annotations.description }}
-*Summary:* {{ .Annotations.summary }}
+{{ define "slack.warning.title" }}[WARNING] {{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}{{ end }}
+
+{{ define "slack.info.title" }}[INFO] {{ .GroupLabels.alertname }}{{ end }}
+
+{{ define "slack.watchdog.title" }}Watchdog Alive{{ end }}
+
+{{ define "slack.default.text" -}}
+{{ range .Alerts -}}
 *Severity:* `{{ .Labels.severity }}`
 *Instance:* {{ .Labels.instance }}
-*Graph:* {{ .GeneratorURL }}
-{{ end }}
-{{ end }}
-
-{{ define "email.critical.html" }}
-<h2 style="color:red;">CRITICAL ALERT</h2>
-<h3>{{ .GroupLabels.alertname }}</h3>
-<table border="1" cellpadding="5">
-<tr><th>Label</th><th>Value</th></tr>
-{{ range .GroupLabels }}
-<tr><td>{{ .Name }}</td><td>{{ .Value }}</td></tr>
-{{ end }}
-</table>
-{{ range .Alerts }}
-<p><strong>Description:</strong> {{ .Annotations.description }}</p>
-<p><strong>Started:</strong> {{ .StartsAt }}</p>
-<p><strong>Graph:</strong> <a href="{{ .GeneratorURL }}">View</a></p>
-{{ end }}
+*Description:* {{ .Annotations.description }}
+<{{ .GeneratorURL }}|View in Prometheus>
+{{ end -}}
 {{ end }}
 
-{{ define "pagerduty.default" }}
-{{ .GroupLabels.alertname }} - {{ .GroupLabels.instance }}
-{{ range .Alerts }}{{ .Annotations.description }} {{ end }}
+{{ define "slack.critical.text" -}}
+{{ range .Alerts -}}
+*Severity:* `{{ .Labels.severity }}`
+*Instance:* {{ .Labels.instance }}
+*Description:* {{ .Annotations.description }}
+*Summary:* {{ .Annotations.summary }}
+<{{ .GeneratorURL }}|View in Prometheus>
+{{ end -}}
 {{ end }}
+
+{{ define "slack.warning.text" -}}
+{{ range .Alerts -}}
+*Severity:* `{{ .Labels.severity }}`
+*Instance:* {{ .Labels.instance }}
+*Description:* {{ .Annotations.description }}
+<{{ .GeneratorURL }}|View in Prometheus>
+{{ end -}}
+{{ end }}
+
+{{ define "slack.info.text" -}}
+{{ range .Alerts -}}
+*Instance:* {{ .Labels.instance }}
+*Description:* {{ .Annotations.description }}
+<{{ .GeneratorURL }}|View in Prometheus>
+{{ end -}}
+{{ end }}
+
+{{ define "slack.watchdog.text" }}Alerting is working. This message repeats every 24h; its *absence* is the problem. If you are reading this and expected an outage alert, that alert could not be delivered.{{ end }}

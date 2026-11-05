@@ -1,157 +1,58 @@
 #!/bin/bash
-# Deploy enhanced monitoring components
+# Align/verify enhanced monitoring components (non-destructive).
+# Mutating curated Prometheus/Alertmanager/Compose files is unsafe here; this
+# script reports drift and performs only idempotent, non-conflicting setup.
 set -euo pipefail
 
-echo "=== Deploying Enhanced Monitoring ==="
+echo "=== Enhanced Monitoring Alignment Check ==="
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+ok=0
+warn=0
 
-# 1. Add Blackbox exporter to docker-compose
-echo "Adding Blackbox exporter to monitoring stack..."
-if ! grep -q "blackbox-exporter" "$PROJECT_ROOT/docker-compose.monitoring.yml" 2>/dev/null; then
-    cat >> "$PROJECT_ROOT/docker-compose.monitoring.yml" << 'EOF'
+check() {
+  local label="$1" path="$2" pattern="$3"
+  if grep -q "$pattern" "$path" 2>/dev/null; then
+    echo "  [ok]   $label"
+    ok=$((ok + 1))
+  else
+    echo "  [warn] $label (missing in ${path#"$PROJECT_ROOT"/})"
+    warn=$((warn + 1))
+  fi
+}
 
-  # Blackbox Exporter - External endpoint monitoring
-  blackbox-exporter:
-    image: prom/blackbox-exporter:latest
-    container_name: blackbox-exporter
-    ports:
-      - "9115:9115"
-    volumes:
-      - ./prometheus/blackbox-exporter.yml:/config/blackbox-exporter.yml
-    command:
-      - '--config.file=/config/blackbox-exporter.yml'
-      - '--web.external-url=http://localhost:9115'
-    restart: unless-stopped
-    networks:
-      - monitoring
-EOF
-    echo "Blackbox exporter added to monitoring stack"
-fi
+# 1. Blackbox exporter present in compose and Prometheus
+check "Blackbox service in compose" "$PROJECT_ROOT/docker-compose.monitoring.yml" "blackbox-exporter"
+check "Blackbox HTTP job in Prometheus" "$PROJECT_ROOT/prometheus/prometheus.yml" "blackbox-http"
+check "Blackbox TCP job in Prometheus" "$PROJECT_ROOT/prometheus/prometheus.yml" "blackbox-tcp"
 
-# 2. Create alertmanager templates directory
+# 2. Alertmanager templates (canonical location) and wiring
 mkdir -p "$PROJECT_ROOT/prometheus/templates"
-cp "$PROJECT_ROOT/prometheus/alertmanager-templates.tmpl" "$PROJECT_ROOT/prometheus/templates/"
+echo "  [ok]   Alertmanager templates directory present"
+ok=$((ok + 1))
+check "Alertmanager templates configured" "$PROJECT_ROOT/prometheus/alertmanager.yml" '^templates:'
+check "Alertmanager templates mounted" "$PROJECT_ROOT/docker-compose.monitoring.yml" "/etc/alertmanager/templates"
 
-# 3. Merge uptime monitoring into prometheus.yml
-echo "Adding uptime monitoring targets to prometheus.yml..."
-if ! grep -q "blackbox-http" "$PROJECT_ROOT/prometheus/prometheus.yml" 2>/dev/null; then
-    cat >> "$PROJECT_ROOT/prometheus/prometheus.yml" << 'EOF'
+# 3. Uptime/business alert rules (curated names)
+check "UptimeCheckFailed rule" "$PROJECT_ROOT/prometheus/alert_rules.yml" "UptimeCheckFailed"
+check "HighEndpointLatency rule" "$PROJECT_ROOT/prometheus/alert_rules.yml" "HighEndpointLatency"
 
-  # Blackbox Exporter - HTTP checks
-  - job_name: 'blackbox-http'
-    metrics_path: /probe
-    params:
-      module: [http_2xx]
-    static_configs:
-      - targets:
-        - https://api.github.com
-        - https://hub.docker.com
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  # Blackbox Exporter - TCP checks
-  - job_name: 'blackbox-tcp'
-    metrics_path: /probe
-    params:
-      module: [tcp_connect]
-    static_configs:
-      - targets:
-        - 'localhost:22'
-        - 'localhost:443'
-        - 'localhost:5432'
-        - 'localhost:6379'
-        - 'localhost:9090'
-        - 'localhost:3002'
-        - 'localhost:8081'
-        - 'localhost:3100'
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  # Business metrics via textfile collector
-  - job_name: 'business-metrics'
-    scrape_interval: 60s
-    static_configs:
-      - targets: ['node-exporter:9100']
-    metrics_path: /metrics
-EOF
-    echo "Uptime monitoring targets added to prometheus.yml"
-fi
-
-# 4. Set up business metrics exporter cron
-echo "Setting up business metrics exporter..."
-if ! crontab -l 2>/dev/null | grep -q "business-metrics-exporter"; then
-    (crontab -l 2>/dev/null; echo "*/5 * * * * $PROJECT_ROOT/prometheus/business-metrics-exporter.sh") | crontab -
-    echo "Business metrics exporter scheduled (every 5 minutes)"
-fi
-
-# 5. Add uptime alerts
-echo "Adding uptime monitoring alerts..."
-if ! grep -q "UptimeCheck" "$PROJECT_ROOT/prometheus/alert_rules.yml" 2>/dev/null; then
-    cat >> "$PROJECT_ROOT/prometheus/alert_rules.yml" << 'EOF'
-
-  - name: uptime_alerts
-    interval: 30s
-    rules:
-      - alert: UptimeCheckFailed
-        expr: probe_success == 0
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Uptime check failed"
-          description: "Endpoint {{ $labels.instance }} is unreachable (module: {{ $labels.module }})"
-
-      - alert: HighLatency
-        expr: probe_duration_seconds > 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High endpoint latency"
-          description: "Endpoint {{ $labels.instance }} has latency of {{ $value }}s"
-
-      - alert: DNSCheckFailed
-        expr: probe_dns_lookup_time_seconds > 1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Slow DNS resolution"
-          description: "DNS lookup for {{ $labels.instance }} took {{ $value }}s"
-
-      - alert: BusinessMetricStale
-        expr: time() - backup_last_success_timestamp > 86400
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "Backup metric is stale"
-          description: "Last successful backup was over 24 hours ago"
-EOF
-    echo "Uptime alerts added to alert_rules.yml"
+# 4. Business metrics exporter cron (idempotent)
+if crontab -l 2>/dev/null | grep -q "business-metrics-exporter"; then
+  echo "  [ok]   Business metrics exporter cron entry present"
+  ok=$((ok + 1))
+else
+  echo "  [warn] Business metrics exporter not scheduled (see README: cron required)"
+  warn=$((warn + 1))
 fi
 
 echo ""
-echo "=== Enhanced Monitoring Deployment Complete ==="
-echo ""
-echo "Components deployed:"
-echo "  - Blackbox exporter (port 9115)"
-echo "  - Business metrics exporter"
-echo "  - Uptime monitoring for critical services"
-echo "  - Enhanced alertmanager with Slack/Email/PagerDuty"
-echo ""
-echo "Restart monitoring stack to apply:"
-echo "  docker-compose -f docker-compose.monitoring.yml down"
-echo "  docker-compose -f docker-compose.monitoring.yml up -d"
+echo "Summary: $ok ok, $warn warning(s)."
+if [[ "$warn" -gt 0 ]]; then
+  echo "Review curated config files; this script does not append to compose/prometheus/alert rules."
+  exit 1
+fi
+
+echo "Enhanced monitoring configuration is aligned. Restart to apply if needed:"
+echo "  docker compose -f docker-compose.monitoring.yml up -d"
