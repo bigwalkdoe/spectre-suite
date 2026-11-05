@@ -108,9 +108,30 @@ fs_field() {
     esac
 }
 
-REPO_BYTES=$(dir_bytes "$BACKUP_REPO_DIR")
-REPO_FS=$(df -P "$BACKUP_REPO_DIR" 2>/dev/null | awk 'NR==2{print $6}' || true)
-[ -n "$REPO_FS" ] || REPO_FS="$BACKUP_REPO_DIR"
+# If the configured repo path is missing, try common locations before falling
+# back to filesystem-only metrics (avoids a false 0 free-space alert).
+if [ ! -d "$BACKUP_REPO_DIR" ]; then
+    for candidate in /backups/spectre-backup /backups/restic /var/lib/restic; do
+        if [ -d "$candidate" ]; then BACKUP_REPO_DIR="$candidate"; break; fi
+    done
+fi
+# Repo size is only meaningful when the repository directory exists.
+if [ -d "$BACKUP_REPO_DIR" ]; then
+    REPO_BYTES=$(dir_bytes "$BACKUP_REPO_DIR")
+    REPO_FS_PATH="$BACKUP_REPO_DIR"
+else
+    REPO_BYTES=0
+    # For filesystem free-space metrics, fall back to the nearest existing
+    # ancestor (or /backups, then /) so a missing/unconfigured repo path does
+    # not publish 0 and trigger a false low-space alert.
+    REPO_FS_PATH="$BACKUP_REPO_DIR"
+    while [ ! -e "$REPO_FS_PATH" ] && [ "$REPO_FS_PATH" != "/" ]; do
+        REPO_FS_PATH=$(dirname "$REPO_FS_PATH")
+    done
+    [ -e "$REPO_FS_PATH" ] || REPO_FS_PATH="/"
+fi
+REPO_FS=$(df -P "$REPO_FS_PATH" 2>/dev/null | awk 'NR==2{print $6}' || true)
+[ -n "$REPO_FS" ] || REPO_FS="$REPO_FS_PATH"
 REPO_FS_SIZE=$(fs_field "$REPO_FS" size)
 REPO_FS_FREE=$(fs_field "$REPO_FS" avail)
 
