@@ -117,11 +117,58 @@ function toggleDarkMode() {
         icon.classList.replace('fa-sun', 'fa-moon');
         localStorage.setItem('spectre-theme', 'light');
     }
+    applyChartTheme();
+}
+
+function getChartTheme() {
+    const isDark = document.documentElement.classList.contains('dark');
+    return {
+        gridColor: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(0,0,0,0.05)',
+        tickColor: isDark ? '#94a3b8' : '#666',
+        legendColor: isDark ? '#e2e8f0' : '#333'
+    };
+}
+
+function applyChartTheme() {
+    if (!chart) return;
+    const theme = getChartTheme();
+    chart.options.scales.x.grid.color = theme.gridColor;
+    chart.options.scales.x.ticks.color = theme.tickColor;
+    chart.options.scales.y.grid.color = theme.gridColor;
+    chart.options.scales.y.ticks.color = theme.tickColor;
+    chart.options.plugins.legend.labels = { color: theme.legendColor };
+    chart.update('none');
+}
+
+function updateLastRefreshed() {
+    const el = document.getElementById('lastRefreshed');
+    if (!el) return;
+    const now = new Date();
+    el.textContent = ` | Last refreshed: ${now.toLocaleTimeString()}`;
+}
+
+function formatBytes(bytes) {
+    if (bytes === null || bytes === undefined || isNaN(bytes)) return 'No data';
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const val = bytes / Math.pow(1024, i);
+    return `${val.toFixed(val >= 10 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatRelativeTime(epochSeconds) {
+    if (!epochSeconds || epochSeconds <= 0) return 'Never';
+    const diff = Math.floor(Date.now() / 1000 - epochSeconds);
+    if (diff < 0) return 'Just now';
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
 }
 
 function initializeDashboard() {
-    fetchAllMetrics();
     initializeChart();
+    fetchAllMetrics();
     checkPrometheusConnection();
 }
 
@@ -154,11 +201,16 @@ async function fetchAllMetrics() {
     if (isRefreshing) return;
     setRefreshing(true);
 
-    const cardIds = ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'alertsCard', 'containersCard', 'chartCard'];
+    const cardIds = ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'alertsCard', 'containersCard', 'chartCard', 'backupCard', 'securityCard'];
     cardIds.forEach(id => { clearCardError(id); setCardLoading(id, true); });
 
     try {
-        const metrics = await Promise.all([
+        const [
+            cpu, mem, disk, netIn, netOut, load1, bootTime, processes, temp,
+            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes,
+            spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
+            findingsCritical, findingsHigh
+        ] = await Promise.all([
             queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
             queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
             queryPrometheus('100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'),
@@ -167,33 +219,48 @@ async function fetchAllMetrics() {
             queryPrometheus('node_load1'),
             queryPrometheus('node_boot_time_seconds'),
             queryPrometheus('node_processes_total'),
-            queryPrometheus('avg(node_hwmon_temp_celsius)')
+            queryPrometheus('avg(node_hwmon_temp_celsius)'),
+            queryPrometheus('backup_last_success_timestamp'),
+            queryPrometheus('backup_health_check_ok'),
+            queryPrometheus('backup_health_check_timestamp'),
+            queryPrometheus('backup_repo_size_bytes'),
+            queryPrometheus('spectre_agent_up'),
+            queryPrometheus('spectre_security_ever_scanned'),
+            queryPrometheus('security_last_scan_timestamp'),
+            queryPrometheus('security_findings_unresolved'),
+            queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
+            queryPrometheus('security_findings_unresolved_by_severity{severity="high"}')
         ]);
 
-        // Treat all-null from Prometheus as unreachable
-        const allNull = metrics.every(v => v === null);
-        if (allNull) {
+        // Treat all-null from core Prometheus as unreachable
+        const coreAllNull = [cpu, mem, disk, netIn, netOut, load1, bootTime].every(v => v === null);
+        if (coreAllNull) {
             showToast('Prometheus unreachable — showing no data', 'error');
             ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard'].forEach(id => setCardError(id, 'No data from Prometheus'));
         } else {
-            updateCPUMetrics(metrics[0]);
-            updateMemoryMetrics(metrics[1]);
-            updateDiskMetrics(metrics[2]);
-            updateNetworkMetrics(metrics[3], metrics[4]);
-            updateSystemHealth(metrics[5], metrics[6], metrics[7], metrics[8]);
+            updateCPUMetrics(cpu);
+            updateMemoryMetrics(mem);
+            updateDiskMetrics(disk);
+            updateNetworkMetrics(netIn, netOut);
+            updateSystemHealth(load1, bootTime, processes, temp);
 
-            if (metrics[0] === null) setCardError('cpuCard', 'CPU data unavailable');
-            if (metrics[1] === null) setCardError('memoryCard', 'Memory data unavailable');
-            if (metrics[2] === null) setCardError('diskCard', 'Disk data unavailable');
-            if (metrics[3] === null && metrics[4] === null) setCardError('networkCard', 'Network data unavailable');
+            if (cpu === null) setCardError('cpuCard', 'CPU data unavailable');
+            if (mem === null) setCardError('memoryCard', 'Memory data unavailable');
+            if (disk === null) setCardError('diskCard', 'Disk data unavailable');
+            if (netIn === null && netOut === null) setCardError('networkCard', 'Network data unavailable');
         }
 
+        updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes);
+        updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh);
         updateContainerStatus();
         checkAlerts();
+        const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+        updateChart(activeRange);
+        updateLastRefreshed();
     } catch (err) {
         console.error('Fetch error:', err);
         showToast('Failed to refresh metrics', 'error');
-        ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard'].forEach(id => setCardError(id, 'Fetch failed'));
+        ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'backupCard', 'securityCard'].forEach(id => setCardError(id, 'Fetch failed'));
     } finally {
         cardIds.forEach(id => setCardLoading(id, false));
         setRefreshing(false);
@@ -319,6 +386,115 @@ function formatUptime(seconds) {
     } else {
         return `${minutes}m`;
     }
+}
+
+// Update Backup Status
+function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes) {
+    const statusEl = document.getElementById('backupStatus');
+    const lastEl = document.getElementById('lastBackup');
+    const sizeEl = document.getElementById('backupSize');
+
+    const hasData = lastSuccess !== null || healthOk !== null || repoBytes !== null;
+    if (!hasData) {
+        if (statusEl) { statusEl.textContent = 'No data'; statusEl.className = 'badge'; }
+        if (lastEl) lastEl.textContent = 'No data';
+        if (sizeEl) sizeEl.textContent = 'No data';
+        setCardError('backupCard', 'Backup metrics unavailable (exporter may not be running)');
+        return;
+    }
+
+    if (lastEl) {
+        lastEl.textContent = lastSuccess ? formatRelativeTime(lastSuccess) : 'Never';
+        if (lastSuccess) lastEl.title = new Date(lastSuccess * 1000).toLocaleString();
+    }
+    if (sizeEl) sizeEl.textContent = formatBytes(repoBytes);
+
+    if (statusEl) {
+        const isHealthy = healthOk === 1;
+        const isStale = lastSuccess && (Date.now() / 1000 - lastSuccess) > 86400 * 2;
+        if (isHealthy && !isStale) {
+            statusEl.textContent = 'OK';
+            statusEl.className = 'badge badge-success';
+        } else if (healthOk === 0 || isStale) {
+            statusEl.textContent = 'Attention';
+            statusEl.className = 'badge badge-warning';
+        } else {
+            statusEl.textContent = 'Unknown';
+            statusEl.className = 'badge';
+        }
+        if (healthTs) statusEl.title = `Last health check: ${new Date(healthTs * 1000).toLocaleString()}`;
+    }
+    clearCardError('backupCard');
+}
+
+// Update Security Status
+function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, critical, high) {
+    const statusEl = document.getElementById('securityStatus');
+    const firewallEl = document.getElementById('firewallStatus');
+    const fail2banEl = document.getElementById('fail2banStatus');
+    const scanEl = document.getElementById('lastSecurityScan');
+    const vulnEl = document.getElementById('vulnerabilities');
+
+    // Firewall/Fail2Ban aren't exposed as Prometheus metrics in this suite
+    if (firewallEl) firewallEl.textContent = 'No data';
+    if (fail2banEl) fail2banEl.textContent = 'No data';
+
+    const hasSecurityMetrics = spectreUp !== null;
+    if (!hasSecurityMetrics) {
+        if (statusEl) { statusEl.textContent = 'No data'; statusEl.className = 'badge'; }
+        if (scanEl) scanEl.textContent = 'No data';
+        if (vulnEl) vulnEl.textContent = 'No data';
+        setCardError('securityCard', 'Security metrics unavailable');
+        return;
+    }
+
+    if (spectreUp === 0) {
+        if (statusEl) { statusEl.textContent = 'Agent Down'; statusEl.className = 'badge badge-danger'; }
+        if (scanEl) scanEl.textContent = 'Agent unavailable';
+        if (vulnEl) vulnEl.textContent = 'Unknown';
+        setCardError('securityCard', 'Spectre security agent is down');
+        return;
+    }
+
+    if (scanEl) {
+        if (everScanned === 1 && lastScan) {
+            scanEl.textContent = formatRelativeTime(lastScan);
+            scanEl.title = new Date(lastScan * 1000).toLocaleString();
+        } else if (everScanned === 0) {
+            scanEl.textContent = 'Never scanned';
+        } else {
+            scanEl.textContent = 'No data';
+        }
+    }
+
+    const totalFindings = unresolved !== null ? Math.floor(unresolved) : null;
+    const criticalCount = critical !== null ? Math.floor(critical) : 0;
+    const highCount = high !== null ? Math.floor(high) : 0;
+
+    if (vulnEl) {
+        if (totalFindings !== null) {
+            vulnEl.textContent = totalFindings + (criticalCount + highCount > 0 ? ` (${criticalCount} critical, ${highCount} high)` : '');
+        } else {
+            vulnEl.textContent = 'No data';
+        }
+    }
+
+    if (statusEl) {
+        if (totalFindings === null) {
+            statusEl.textContent = 'Unknown';
+            statusEl.className = 'badge';
+        } else if (criticalCount > 0 || totalFindings > 10) {
+            statusEl.textContent = 'At Risk';
+            statusEl.className = 'badge badge-danger';
+        } else if (highCount > 0 || totalFindings > 0) {
+            statusEl.textContent = 'Review';
+            statusEl.className = 'badge badge-warning';
+        } else {
+            statusEl.textContent = 'Secure';
+            statusEl.className = 'badge badge-success';
+        }
+    }
+    clearCardError('securityCard');
 }
 
 // Update Container Status
@@ -453,6 +629,7 @@ async function checkPrometheusConnection() {
 // Initialize Chart
 function initializeChart() {
     const ctx = document.getElementById('resourceChart').getContext('2d');
+    const theme = getChartTheme();
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -493,17 +670,18 @@ function initializeChart() {
             },
             scales: {
                 x: {
-                    grid: { display: false },
-                    ticks: { maxTicksLimit: 10 }
+                    grid: { display: false, color: theme.gridColor },
+                    ticks: { maxTicksLimit: 10, color: theme.tickColor }
                 },
                 y: {
                     min: 0,
                     max: 100,
-                    grid: { color: 'rgba(0,0,0,0.05)' }
+                    grid: { color: theme.gridColor },
+                    ticks: { color: theme.tickColor }
                 }
             },
             plugins: {
-                legend: { position: 'bottom' }
+                legend: { position: 'bottom', labels: { color: theme.legendColor } }
             }
         }
     });
@@ -537,6 +715,7 @@ async function updateChart(range) {
         if (responses.some(r => !r.ok)) {
             console.error('Chart range query failed:',
                 responses.map((r, i) => `${i}: HTTP ${r.status}`).join(', '));
+            setCardError('chartCard', 'Chart data unavailable');
             return;
         }
 
@@ -546,6 +725,7 @@ async function updateChart(range) {
 
         if (results.some(d => d.status !== 'success')) {
             console.error('Chart range query returned non-success status');
+            setCardError('chartCard', 'Chart data unavailable');
             return;
         }
 
@@ -554,6 +734,7 @@ async function updateChart(range) {
             chart.data.labels = [];
             chart.data.datasets.forEach(d => { d.data = []; });
             chart.update();
+            setCardError('chartCard', 'No trend data available');
             return;
         }
 
@@ -571,9 +752,11 @@ async function updateChart(range) {
             dataset.data = results[i]?.data?.result?.[0]?.values?.map(v => parseFloat(v[1])) || [];
         });
         chart.update();
+        clearCardError('chartCard');
     } catch (e) {
         if (myToken === chartRequestToken) {
             console.error('Error updating chart:', e);
+            setCardError('chartCard', 'Chart update failed');
         }
     }
 }
