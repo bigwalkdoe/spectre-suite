@@ -71,10 +71,12 @@ boot or resume:
 | 01:00 | Database backup | Daily |
 | 02:00 | Full backup (Sat) / Docker volume backup | Daily/Weekly |
 | 02:30 | PostgreSQL vacuum & analyze (`vacuum-databases.sh`) | Daily |
+| 04:10 | Adopted restic backup (`scripts/backups/restic/backup.sh`, user timer) | Daily (`Persistent=true`) |
 | 04:30 | Off-site backup replication | Daily |
 | 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
 | 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
 | 05:00 | Missed-backup catch-up (`run-missed-backups.sh`) | Daily, plus after boot/resume |
+| 05:30 | Adopted restic verify (`scripts/backups/restic/verify.sh`, user timer) | Weekly (Sun, `Persistent=true`) |
 | 08:00 | Compliance report (`scripts/maintenance/compliance-report.sh`) | Weekly (Mon), if scheduled |
 | 09:00 | Access review | Weekly (Mon) |
 | 10:00 | OPA policy evaluation | Weekly (Mon) |

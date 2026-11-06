@@ -109,13 +109,13 @@ docker exec -it <container_name> cat /app/config.yml
 
 ---
 
-### Runbook 4: Backup Failure
+### Runbook 4: Backup Failure / Restore
 
 **Symptoms:**
-- Alert: BackupFailed (from business metrics)
-- Missing backup files
+- Alert: BackupFailed (artifact/business metrics) or restic alerts (`restic_backup_alerts`: stale backup, missing/failed verify)
+- Missing backup files, stale/missing markers, or failed snapshot/verify
 
-**Check:**
+**Check (artifact pipeline + catch-up):**
 ```bash
 tail -100 /var/log/backup.log
 ls -la /backups/databases/
@@ -124,26 +124,43 @@ journalctl --user -u spectre-backup-catchup.service --since "1 hour ago"
 systemctl --user list-timers spectre-backup-catchup.timer
 ```
 
-**Resolution:**
+**Check (adopted restic):**
 ```bash
-# Run backup manually
+systemctl --user list-timers | grep spectre-restic
+ls -la "${XDG_STATE_HOME:-$HOME/.local/state}/spectre-suite/backups"   # last-success, last-offsite-success, last-verify, last-health
+journalctl --user -u spectre-restic-backup.service --since "1 day ago"
+journalctl --user -u spectre-restic-verify.service --since "1 week ago"
+RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env" scripts/backups/restic/backup.sh   # manual run (foreground)
+```
+
+**Resolution (artifact backups):**
+```bash
 scripts/backups/backup-databases.sh
-
-# Retry through the catch-up path, which only acts when health says stale
-scripts/backups/run-missed-backups.sh
-
-# Check disk space
+scripts/backups/run-missed-backups.sh   # catch-up; acts only when health says stale
 df -h /backups
-
-# Verify Docker is running
 docker ps
-
-# Check database connectivity
 docker exec postgres pg_isready
-
-# Fix and re-run
 scripts/backups/backup-all.sh
 ```
+
+**Restore an artifact backup** (suite tar/db dump archives under `/backups/*`; independent of restic snapshots):
+```bash
+scripts/backups/restore-databases.sh
+scripts/backups/restore-docker-volumes.sh
+scripts/backups/restore-from-remote.sh   # off-site artifact copy
+```
+
+**Restore from a restic snapshot** (adopted engine; local-first, tag-scoped `spectre-suite,workstation`):
+```bash
+export RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env"
+scripts/backups/restic/restore.sh --list
+scripts/backups/restic/restore.sh --snapshot <id> --dry-run
+scripts/backups/restic/restore.sh --snapshot <id> --target /tmp/restore-test [paths...]
+scripts/backups/restic/restore.sh --latest --target /tmp/restore-test --dry-run   # optional
+# Use --local to read RESTIC_REPOSITORY_LOCAL (/backups/spectre-backup). Verify restored files before replacing originals.
+```
+
+Markers/alerts: state markers in `~/.local/state/spectre-suite/backups/` feed `restic_*` exporter gauges (`restic_last_success_timestamp`, `restic_last_verify_timestamp`, etc.); alert group `restic_backup_alerts` in `prometheus/alert_rules.yml`. `spectre-backup-catchup` remains the suite artifact catch-up (unchanged).
 
 ---
 
