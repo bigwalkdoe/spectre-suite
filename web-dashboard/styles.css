@@ -871,7 +871,9 @@ body {
 .btn:focus-visible,
 .chart-controls .btn:focus-visible,
 #themeToggle:focus-visible,
-#refreshBtn:focus-visible {
+#refreshBtn:focus-visible,
+.refresh-interval-select:focus-visible,
+a:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
     border-radius: 6px;
@@ -881,9 +883,71 @@ body {
 [data-theme="dark"] .chart-controls .btn:focus-visible,
 [data-theme="dark"] #themeToggle:focus-visible,
 [data-theme="dark"] #refreshBtn:focus-visible,
+[data-theme="dark"] .refresh-interval-select:focus-visible,
+[data-theme="dark"] a:focus-visible,
 .dark .btn:focus-visible,
 .dark .chart-controls .btn:focus-visible,
 .dark #themeToggle:focus-visible,
-.dark #refreshBtn:focus-visible {
+.dark #refreshBtn:focus-visible,
+.dark .refresh-interval-select:focus-visible,
+.dark a:focus-visible {
     box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.6);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .status-dot { animation: none; }
+}
+
+/* Print styles */
+@media print {
+    body { background: #fff !important; color: #000 !important; }
+    .dashboard { max-width: none; padding: 0; }
+    .dashboard-header, .card, .dashboard-footer {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+        break-inside: avoid;
+    }
+    #toast-container, .header-controls button, .refresh-interval-label, .chart-controls, .action-btn, .card-link { display: none !important; }
+    .card { margin-bottom: 12px; }
+    .chart-container { height: 240px; }
+}
+
+/* Visually hidden (for screen readers) */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.visually-hidden:focus,
+.visually-hidden:focus-within {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    color: var(--text);
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    z-index: 2000;
 }

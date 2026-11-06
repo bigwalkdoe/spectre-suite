@@ -7,6 +7,7 @@
 // Override with ?prometheus=https://prometheus.example.com to read from a
 // Prometheus reachable from the browser rather than through this proxy.
 const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus') || '';
+const ACTIONS_BASE = new URLSearchParams(location.search).get('actionsBase') || '';
 const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
 
 let refreshIntervalMs = DEFAULT_REFRESH_INTERVAL;
@@ -107,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event listeners
     document.getElementById('refreshBtn').addEventListener('click', fetchAllMetrics);
     document.getElementById('themeToggle').addEventListener('click', toggleDarkMode);
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) exportBtn.addEventListener('click', exportSnapshot);
     document.getElementById('refreshInterval').addEventListener('change', (e) => {
         refreshIntervalMs = parseInt(e.target.value, 10) || 0;
         localStorage.setItem('spectre-refresh-interval', String(refreshIntervalMs));
@@ -141,13 +144,14 @@ function initializeTheme() {
     const savedTheme = localStorage.getItem('spectre-theme');
     const toggle = document.getElementById('themeToggle');
     const icon = toggle.querySelector('i');
+    const isDark = savedTheme === 'dark';
 
-    if (savedTheme === 'dark') {
-        html.classList.add('dark');
-        icon.classList.replace('fa-moon', 'fa-sun');
-    } else {
-        html.classList.remove('dark');
-        icon.classList.replace('fa-sun', 'fa-moon');
+    html.classList.toggle('dark', isDark);
+    if (icon) icon.classList.toggle('fa-sun', isDark);
+    if (icon) icon.classList.toggle('fa-moon', !isDark);
+    if (toggle) {
+        toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
     }
 }
 
@@ -157,13 +161,15 @@ function toggleDarkMode() {
     const toggle = document.getElementById('themeToggle');
     const icon = toggle.querySelector('i');
 
-    if (isDark) {
-        icon.classList.replace('fa-moon', 'fa-sun');
-        localStorage.setItem('spectre-theme', 'dark');
-    } else {
-        icon.classList.replace('fa-sun', 'fa-moon');
-        localStorage.setItem('spectre-theme', 'light');
+    if (icon) {
+        icon.classList.toggle('fa-sun', isDark);
+        icon.classList.toggle('fa-moon', !isDark);
     }
+    if (toggle) {
+        toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+    localStorage.setItem('spectre-theme', isDark ? 'dark' : 'light');
     applyChartTheme();
 }
 
@@ -999,30 +1005,110 @@ async function updateChart(range) {
     }
 }
 
-// Quick Actions
-function runBackup() {
-    if (confirm('This will run a system backup. Continue?')) {
-        // In production, this would call an API endpoint
-        showToast('Backup initiated. Check logs for progress.', 'info');
+// Export snapshot (frontend-only)
+async function exportSnapshot() {
+    const snapshot = {
+        exportedAt: new Date().toISOString(),
+        prometheusConnected: document.getElementById('prometheusStatus')?.textContent || null,
+        systemStatus: document.getElementById('systemStatusText')?.textContent || null,
+        metrics: {
+            cpu: document.getElementById('cpuUsage')?.textContent,
+            memory: document.getElementById('memoryUsage')?.textContent,
+            disk: document.getElementById('diskUsage')?.textContent,
+            network: document.getElementById('networkIO')?.textContent,
+            load: document.getElementById('systemLoad')?.textContent,
+            uptime: document.getElementById('uptime')?.textContent,
+            processes: document.getElementById('processes')?.textContent,
+            temperature: document.getElementById('temperature')?.textContent
+        },
+        backup: {
+            status: document.getElementById('backupStatus')?.textContent,
+            lastBackup: document.getElementById('lastBackup')?.textContent,
+            health: document.getElementById('backupHealth')?.textContent,
+            sizeFree: document.getElementById('backupSize')?.textContent,
+            resticOffsite: document.getElementById('resticOffsite')?.textContent,
+            resticVerify: document.getElementById('resticVerify')?.textContent
+        },
+        security: {
+            status: document.getElementById('securityStatus')?.textContent,
+            agent: document.getElementById('agentStatusDetail')?.textContent,
+            lastScan: document.getElementById('lastSecurityScan')?.textContent,
+            unresolved: document.getElementById('vulnerabilities')?.textContent,
+            severity: document.getElementById('severityBreakdown')?.textContent
+        },
+        alerts: {
+            count: document.getElementById('alertCount')?.textContent,
+            active: currentAlerts.map(a => ({
+                name: a.labels?.alertname,
+                severity: a.labels?.severity,
+                description: a.annotations?.description || a.annotations?.summary
+            }))
+        },
+        diagnostics: {
+            queryHealth: document.getElementById('queryHealth')?.textContent,
+            backupExporter: document.getElementById('backupExporterStatus')?.textContent,
+            securityExporter: document.getElementById('securityExporterStatus')?.textContent
+        }
+    };
+
+    const text = JSON.stringify(snapshot, null, 2);
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('Snapshot copied to clipboard (JSON)', 'success');
+    } catch (e) {
+        // Fallback: download as file
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `spectre-dashboard-snapshot-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Snapshot downloaded (clipboard unavailable)', 'info');
     }
+}
+
+// Quick Actions (frontend hook with graceful fallback; real backend required for execution)
+async function triggerAction(action, label) {
+    if (!confirm(`This will request "${label}". Continue?`)) return;
+
+    if (!ACTIONS_BASE) {
+        showToast(`${label}: no action endpoint configured. Set ?actionsBase=... or add a backend service to execute actions.`, 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${ACTIONS_BASE.replace(/\/$/, '')}/${encodeURIComponent(action)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, requestedAt: new Date().toISOString() })
+        });
+        if (response.ok) {
+            showToast(`${label} accepted by action endpoint.`, 'success');
+        } else {
+            showToast(`${label} failed (HTTP ${response.status}). Check action service.`, 'error');
+        }
+    } catch (e) {
+        console.error('Action error:', e);
+        showToast(`${label} failed: action endpoint unreachable.`, 'error');
+    }
+}
+
+function runBackup() {
+    triggerAction('backup', 'Run backup');
 }
 
 function runMaintenance() {
-    if (confirm('This will run system maintenance. Continue?')) {
-        // In production, this would call an API endpoint
-        showToast('Maintenance initiated. Check logs for progress.', 'info');
-    }
+    triggerAction('maintenance', 'Run maintenance');
 }
 
 function runSecurityScan() {
-    if (confirm('This will run a security scan. Continue?')) {
-        // In production, this would call an API endpoint
-        showToast('Security scan initiated. Check logs for progress.', 'info');
-    }
+    triggerAction('security-scan', 'Security scan');
 }
 
 function viewLogs() {
-    // Open logs in new tab or show modal
     showToast('Opening Grafana logs...', 'info');
     window.open('http://localhost:3002', '_blank');
 }
