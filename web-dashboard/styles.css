@@ -107,6 +107,15 @@ body {
     margin-top: 10px;
     color: var(--muted);
     font-size: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.last-refreshed {
+    color: var(--muted);
+    opacity: 0.8;
 }
 
 /* Buttons */
