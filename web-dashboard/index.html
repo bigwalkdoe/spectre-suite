@@ -133,12 +133,20 @@
                             <span class="backup-value" id="lastBackup">--</span>
                         </div>
                         <div class="backup-item">
-                            <span class="backup-label">Backup Size</span>
+                            <span class="backup-label">Health Check</span>
+                            <span class="backup-value" id="backupHealth">--</span>
+                        </div>
+                        <div class="backup-item">
+                            <span class="backup-label">Repo Size / Free</span>
                             <span class="backup-value" id="backupSize">--</span>
                         </div>
                         <div class="backup-item">
-                            <span class="backup-label">Retention</span>
-                            <span class="backup-value">7-30 days</span>
+                            <span class="backup-label">Restic Offsite</span>
+                            <span class="backup-value" id="resticOffsite">--</span>
+                        </div>
+                        <div class="backup-item">
+                            <span class="backup-label">Restic Verify</span>
+                            <span class="backup-value" id="resticVerify">--</span>
                         </div>
                     </div>
                 </div>
@@ -184,20 +192,20 @@
                 <div class="card-body" aria-live="polite">
                     <div class="security-info">
                         <div class="security-item">
-                            <span class="security-label">Firewall</span>
-                            <span class="security-value" id="firewallStatus">No data</span>
-                        </div>
-                        <div class="security-item">
-                            <span class="security-label">Fail2Ban</span>
-                            <span class="security-value" id="fail2banStatus">No data</span>
+                            <span class="security-label">Agent Status</span>
+                            <span class="security-value" id="agentStatusDetail">--</span>
                         </div>
                         <div class="security-item">
                             <span class="security-label">Last Security Scan</span>
                             <span class="security-value" id="lastSecurityScan">--</span>
                         </div>
                         <div class="security-item">
-                            <span class="security-label">Vulnerabilities</span>
+                            <span class="security-label">Unresolved Findings</span>
                             <span class="security-value" id="vulnerabilities">0</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Severity Breakdown</span>
+                            <span class="security-value" id="severityBreakdown">--</span>
                         </div>
                     </div>
                 </div>
