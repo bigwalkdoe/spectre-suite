@@ -96,6 +96,17 @@ Edit `web-dashboard/dashboard.js`:
 const REFRESH_INTERVAL = 30000; // milliseconds
 ```
 
+### Quick Actions & Action Endpoints
+Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actions/<action>` via the nginx proxy to the `dashboard-actions` service.
+
+- The action service is **allowlisted** and **token-protected**. It queues trigger files; a host handler runs the scripts.
+- Set `DASHBOARD_ACTION_TOKEN` in `.env`.
+- Install the host handler: `./scripts/systemd/install-dashboard-actions-handler.sh` (or copy units from `systemd/dashboard-actions/` and adjust paths).
+- Trigger actions with the dashboard; when prompted, enter the token (stored in `sessionStorage` for the browser session).
+
+To disable actions in the UI: open the dashboard with `?actionsBase=off`.
+
+
 ## Customization
 
 ### Adding Custom Metrics

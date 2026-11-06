@@ -102,3 +102,11 @@ reports/
 # Alertmanager secret files (written by scripts/setup-notification-channels.sh)
 /prometheus/alertmanager-secrets/*
 !/prometheus/alertmanager-secrets/README.md
+
+# dashboard action trigger queue (runtime files)
+dashboard-actions/triggers/*.json
+dashboard-actions/triggers/processed/*
+dashboard-actions/triggers/failed/*
+!dashboard-actions/triggers/.gitkeep
+!dashboard-actions/triggers/processed/.gitkeep
+!dashboard-actions/triggers/failed/.gitkeep
