@@ -82,9 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chart range buttons
     document.querySelectorAll('.chart-controls .btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
+            const target = e.currentTarget;
             document.querySelectorAll('.chart-controls .btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            updateChart(e.target.dataset.range);
+            target.classList.add('active');
+            updateChart(target.dataset.range);
         });
     });
 });
@@ -206,7 +207,7 @@ async function fetchAllMetrics() {
 
     try {
         const [
-            cpu, mem, disk, netIn, netOut, load1, bootTime, processes, temp,
+            cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal,
             backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes,
             spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
             findingsCritical, findingsHigh
@@ -218,8 +219,9 @@ async function fetchAllMetrics() {
             queryPrometheus('rate(node_network_transmit_bytes_total[5m])'),
             queryPrometheus('node_load1'),
             queryPrometheus('node_boot_time_seconds'),
-            queryPrometheus('node_processes_total'),
+            queryPrometheus('node_procs_running'),
             queryPrometheus('avg(node_hwmon_temp_celsius)'),
+            queryPrometheus('avg(node_thermal_zone_temp)'),
             queryPrometheus('backup_last_success_timestamp'),
             queryPrometheus('backup_health_check_ok'),
             queryPrometheus('backup_health_check_timestamp'),
@@ -231,6 +233,7 @@ async function fetchAllMetrics() {
             queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
             queryPrometheus('security_findings_unresolved_by_severity{severity="high"}')
         ]);
+        const temp = tempHwmon ?? tempThermal;
 
         // Treat all-null from core Prometheus as unreachable
         const coreAllNull = [cpu, mem, disk, netIn, netOut, load1, bootTime].every(v => v === null);
