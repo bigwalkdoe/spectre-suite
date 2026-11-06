@@ -500,7 +500,7 @@ scripts/backups/restic-maintenance.sh snapshots
 scripts/backups/restic-maintenance.sh forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune --dry-run
 ```
 
-Optional scheduling (user systemd timer, requires configured `RESTIC_CONFIG`): `scripts/systemd/install-restic-timer.sh --print|--uninstall`.
+Optional scheduling (user systemd timers, require configured `RESTIC_CONFIG`): `scripts/systemd/install-restic-timer.sh` (daily backup) and `scripts/systemd/install-restic-maintenance-timer.sh` (weekly `restic-forget-prune.sh`; verify `RESTIC_FORGET_ARGS` and dry-run first).
 
 See `scripts/backups/restic.env.example` (no secrets). **Never commit
 `RESTIC_PASSWORD*`, keys, or backend credentials.** `BACKUP_REPO_DIR` /
