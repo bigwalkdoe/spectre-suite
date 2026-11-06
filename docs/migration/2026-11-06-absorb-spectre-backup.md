@@ -3,7 +3,7 @@
 **Date:** 2026-11-06  
 **Spec:** `docs/superpowers/specs/2026-11-06-absorb-spectre-backup-design.md`  
 **Plan:** `docs/superpowers/plans/2026-11-06-absorb-spectre-backup.md`  
-**Status:** Code landed (Tasks 1–8). **Task 9 cutover/rehearsal is operator-only and must not be run without explicit human confirmation on this host.** Do not archive the spectre-backup repo, delete old configs/units/scripts, or delete `~/archive/backups` until §8.1 + seven consecutive green days are satisfied and no machine needs the server role.
+**Status:** Tasks 1–8 landed. **Task 9 STOPPED at Step 4 (2026-11-06, host `fedora`, explicit approval given)** — Review Focus 1 failure: first adopted snapshot contained repo/key material because `~` was not expanded in exclude patterns. Protective remediation taken (offsite run terminated before propagation; `45e5f7c4` not on offsite; `45e5f7c4` forgotten locally; repo lock cleaned). Exclude patterns fixed to absolute paths in deployed config and canonical template. **Do not proceed** until exclude fix is validated by a new rehearsal proving `restic ls` key-absence. `spectre-backup.timer` is **disabled** (Step 3); `spectre-backup-catchup.timer` and `home-backup.timer` remain active; **new timers not installed**. Re-enable `spectre-backup.timer` for rollback if desired before re-attempting. Do not archive spectre-backup repo, delete old configs/units/scripts, or delete `~/archive/backups`.
 
 ## Goal
 
@@ -115,33 +115,41 @@ df -h / /backups /home
 - Keep old password copy and old config files; repo and snapshots are unchanged (additive new snapshots only).
 - Because forget is tag-scoped to `spectre-suite`, grandfathered snapshots remain intact regardless of new-engine actions.
 
-## Evidence (append during Task 9; do not fabricate)
+## Evidence (Task 9, 2026-11-06 — STOPPED at Step 4)
 
-### Baseline
-- Date/host:
-- Local snapshots:
-- Offsite snapshots:
-- Timers:
-- Free space:
+### Baseline (Step 1)
+- Date/host: `2026-11-06T07:30:59+05:00`, `fedora`
+- Local snapshots (`/backups/spectre-backup`): 1 — `fad2bfa8` 2026-11-06 04:01:55 `spectre-backup,workstation` 14.560 GiB
+- Offsite snapshots (`rclone:spectre-backup:`): 30 — latest `16cd965d` 2026-11-06 04:06:36 `spectre-backup,workstation`
+- Timers (active): `home-backup.timer` (02:00, next 2026-11-07), `spectre-backup.timer` (04:25), `spectre-backup-catchup.timer` (05:00, **enabled**)
+- Free space: `/` `/home` `/backups` 236G size, 158G used, 65G avail (71%)
+- Config/password (pre-cutover): `~/.config/spectre-backup/.env` sha256 `20c95f9c…`, `password` sha256 `ad371f4d…`
 
-### Cutover run
-- First adopted snapshot id/tags:
-- `restic ls` key-absence check:
-- Markers (`last-success` / `last-offsite-success` / `last-verify`):
-- Verify output:
+### Step 2 (canonical config + password copy, no switch)
+- Created `~/.config/spectre-suite/backups/` (deployed `include/exclude/include-remote/include-artifacts.conf` from `config/backups/restic/`) and `~/.local/state/spectre-suite/backups/`.
+- Wrote `~/.secrets/spectre-suite-backups.env` (0600, preserved repo/rclone/PG/container/notify; `RESTIC_PASSWORD_FILE=$HOME/.secrets/spectre-restic-password`, `LOG_DIR=$HOME/.local/state/spectre-suite/backups`, `RESTIC_TAG=spectre-suite`).
+- `install -m 600 ~/.config/spectre-backup/password ~/.secrets/spectre-restic-password` (sha256 matches old; old kept). Proven: `restic -r /backups/spectre-backup snapshots --compact` succeeded with new password file.
 
-### Restore rehearsal (`/tmp/spectre-restore-rehearsal/<ts>/`)
-| Source | Restored path | Comparison (sha/diff/cmp) | Result |
-|---|---|---|---|
-| `~/dev` file | | | |
-| `~/docs` file | | | |
-| `~/.secrets` non-key file | | | |
-| one artifact | | | |
-| one host dump | | | |
+### Step 3
+- `systemctl --user disable --now spectre-backup.timer` → removed `timers.target.wants/spectre-backup.timer` (units preserved). `spectre-backup-catchup.timer` remained **enabled**. `home-backup.timer` still active.
 
-### Timers/metrics after enable
-- `systemctl --user list-timers` excerpt:
-- `restic_*` metric sample:
+### Step 4 (first adopted backup) — **FAILED Review Focus 1 / STOP**
+- A timed-out first attempt (tool timeout killed wrapper) left partial state: `last-attempt=1793932376`, `backup.log` showed `restic` interrupted by `SIGTERM` (`context canceled`) and many `permission denied` errors on 61 historical `root:root 0600` files in `/backups/configurations/sshd_config_*` (no `sudo -n`; total unreadable under `/backups` = 61). No new snapshot.
+- Mitigation for readability (temporary, restored): appended the 61 exact unreadable paths to deployed `exclude.conf` (backup `exclude.conf.bak-cutover`) and reran.
+- Rerun (07:36 PKT) created local snapshot **`45e5f7c4`** `2026-11-06T07:36:47.47244738+05:00` host `fedora` tags `["spectre-suite","workstation"]` (22.812 GiB). `last-success=1793932807 45e5f7c4`. Offsite leg then retried against `rclone:spectre-backup:` with Google Drive rate-limit/transient 500 responses (degraded by design) and was still running when verification began.
+- **`restic ls 45e5f7c4` key-absence check: FAIL (Review Focus 1).** Snapshot contained `/home/deon/.config/spectre-backup/password`, `/home/deon/.secrets/restic-repo-password`, `/home/deon/.secrets/spectre-restic-password`. Scope targets (`/home/deon/dev`, `/home/deon/docs`, `/home/deon/.secrets`, `/home/deon/archive/old-projects`, dumps, `/backups/{databases,configurations,docker-volumes,projects}`) were present in the snapshot root list.
+- **Root cause:** canonical/deployed `exclude.conf` used `~` (e.g. `~/.config/spectre-backup`, `~/.secrets/spectre-restic-password`, `~/.secrets/restic-repo-password`); restic does **not** expand `~` in `--exclude-file`, so absolute paths were not excluded.
+- **Protective/remediation actions:** restored `exclude.conf` (removed temp unreadable-path entries); **terminated** orphaned offsite restic/rclone (`3828594`/`3828614`, backing up to `rclone:spectre-backup:`) to prevent propagation — confirmed `45e5f7c4` **not present** offsite (`restic snapshots 45e5f7c4` on `rclone:spectre-backup:` → “no matching ID”). Removed stale lock (`258b711a`, `restic unlock`) and **forgot `45e5f7c4` locally** (`restic forget 45e5f7c4`); repo now contains only `fad2bfa8`.
+- **Fix applied (must validate before re-attempt):** replaced `~` with absolute `/home/deon/...` paths and added `/home/deon/.secrets/spectre-suite-backups.env` in both `config/backups/restic/exclude.conf` (repo) and `~/.config/spectre-suite/backups/exclude.conf` (deployed).
+- `last-offsite-success` / `last-health`: not finalized (run terminated during degraded offsite phase). `last-attempt`/`last-success` reflect the aborted/compromised run and were **superseded by forgetting 45e5f7c4**; treat markers as invalid for cutover until a clean successful run.
+
+### Restore rehearsal (Step 5)
+- **Not executed** (STOP at Step 4).
+
+### Timers/metrics after enable (Step 7)
+- **Not executed.** Current state: `spectre-backup.timer` **disabled** (Step 3); `spectre-backup-catchup.timer` **enabled**; `home-backup.timer` **active**; adopted `spectre-restic-*` timers **not installed**. Rollback option: `systemctl --user enable --now spectre-backup.timer`.
 
 ### Notes / deviations
-- 
+- 61 historical `root:root 0600` artifacts remain under `/backups/configurations/sshd_config_*` (pre-Task 1); unreadable without sudo. New copies are fixed by Task 1, but old unreadables can cause restic read errors — requires `sudo chmod 0644` (or equivalent) or a deliberate policy, tracked separately.
+- A restic child continued offsite after the wrapper was killed; it was terminated to protect against propagating a bad snapshot. The bad snapshot was local-only and has been forgotten.
+- **Next action (needs explicit confirmation):** re-validate excludes (e.g., `restic backup --dry-run`/a scoped test or a new Step 4) and confirm `restic ls <new-id>` shows **no** `spectre-restic-password`/`restic-repo-password`/`.config/spectre-backup/password`/env secrets before resuming Steps 4–8. Also consider re-enabling `spectre-backup.timer` in the interim. 
