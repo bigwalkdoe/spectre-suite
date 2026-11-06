@@ -1,8 +1,7 @@
 #!/bin/bash
-# Consolidation (§2.2): canonical (documented) implementation lives in
-# scripts/network/harden-network-security.sh. This path is kept as a delegator to
-# collapse the duplicate. (The previous aggressive variant reset firewalls/SSH and
-# was unreferenced by docs/schedulers; prefer the documented hardening entrypoint.)
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/../network/harden-network-security.sh" "$@"
+# Phase 1 forwarder (§8.4, host-unchanged): set repo root, delegate to spectre/actions impl.
+_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPECTRE_REPO_ROOT="$(cd "$_SELF_DIR" && while [ ! -d spectre/actions ] && [ "$PWD" != "/" ]; do cd ..; done; pwd)"
+export SPECTRE_REPO_ROOT
+_TARGET="$SPECTRE_REPO_ROOT/spectre/actions/maintenance/network-security-hardening.sh"
+if [ "${BASH_SOURCE[0]-$0}" = "${0-}" ]; then exec "$_TARGET" "$@"; else . "$_TARGET"; fi
