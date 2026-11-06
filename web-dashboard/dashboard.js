@@ -211,6 +211,20 @@ async function queryPrometheus(query) {
     }
 }
 
+async function queryPrometheusFirst(query) {
+    try {
+        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.status !== 'success' || !Array.isArray(data.data?.result) || data.data.result.length === 0) {
+            return null;
+        }
+        return data.data.result[0];
+    } catch (error) {
+        return null;
+    }
+}
+
 // Fetch all metrics
 async function fetchAllMetrics() {
     if (isRefreshing) return;
@@ -222,9 +236,11 @@ async function fetchAllMetrics() {
     try {
         const [
             cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal,
-            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes,
+            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
+            resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
             spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
-            findingsCritical, findingsHigh
+            findingsCritical, findingsHigh, findingsMedium, findingsLow,
+            agentReasonResult
         ] = await Promise.all([
             queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
             queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
@@ -240,12 +256,20 @@ async function fetchAllMetrics() {
             queryPrometheus('backup_health_check_ok'),
             queryPrometheus('backup_health_check_timestamp'),
             queryPrometheus('backup_repo_size_bytes'),
+            queryPrometheus('backup_repo_fs_free_bytes'),
+            queryPrometheus('restic_last_success_timestamp'),
+            queryPrometheus('restic_last_offsite_success_timestamp'),
+            queryPrometheus('restic_verify_ok'),
+            queryPrometheus('restic_verify_timestamp'),
             queryPrometheus('spectre_agent_up'),
             queryPrometheus('spectre_security_ever_scanned'),
             queryPrometheus('security_last_scan_timestamp'),
             queryPrometheus('security_findings_unresolved'),
             queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="high"}')
+            queryPrometheus('security_findings_unresolved_by_severity{severity="high"}'),
+            queryPrometheus('security_findings_unresolved_by_severity{severity="medium"}'),
+            queryPrometheus('security_findings_unresolved_by_severity{severity="low"}'),
+            queryPrometheusFirst('spectre_agent_up_reason')
         ]);
         const temp = tempHwmon ?? tempThermal;
 
@@ -267,8 +291,9 @@ async function fetchAllMetrics() {
             if (netIn === null && netOut === null) setCardError('networkCard', 'Network data unavailable');
         }
 
-        updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes);
-        updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh);
+        const agentReason = agentReasonResult?.metric?.reason || null;
+        updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs);
+        updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason);
         updateContainerStatus();
         checkAlerts();
         const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
@@ -416,73 +441,111 @@ function formatUptime(seconds) {
 }
 
 // Update Backup Status
-function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes) {
+function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes, repoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs) {
     const statusEl = document.getElementById('backupStatus');
     const lastEl = document.getElementById('lastBackup');
+    const healthEl = document.getElementById('backupHealth');
     const sizeEl = document.getElementById('backupSize');
+    const offsiteEl = document.getElementById('resticOffsite');
+    const verifyEl = document.getElementById('resticVerify');
 
-    const hasData = lastSuccess !== null || healthOk !== null || repoBytes !== null;
+    const effectiveLast = (lastSuccess && lastSuccess > 0) ? lastSuccess : (resticLastSuccess && resticLastSuccess > 0 ? resticLastSuccess : null);
+    const hasData = effectiveLast !== null || healthOk !== null || repoBytes !== null || resticVerifyOk !== null || resticOffsite !== null;
+
     if (!hasData) {
         if (statusEl) { statusEl.textContent = 'No data'; statusEl.className = 'badge'; }
-        if (lastEl) lastEl.textContent = 'No data';
-        if (sizeEl) sizeEl.textContent = 'No data';
+        [lastEl, healthEl, sizeEl, offsiteEl, verifyEl].forEach(el => { if (el) el.textContent = 'No data'; });
         setCardError('backupCard', 'Backup metrics unavailable (exporter may not be running)');
         return;
     }
 
     if (lastEl) {
-        lastEl.textContent = lastSuccess ? formatRelativeTime(lastSuccess) : 'Never';
-        if (lastSuccess) lastEl.title = new Date(lastSuccess * 1000).toLocaleString();
+        lastEl.textContent = effectiveLast ? formatRelativeTime(effectiveLast) : 'Never';
+        if (effectiveLast) lastEl.title = new Date(effectiveLast * 1000).toLocaleString();
     }
-    if (sizeEl) sizeEl.textContent = formatBytes(repoBytes);
+
+    if (healthEl) {
+        if (healthOk === 1) {
+            healthEl.textContent = `OK${healthTs ? ` (${formatRelativeTime(healthTs)})` : ''}`;
+        } else if (healthOk === 0) {
+            healthEl.textContent = `Failed${healthTs ? ` (${formatRelativeTime(healthTs)})` : ''}`;
+        } else {
+            healthEl.textContent = 'No data';
+        }
+        if (healthTs) healthEl.title = new Date(healthTs * 1000).toLocaleString();
+    }
+
+    if (sizeEl) {
+        const sizeText = formatBytes(repoBytes);
+        const freeText = repoFree !== null ? formatBytes(repoFree) : null;
+        sizeEl.textContent = freeText ? `${sizeText} / ${freeText} free` : sizeText;
+    }
+
+    if (offsiteEl) {
+        offsiteEl.textContent = (resticOffsite && resticOffsite > 0) ? formatRelativeTime(resticOffsite) : 'No data';
+        if (resticOffsite && resticOffsite > 0) offsiteEl.title = new Date(resticOffsite * 1000).toLocaleString();
+    }
+
+    if (verifyEl) {
+        if (resticVerifyOk === 1) {
+            verifyEl.textContent = `Passed${resticVerifyTs ? ` (${formatRelativeTime(resticVerifyTs)})` : ''}`;
+        } else if (resticVerifyOk === 0 && resticVerifyTs) {
+            verifyEl.textContent = `Failed (${formatRelativeTime(resticVerifyTs)})`;
+        } else if (resticVerifyTs) {
+            verifyEl.textContent = formatRelativeTime(resticVerifyTs);
+        } else {
+            verifyEl.textContent = 'No data';
+        }
+        if (resticVerifyTs) verifyEl.title = new Date(resticVerifyTs * 1000).toLocaleString();
+    }
 
     if (statusEl) {
         const isHealthy = healthOk === 1;
-        const isStale = lastSuccess && (Date.now() / 1000 - lastSuccess) > 86400 * 2;
-        if (isHealthy && !isStale) {
+        const isStale = effectiveLast && (Date.now() / 1000 - effectiveLast) > 86400 * 2;
+        const verifyBad = resticVerifyOk === 0;
+        if (isHealthy && !isStale && !verifyBad) {
             statusEl.textContent = 'OK';
             statusEl.className = 'badge badge-success';
-        } else if (healthOk === 0 || isStale) {
+        } else if (healthOk === 0 || isStale || verifyBad) {
             statusEl.textContent = 'Attention';
             statusEl.className = 'badge badge-warning';
         } else {
             statusEl.textContent = 'Unknown';
             statusEl.className = 'badge';
         }
-        if (healthTs) statusEl.title = `Last health check: ${new Date(healthTs * 1000).toLocaleString()}`;
     }
     clearCardError('backupCard');
     setCardUpdated('backupCard');
 }
 
 // Update Security Status
-function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, critical, high) {
+function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, critical, high, medium, low, agentReason) {
     const statusEl = document.getElementById('securityStatus');
-    const firewallEl = document.getElementById('firewallStatus');
-    const fail2banEl = document.getElementById('fail2banStatus');
+    const agentEl = document.getElementById('agentStatusDetail');
     const scanEl = document.getElementById('lastSecurityScan');
     const vulnEl = document.getElementById('vulnerabilities');
-
-    // Firewall/Fail2Ban aren't exposed as Prometheus metrics in this suite
-    if (firewallEl) firewallEl.textContent = 'No data';
-    if (fail2banEl) fail2banEl.textContent = 'No data';
+    const severityEl = document.getElementById('severityBreakdown');
 
     const hasSecurityMetrics = spectreUp !== null;
     if (!hasSecurityMetrics) {
         if (statusEl) { statusEl.textContent = 'No data'; statusEl.className = 'badge'; }
-        if (scanEl) scanEl.textContent = 'No data';
-        if (vulnEl) vulnEl.textContent = 'No data';
+        [agentEl, scanEl, vulnEl, severityEl].forEach(el => { if (el) el.textContent = 'No data'; });
         setCardError('securityCard', 'Security metrics unavailable');
         return;
     }
 
     if (spectreUp === 0) {
+        const reasonText = agentReason ? agentReason.replace(/_/g, ' ') : 'unavailable';
         if (statusEl) { statusEl.textContent = 'Agent Down'; statusEl.className = 'badge badge-danger'; }
+        if (agentEl) agentEl.textContent = `Down (${reasonText})`;
         if (scanEl) scanEl.textContent = 'Agent unavailable';
         if (vulnEl) vulnEl.textContent = 'Unknown';
-        setCardError('securityCard', 'Spectre security agent is down');
+        if (severityEl) severityEl.textContent = 'Unknown';
+        setCardError('securityCard', `Spectre security agent is down: ${reasonText}`);
         return;
     }
+
+    if (agentEl) agentEl.textContent = 'Up';
 
     if (scanEl) {
         if (everScanned === 1 && lastScan) {
@@ -496,14 +559,21 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
     }
 
     const totalFindings = unresolved !== null ? Math.floor(unresolved) : null;
-    const criticalCount = critical !== null ? Math.floor(critical) : 0;
-    const highCount = high !== null ? Math.floor(high) : 0;
+    const c = critical !== null ? Math.floor(critical) : 0;
+    const h = high !== null ? Math.floor(high) : 0;
+    const m = medium !== null ? Math.floor(medium) : 0;
+    const l = low !== null ? Math.floor(low) : 0;
 
     if (vulnEl) {
+        vulnEl.textContent = totalFindings !== null ? String(totalFindings) : 'No data';
+    }
+
+    if (severityEl) {
         if (totalFindings !== null) {
-            vulnEl.textContent = totalFindings + (criticalCount + highCount > 0 ? ` (${criticalCount} critical, ${highCount} high)` : '');
+            severityEl.textContent = `C:${c} H:${h} M:${m} L:${l}`;
+            severityEl.title = `Critical: ${c}, High: ${h}, Medium: ${m}, Low: ${l}`;
         } else {
-            vulnEl.textContent = 'No data';
+            severityEl.textContent = 'No data';
         }
     }
 
@@ -511,10 +581,10 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
         if (totalFindings === null) {
             statusEl.textContent = 'Unknown';
             statusEl.className = 'badge';
-        } else if (criticalCount > 0 || totalFindings > 10) {
+        } else if (c > 0 || totalFindings > 10) {
             statusEl.textContent = 'At Risk';
             statusEl.className = 'badge badge-danger';
-        } else if (highCount > 0 || totalFindings > 0) {
+        } else if (h > 0 || totalFindings > 0) {
             statusEl.textContent = 'Review';
             statusEl.className = 'badge badge-warning';
         } else {
