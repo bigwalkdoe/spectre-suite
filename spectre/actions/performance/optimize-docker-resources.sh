@@ -1,0 +1,1 @@
+../../../scripts/performance/optimize-docker-resources.sh

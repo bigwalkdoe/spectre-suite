@@ -1,0 +1,1 @@
+../../../scripts/maintenance/check-system-performance.sh

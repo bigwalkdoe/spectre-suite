@@ -1,0 +1,1 @@
+../../../scripts/project-specific/backup-all-projects.sh

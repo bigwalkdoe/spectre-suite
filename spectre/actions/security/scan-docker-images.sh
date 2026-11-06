@@ -1,0 +1,1 @@
+../../../scripts/security/scan-docker-images.sh

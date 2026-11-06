@@ -1,0 +1,1 @@
+../../../scripts/maintenance/run-maintenance.sh

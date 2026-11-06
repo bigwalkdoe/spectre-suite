@@ -1,0 +1,1 @@
+../../../scripts/maintenance/cleanup-unused-resources.sh

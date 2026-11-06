@@ -1,0 +1,1 @@
+../../../scripts/backups/backup-all.sh

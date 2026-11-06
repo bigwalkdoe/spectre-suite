@@ -1,0 +1,1 @@
+../../../scripts/maintenance/fedora-optimize.sh

@@ -1,0 +1,1 @@
+../../../scripts/performance/optimize-system-performance.sh

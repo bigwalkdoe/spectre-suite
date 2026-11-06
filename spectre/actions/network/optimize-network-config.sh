@@ -1,0 +1,1 @@
+../../../scripts/network/optimize-network-config.sh

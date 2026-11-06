@@ -1,0 +1,1 @@
+../../../scripts/performance/check-performance.sh

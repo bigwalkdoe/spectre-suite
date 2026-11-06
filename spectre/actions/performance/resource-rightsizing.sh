@@ -1,0 +1,1 @@
+../../../scripts/performance/resource-rightsizing.sh

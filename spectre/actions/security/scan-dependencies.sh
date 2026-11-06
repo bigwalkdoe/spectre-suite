@@ -1,0 +1,1 @@
+../../../scripts/security/scan-dependencies.sh

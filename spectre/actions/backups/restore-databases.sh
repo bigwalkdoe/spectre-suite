@@ -1,0 +1,1 @@
+../../../scripts/backups/restore-databases.sh

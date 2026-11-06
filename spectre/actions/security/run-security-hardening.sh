@@ -1,0 +1,1 @@
+../../../scripts/security/run-security-hardening.sh

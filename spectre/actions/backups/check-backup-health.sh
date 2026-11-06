@@ -1,0 +1,1 @@
+../../../scripts/backups/check-backup-health.sh

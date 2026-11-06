@@ -1,0 +1,1 @@
+../../../scripts/backups/backup-projects.sh

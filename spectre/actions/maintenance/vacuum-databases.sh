@@ -1,0 +1,1 @@
+../../../scripts/maintenance/vacuum-databases.sh

@@ -1,0 +1,1 @@
+../../../scripts/systemd/install-dashboard-actions-handler.sh

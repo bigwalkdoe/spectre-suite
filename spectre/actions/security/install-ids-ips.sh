@@ -1,0 +1,1 @@
+../../../scripts/security/install-ids-ips.sh

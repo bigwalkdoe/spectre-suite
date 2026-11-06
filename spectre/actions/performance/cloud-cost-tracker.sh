@@ -1,0 +1,1 @@
+../../../scripts/performance/cloud-cost-tracker.sh

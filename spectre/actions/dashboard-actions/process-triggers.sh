@@ -1,0 +1,1 @@
+../../../scripts/dashboard-actions/process-triggers.sh

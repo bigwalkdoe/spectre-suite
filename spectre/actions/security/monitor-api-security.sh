@@ -1,0 +1,1 @@
+../../../scripts/security/monitor-api-security.sh

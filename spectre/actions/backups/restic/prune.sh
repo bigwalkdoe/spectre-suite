@@ -1,0 +1,1 @@
+../../../../scripts/backups/restic/prune.sh

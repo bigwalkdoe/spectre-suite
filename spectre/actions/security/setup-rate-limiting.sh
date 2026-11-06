@@ -1,0 +1,1 @@
+../../../scripts/security/setup-rate-limiting.sh

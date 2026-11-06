@@ -1,0 +1,1 @@
+../../../scripts/security/security-integration.sh

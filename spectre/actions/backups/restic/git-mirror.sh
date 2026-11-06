@@ -1,0 +1,1 @@
+../../../../scripts/backups/restic/git-mirror.sh

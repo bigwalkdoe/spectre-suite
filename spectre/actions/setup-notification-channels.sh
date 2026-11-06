@@ -1,0 +1,1 @@
+../../scripts/setup-notification-channels.sh

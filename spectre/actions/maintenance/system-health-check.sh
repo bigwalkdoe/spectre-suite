@@ -1,0 +1,1 @@
+../../../scripts/maintenance/system-health-check.sh
