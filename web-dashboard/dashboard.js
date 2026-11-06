@@ -7,7 +7,10 @@
 // Override with ?prometheus=https://prometheus.example.com to read from a
 // Prometheus reachable from the browser rather than through this proxy.
 const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus') || '';
-const ACTIONS_BASE = new URLSearchParams(location.search).get('actionsBase') || '';
+// Defaults to same-origin nginx proxy (/actions -> dashboard-actions service).
+// Override with ?actionsBase=https://... or set to "off" to disable.
+const ACTIONS_BASE_PARAM = new URLSearchParams(location.search).get('actionsBase');
+const ACTIONS_BASE = ACTIONS_BASE_PARAM === 'off' ? '' : (ACTIONS_BASE_PARAM || '/actions');
 const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
 
 let refreshIntervalMs = DEFAULT_REFRESH_INTERVAL;
@@ -1071,28 +1074,62 @@ async function exportSnapshot() {
 }
 
 // Quick Actions (frontend hook with graceful fallback; real backend required for execution)
-async function triggerAction(action, label) {
+function getActionToken() {
+    return sessionStorage.getItem('spectre-action-token') || '';
+}
+
+function setActionToken(token) {
+    if (token) sessionStorage.setItem('spectre-action-token', token);
+    else sessionStorage.removeItem('spectre-action-token');
+}
+
+async function triggerAction(action, label, retry = true) {
     if (!confirm(`This will request "${label}". Continue?`)) return;
 
     if (!ACTIONS_BASE) {
-        showToast(`${label}: no action endpoint configured. Set ?actionsBase=... or add a backend service to execute actions.`, 'error');
+        showToast(`${label}: actions disabled (actionsBase=off).`, 'error');
         return;
     }
+
+    const token = getActionToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['X-Dashboard-Action-Token'] = token;
 
     try {
         const response = await fetch(`${ACTIONS_BASE.replace(/\/$/, '')}/${encodeURIComponent(action)}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ action, requestedAt: new Date().toISOString() })
         });
+
+        let payload = null;
+        try { payload = await response.json(); } catch (_) {}
+
+        if (response.status === 401 && retry) {
+            const entered = prompt('Action token required. Enter DASHBOARD_ACTION_TOKEN (stored for this browser session):');
+            if (entered) {
+                setActionToken(entered.trim());
+                return triggerAction(action, label, false);
+            }
+            showToast(`${label}: action token required.`, 'error');
+            return;
+        }
+
+        if (response.status === 503 && payload?.error === 'not_configured') {
+            showToast(`${label}: action service not configured (set DASHBOARD_ACTION_TOKEN).`, 'error');
+            return;
+        }
+
         if (response.ok) {
-            showToast(`${label} accepted by action endpoint.`, 'success');
+            const msg = payload?.message || `${label} accepted.`;
+            showToast(msg, 'success');
         } else {
-            showToast(`${label} failed (HTTP ${response.status}). Check action service.`, 'error');
+            const detail = payload?.message || payload?.error || `HTTP ${response.status}`;
+            showToast(`${label} failed: ${detail}`, 'error');
         }
     } catch (e) {
         console.error('Action error:', e);
-        showToast(`${label} failed: action endpoint unreachable.`, 'error');
+        showToast(`${label} failed: action endpoint unreachable. Is dashboard-actions running and proxied?`, 'error');
     }
 }
 

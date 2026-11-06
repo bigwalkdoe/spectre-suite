@@ -306,10 +306,37 @@ services:
     restart: unless-stopped
     networks:
       - monitoring
+    depends_on:
+      - dashboard-actions
     deploy:
       resources:
         limits:
           memory: 128m
+
+  # Dashboard Actions - allowlisted trigger queue (no script execution in container)
+  # Queues trigger files for a host handler (scripts/dashboard-actions/process-triggers.sh).
+  # Requires DASHBOARD_ACTION_TOKEN. Bind-mounted triggers dir is consumed by the host.
+  dashboard-actions:
+    build:
+      context: ./web-dashboard/actions-backend
+    container_name: dashboard-actions
+    environment:
+      - DASHBOARD_ACTION_TOKEN=${DASHBOARD_ACTION_TOKEN:?set DASHBOARD_ACTION_TOKEN}
+      - PORT=8090
+      - TRIGGERS_DIR=/triggers
+      - REPO_ROOT=/repo
+    volumes:
+      - ./dashboard-actions/triggers:/triggers:z
+      - ./:/repo:ro,z
+    expose:
+      - "8090"
+    restart: unless-stopped
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 64m
 
 networks:
   monitoring:

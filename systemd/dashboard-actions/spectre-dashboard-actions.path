@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for Spectre dashboard action triggers
+
+[Path]
+PathChanged=%h/dev/github/spectre-suite/dashboard-actions/triggers
+Unit=spectre-dashboard-actions.service
+
+[Install]
+WantedBy=default.target
