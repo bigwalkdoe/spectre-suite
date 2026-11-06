@@ -1,0 +1,9 @@
+[Unit]
+Description=Process Spectre dashboard action triggers
+
+[Service]
+Type=oneshot
+ExecStart=%h/dev/github/spectre-suite/scripts/dashboard-actions/process-triggers.sh
+WorkingDirectory=%h/dev/github/spectre-suite
+# Runs as the user; scripts may require sudo depending on what they do.
+# Adjust paths if the repo is checked out elsewhere.
