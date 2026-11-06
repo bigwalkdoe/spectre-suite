@@ -11,6 +11,61 @@ const REFRESH_INTERVAL = 30000; // 30 seconds
 
 let chart = null;
 let chartRequestToken = 0; // Monotonic token to discard stale updateChart responses
+let isRefreshing = false;
+let lastPrometheusConnected = null;
+
+// UI helpers: loading states, error states, and toasts
+function setCardLoading(cardId, isLoading) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.classList.toggle('card--loading', isLoading);
+}
+
+function setCardError(cardId, message) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.classList.remove('card--loading');
+    card.classList.add('card--error');
+    let errorEl = card.querySelector('.error-message');
+    if (!errorEl) {
+        errorEl = document.createElement('div');
+        errorEl.className = 'error-message';
+        const body = card.querySelector('.card-body') || card;
+        body.appendChild(errorEl);
+    }
+    errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+}
+
+function clearCardError(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.classList.remove('card--error', 'card--loading');
+    const errorEl = card.querySelector('.error-message');
+    if (errorEl) errorEl.remove();
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+    toast.innerHTML = `<i class="fas ${iconClass}"></i><span class="toast-message">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(120%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+function setRefreshing(refreshing) {
+    isRefreshing = refreshing;
+    const btn = document.getElementById('refreshBtn');
+    if (!btn) return;
+    btn.disabled = refreshing;
+    btn.classList.toggle('btn--loading', refreshing);
+}
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
@@ -96,25 +151,53 @@ async function queryPrometheus(query) {
 
 // Fetch all metrics
 async function fetchAllMetrics() {
-    const metrics = await Promise.all([
-        queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
-        queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
-        queryPrometheus('100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'),
-        queryPrometheus('rate(node_network_receive_bytes_total[5m])'),
-        queryPrometheus('rate(node_network_transmit_bytes_total[5m])'),
-        queryPrometheus('node_load1'),
-        queryPrometheus('node_boot_time_seconds'),
-        queryPrometheus('node_processes_total'),
-        queryPrometheus('avg(node_hwmon_temp_celsius)')
-    ]);
+    if (isRefreshing) return;
+    setRefreshing(true);
 
-    updateCPUMetrics(metrics[0]);
-    updateMemoryMetrics(metrics[1]);
-    updateDiskMetrics(metrics[2]);
-    updateNetworkMetrics(metrics[3], metrics[4]);
-    updateSystemHealth(metrics[5], metrics[6], metrics[7], metrics[8]);
-    updateContainerStatus();
-    checkAlerts();
+    const cardIds = ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'alertsCard', 'containersCard', 'chartCard'];
+    cardIds.forEach(id => { clearCardError(id); setCardLoading(id, true); });
+
+    try {
+        const metrics = await Promise.all([
+            queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
+            queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
+            queryPrometheus('100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'),
+            queryPrometheus('rate(node_network_receive_bytes_total[5m])'),
+            queryPrometheus('rate(node_network_transmit_bytes_total[5m])'),
+            queryPrometheus('node_load1'),
+            queryPrometheus('node_boot_time_seconds'),
+            queryPrometheus('node_processes_total'),
+            queryPrometheus('avg(node_hwmon_temp_celsius)')
+        ]);
+
+        // Treat all-null from Prometheus as unreachable
+        const allNull = metrics.every(v => v === null);
+        if (allNull) {
+            showToast('Prometheus unreachable — showing no data', 'error');
+            ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard'].forEach(id => setCardError(id, 'No data from Prometheus'));
+        } else {
+            updateCPUMetrics(metrics[0]);
+            updateMemoryMetrics(metrics[1]);
+            updateDiskMetrics(metrics[2]);
+            updateNetworkMetrics(metrics[3], metrics[4]);
+            updateSystemHealth(metrics[5], metrics[6], metrics[7], metrics[8]);
+
+            if (metrics[0] === null) setCardError('cpuCard', 'CPU data unavailable');
+            if (metrics[1] === null) setCardError('memoryCard', 'Memory data unavailable');
+            if (metrics[2] === null) setCardError('diskCard', 'Disk data unavailable');
+            if (metrics[3] === null && metrics[4] === null) setCardError('networkCard', 'Network data unavailable');
+        }
+
+        updateContainerStatus();
+        checkAlerts();
+    } catch (err) {
+        console.error('Fetch error:', err);
+        showToast('Failed to refresh metrics', 'error');
+        ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard'].forEach(id => setCardError(id, 'Fetch failed'));
+    } finally {
+        cardIds.forEach(id => setCardLoading(id, false));
+        setRefreshing(false);
+    }
 }
 
 // Update CPU metrics
@@ -246,6 +329,7 @@ async function updateContainerStatus() {
         const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(
             'count by (name) (container_last_seen{name!=""})'
         )}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         const live = new Map((data.data && data.data.result || [])
             .map(r => [r.metric.name, r.value[1]]));
@@ -269,9 +353,11 @@ async function updateContainerStatus() {
         const allRunning = containers.every(c => c.status === 'running');
         containerStatus.textContent = allRunning ? 'All Running' : 'Issues';
         containerStatus.className = allRunning ? 'badge badge-success' : 'badge badge-warning';
-
+        clearCardError('containersCard');
     } catch (error) {
         console.error('Error fetching container status:', error);
+        setCardError('containersCard', 'Container data unavailable');
+        document.getElementById('containersGrid').innerHTML = '<div class="no-alerts">Unable to fetch container status</div>';
     }
 }
 
@@ -309,27 +395,58 @@ async function checkAlerts() {
             `;
             }).join('');
         }
+        clearCardError('alertsCard');
     } catch (error) {
         console.error('Error checking alerts:', error);
+        setCardError('alertsCard', 'Alerts unavailable');
         document.getElementById('alertsList').innerHTML = '<div class="no-alerts">Unable to fetch alerts</div>';
     }
 }
 
 // Check Prometheus Connection
 async function checkPrometheusConnection() {
+    const statusIndicator = document.getElementById('systemStatus');
+    const statusText = document.getElementById('systemStatusText');
     try {
         const response = await fetch(`${PROMETHEUS_URL}/api/v1/status/buildinfo`);
         const prometheusStatus = document.getElementById('prometheusStatus');
         if (response.ok) {
             prometheusStatus.textContent = 'Connected';
             prometheusStatus.style.color = '#10b981';
+            if (statusIndicator) {
+                statusIndicator.classList.remove('offline');
+                statusIndicator.classList.add('online');
+            }
+            if (statusText) statusText.textContent = 'All Systems Operational';
+            if (lastPrometheusConnected === false) {
+                showToast('Prometheus reconnected', 'success');
+            }
+            lastPrometheusConnected = true;
         } else {
             prometheusStatus.textContent = 'Disconnected';
             prometheusStatus.style.color = '#ef4444';
+            if (statusIndicator) {
+                statusIndicator.classList.remove('online');
+                statusIndicator.classList.add('offline');
+            }
+            if (statusText) statusText.textContent = 'Prometheus Disconnected';
+            if (lastPrometheusConnected !== false) {
+                showToast('Prometheus disconnected', 'error');
+            }
+            lastPrometheusConnected = false;
         }
     } catch (error) {
         document.getElementById('prometheusStatus').textContent = 'Disconnected';
         document.getElementById('prometheusStatus').style.color = '#ef4444';
+        if (statusIndicator) {
+            statusIndicator.classList.remove('online');
+            statusIndicator.classList.add('offline');
+        }
+        if (statusText) statusText.textContent = 'Prometheus Unreachable';
+        if (lastPrometheusConnected !== false) {
+            showToast('Prometheus unreachable', 'error');
+        }
+        lastPrometheusConnected = false;
     }
 }
 
@@ -465,25 +582,26 @@ async function updateChart(range) {
 function runBackup() {
     if (confirm('This will run a system backup. Continue?')) {
         // In production, this would call an API endpoint
-        alert('Backup initiated. Check logs for progress.');
+        showToast('Backup initiated. Check logs for progress.', 'info');
     }
 }
 
 function runMaintenance() {
     if (confirm('This will run system maintenance. Continue?')) {
         // In production, this would call an API endpoint
-        alert('Maintenance initiated. Check logs for progress.');
+        showToast('Maintenance initiated. Check logs for progress.', 'info');
     }
 }
 
 function runSecurityScan() {
     if (confirm('This will run a security scan. Continue?')) {
         // In production, this would call an API endpoint
-        alert('Security scan initiated. Check logs for progress.');
+        showToast('Security scan initiated. Check logs for progress.', 'info');
     }
 }
 
 function viewLogs() {
     // Open logs in new tab or show modal
+    showToast('Opening Grafana logs...', 'info');
     window.open('http://localhost:3002', '_blank');
 }
