@@ -45,6 +45,8 @@ $HOME/dev
 /backups/spectre-backup
 /backups/spectre-backup/data
 EOF
+# shellcheck disable=SC2034  # used via nameref by build_targets
+declare -a t_repo=()
 if build_targets "$fixture_repo" t_repo 2>/dev/null; then
   fail "build_targets must refuse paths under RESTIC_REPOSITORY_LOCAL"
 fi
@@ -57,6 +59,7 @@ $HOME/dev
 $HOME/docs
 $HOME/archive/old-projects
 EOF
+declare -a t_real=()
 build_targets "$fixture_real" t_real
 joined=" ${t_real[*]} "
 [[ "$joined" == *" $HOME/dev "* ]] || fail "missing ~/dev in targets: $joined"
@@ -76,6 +79,7 @@ $art/postgres_*.sql.gz
 $art/redis_backup_*.rdb
 $art/missing_*.tar.gz
 EOF
+declare -a t_art=()
 build_artifact_targets "$fixture_art" t_art
 [[ " ${t_art[*]} " == *"$art/postgres_20260101.sql.gz"* ]] || fail "artifact glob not expanded: ${t_art[*]}"
 [[ " ${t_art[*]} " == *"$art/redis_backup_20260101.rdb"* ]] || fail "artifact glob not expanded: ${t_art[*]}"
