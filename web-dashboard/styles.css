@@ -76,6 +76,27 @@ body {
     justify-content: flex-end;
 }
 
+.refresh-interval-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.refresh-interval-select {
+    background: var(--card-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.refresh-interval-select option {
+    background: var(--card-bg);
+    color: var(--text);
+}
+
 .status-indicator {
     display: flex;
     align-items: center;
@@ -493,7 +514,7 @@ body {
 }
 
 /* Security Info */
-.security-info {
+.security-info, .diagnostics-info {
     display: flex;
     flex-direction: column;
     gap: 15px;

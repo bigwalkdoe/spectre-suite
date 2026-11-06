@@ -18,6 +18,16 @@
                     <button id="themeToggle" class="btn btn-sm" aria-label="Toggle dark mode" title="Toggle dark mode">
                         <i class="fas fa-moon"></i>
                     </button>
+                    <label class="refresh-interval-label" for="refreshInterval" title="Auto-refresh interval">
+                        <i class="fas fa-clock"></i>
+                        <select id="refreshInterval" class="btn btn-sm refresh-interval-select" aria-label="Refresh interval">
+                            <option value="15000">15s</option>
+                            <option value="30000" selected>30s</option>
+                            <option value="60000">1m</option>
+                            <option value="300000">5m</option>
+                            <option value="0">Off</option>
+                        </select>
+                    </label>
                     <span class="status-indicator online" id="systemStatus">
                         <span class="status-dot"></span>
                         <span id="systemStatusText">All Systems Operational</span>
@@ -240,6 +250,34 @@
                             <i class="fas fa-file-alt"></i>
                             <span>View Logs</span>
                         </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Diagnostics -->
+            <section class="card" id="diagnosticsCard">
+                <div class="card-header">
+                    <h2><i class="fas fa-stethoscope"></i> Diagnostics</h2>
+                    <span class="badge" id="diagnosticsStatus">--</span>
+                </div>
+                <div class="card-body" aria-live="polite">
+                    <div class="diagnostics-info">
+                        <div class="security-item">
+                            <span class="security-label">Query Health</span>
+                            <span class="security-value" id="queryHealth">--</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Backup Exporter</span>
+                            <span class="security-value" id="backupExporterStatus">--</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Security Exporter</span>
+                            <span class="security-value" id="securityExporterStatus">--</span>
+                        </div>
+                        <div class="security-item">
+                            <span class="security-label">Auto-refresh</span>
+                            <span class="security-value" id="autoRefreshStatus">--</span>
+                        </div>
                     </div>
                 </div>
             </section>

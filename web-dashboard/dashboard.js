@@ -7,14 +7,18 @@
 // Override with ?prometheus=https://prometheus.example.com to read from a
 // Prometheus reachable from the browser rather than through this proxy.
 const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus') || '';
-const REFRESH_INTERVAL = 30000; // 30 seconds
+const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
 
+let refreshIntervalMs = DEFAULT_REFRESH_INTERVAL;
+let refreshTimerId = null;
 let chart = null;
 let chartRequestToken = 0; // Monotonic token to discard stale updateChart responses
 let isRefreshing = false;
 let lastPrometheusConnected = null;
 let currentAlerts = [];
 let activeAlertFilter = 'all';
+let lastQueryStats = { total: 0, succeeded: 0, failed: 0 };
+let lastExporterStatus = { backup: false, security: false };
 
 // UI helpers: loading states, error states, and toasts
 function setCardLoading(cardId, isLoading) {
@@ -69,17 +73,46 @@ function setRefreshing(refreshing) {
     btn.classList.toggle('btn--loading', refreshing);
 }
 
+function loadRefreshInterval() {
+    const saved = localStorage.getItem('spectre-refresh-interval');
+    const ms = saved !== null ? parseInt(saved, 10) : DEFAULT_REFRESH_INTERVAL;
+    refreshIntervalMs = isNaN(ms) ? DEFAULT_REFRESH_INTERVAL : ms;
+    const select = document.getElementById('refreshInterval');
+    if (select) {
+        select.value = String(refreshIntervalMs);
+        if (!select.value) select.value = String(DEFAULT_REFRESH_INTERVAL);
+    }
+}
+
+function applyRefreshInterval() {
+    if (refreshTimerId) {
+        clearInterval(refreshTimerId);
+        refreshTimerId = null;
+    }
+    if (refreshIntervalMs > 0) {
+        refreshTimerId = setInterval(fetchAllMetrics, refreshIntervalMs);
+    }
+    updateDiagnostics();
+}
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
+    loadRefreshInterval();
     initializeDashboard();
     updateTimestamp();
     setInterval(updateTimestamp, 1000);
-    setInterval(fetchAllMetrics, REFRESH_INTERVAL);
+    applyRefreshInterval();
     
     // Event listeners
     document.getElementById('refreshBtn').addEventListener('click', fetchAllMetrics);
     document.getElementById('themeToggle').addEventListener('click', toggleDarkMode);
+    document.getElementById('refreshInterval').addEventListener('change', (e) => {
+        refreshIntervalMs = parseInt(e.target.value, 10) || 0;
+        localStorage.setItem('spectre-refresh-interval', String(refreshIntervalMs));
+        applyRefreshInterval();
+        showToast(refreshIntervalMs > 0 ? `Auto-refresh set to ${e.target.selectedOptions[0]?.text || 'custom'}` : 'Auto-refresh disabled', 'info');
+    });
     
     // Chart range buttons
     document.querySelectorAll('.chart-controls .btn').forEach(btn => {
@@ -175,6 +208,42 @@ function setCardUpdated(cardId) {
     el.innerHTML = `<i class="fas fa-clock"></i> ${text}`;
 }
 
+function updateDiagnostics() {
+    const queryHealth = document.getElementById('queryHealth');
+    const backupExporter = document.getElementById('backupExporterStatus');
+    const securityExporter = document.getElementById('securityExporterStatus');
+    const autoRefresh = document.getElementById('autoRefreshStatus');
+    const diagStatus = document.getElementById('diagnosticsStatus');
+
+    if (queryHealth) {
+        if (lastQueryStats.total === 0) {
+            queryHealth.textContent = 'No queries run';
+        } else {
+            queryHealth.textContent = `${lastQueryStats.succeeded}/${lastQueryStats.total} metrics loaded (${lastQueryStats.failed} failed)`;
+        }
+    }
+    if (backupExporter) {
+        backupExporter.textContent = lastExporterStatus.backup ? 'Publishing metrics' : 'No data (not scheduled or no output)';
+    }
+    if (securityExporter) {
+        securityExporter.textContent = lastExporterStatus.security ? 'Publishing metrics' : 'No data (agent/exporter unavailable)';
+    }
+    if (autoRefresh) {
+        if (refreshIntervalMs > 0) {
+            const label = refreshIntervalMs >= 60000 ? `${refreshIntervalMs / 60000}m` : `${refreshIntervalMs / 1000}s`;
+            autoRefresh.textContent = `Every ${label}`;
+        } else {
+            autoRefresh.textContent = 'Disabled';
+        }
+    }
+    if (diagStatus) {
+        const healthy = lastQueryStats.failed === 0 && lastQueryStats.total > 0;
+        const degraded = lastQueryStats.succeeded > 0 && lastQueryStats.failed > 0;
+        diagStatus.textContent = healthy ? 'OK' : degraded ? 'Degraded' : lastQueryStats.total === 0 ? '--' : 'Issues';
+        diagStatus.className = healthy ? 'badge badge-success' : degraded ? 'badge badge-warning' : 'badge';
+    }
+}
+
 function formatBytes(bytes) {
     if (bytes === null || bytes === undefined || isNaN(bytes)) return 'No data';
     if (bytes === 0) return '0 B';
@@ -247,14 +316,7 @@ async function fetchAllMetrics() {
     cardIds.forEach(id => { clearCardError(id); setCardLoading(id, true); });
 
     try {
-        const [
-            cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal,
-            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
-            resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
-            spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
-            findingsCritical, findingsHigh, findingsMedium, findingsLow,
-            agentReasonResult
-        ] = await Promise.all([
+        const metricResults = await Promise.all([
             queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
             queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
             queryPrometheus('100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'),
@@ -281,10 +343,25 @@ async function fetchAllMetrics() {
             queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
             queryPrometheus('security_findings_unresolved_by_severity{severity="high"}'),
             queryPrometheus('security_findings_unresolved_by_severity{severity="medium"}'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="low"}'),
-            queryPrometheusFirst('spectre_agent_up_reason')
+            queryPrometheus('security_findings_unresolved_by_severity{severity="low"}')
         ]);
+        const [
+            cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal,
+            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
+            resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+            spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
+            findingsCritical, findingsHigh, findingsMedium, findingsLow
+        ] = metricResults;
+        const agentReasonResult = await queryPrometheusFirst('spectre_agent_up_reason');
         const temp = tempHwmon ?? tempThermal;
+
+        const totalQueries = metricResults.length;
+        const succeeded = metricResults.filter(v => v !== null).length;
+        lastQueryStats = { total: totalQueries, succeeded, failed: totalQueries - succeeded };
+        lastExporterStatus = {
+            backup: [backupLastSuccess, backupHealthOk, resticLastSuccess].some(v => v !== null),
+            security: spectreUp !== null
+        };
 
         // Treat all-null from core Prometheus as unreachable
         const coreAllNull = [cpu, mem, disk, netIn, netOut, load1, bootTime].every(v => v === null);
@@ -312,10 +389,13 @@ async function fetchAllMetrics() {
         const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
         updateChart(activeRange);
         updateLastRefreshed();
+        updateDiagnostics();
     } catch (err) {
         console.error('Fetch error:', err);
         showToast('Failed to refresh metrics', 'error');
         ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'backupCard', 'securityCard'].forEach(id => setCardError(id, 'Fetch failed'));
+        lastQueryStats = { total: 0, succeeded: 0, failed: 0 };
+        updateDiagnostics();
     } finally {
         cardIds.forEach(id => setCardLoading(id, false));
         setRefreshing(false);
