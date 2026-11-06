@@ -112,10 +112,8 @@ from spectre.dispatch.envelope import Status
 from spectre.dispatch.lock import JobLock, LockUnavailable
 from spectre.dispatch.registry import Job
 from spectre.dispatch.resolve import DispatchError, ResolvedAction, actions_root, resolve
-from spectre.dispatch.retention import UNKNOWN_JOB, record_growth
 from spectre.dispatch.runner import run_action
 from spectre.dispatch.verify import Finding
-from spectre.memory.db import init_db, save_run
 
 # The exit codes, named so a reader does not have to count down a table to find
 # which one a `raise typer.Exit` carries.
@@ -305,8 +303,25 @@ def _growth() -> dict[str, str] | None:
     in this module should still surface as a traceback.
     """
     try:
+        from sqlalchemy.exc import SQLAlchemyError
+        from spectre.dispatch.retention import record_growth
+
         counts = record_growth()
-    except (FileNotFoundError, SQLAlchemyError):
+    except FileNotFoundError:
+        return None
+    except ImportError:
+        return None
+    except Exception as e:
+        # SQLAlchemyError (and friends) — catch by name to avoid a hard dep at import time
+        if e.__class__.__name__ in {"SQLAlchemyError", "OperationalError", "DatabaseError"}:
+            return None
+        # re-raise truly unexpected errors? keep behavior: only known DB errors degrade
+        try:
+            from sqlalchemy.exc import SQLAlchemyError as _SAE
+            if isinstance(e, _SAE):
+                return None
+        except Exception:
+            pass
         return None
     return {name: str(count) for name, count in counts.items()}
 
@@ -356,6 +371,10 @@ def actions_list() -> None:
     for row in rows:
         typer.echo("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row[:-1])) + f"  {row[-1]}")
 
+    try:
+        from spectre.dispatch.retention import UNKNOWN_JOB
+    except Exception:
+        UNKNOWN_JOB = "<unknown>"
     unattributed = growth.get(UNKNOWN_JOB) if growth is not None else None
     if unattributed:
         typer.echo(
@@ -514,6 +533,8 @@ def run_action_job(job: Job, args: list[str]) -> None:
     # means a refusal never opens the database at all, so "the refusal records
     # nothing" holds because it never reaches the store, not merely because it
     # decided not to write.
+    from spectre.memory.db import init_db, save_run
+
     init_db()
     save_run(envelope)
 

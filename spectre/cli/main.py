@@ -17,12 +17,21 @@ from spectre.cli.dispatch_cmds import register as register_dispatch_commands
 from spectre.config.settings import load_settings
 from spectre.core.kernel import Kernel
 from spectre.core.service_bus import ServiceBus
-from spectre.memory.db import (
-    Report,
-    init_db,
-    save_report,
-)
-from spectre.workflow_engine.engine import WorkflowEngine
+def _lazy_db():
+    from spectre.memory.db import Report, init_db, save_report
+    return Report, init_db, save_report
+
+
+def Report(*args, **kwargs):
+    return _lazy_db()[0](*args, **kwargs)
+
+
+def init_db(*args, **kwargs):
+    return _lazy_db()[1](*args, **kwargs)
+
+
+def save_report(*args, **kwargs):
+    return _lazy_db()[2](*args, **kwargs)
 
 app = typer.Typer(
     name="spectre",
@@ -39,14 +48,16 @@ register_dispatch_commands(app)
 console = Console()
 
 # Lazy-loaded globals
-_engine: WorkflowEngine | None = None
+_engine = None
 _kernel: Kernel | None = None
 _service_bus: ServiceBus | None = None
 
 
-def _get_engine(config: dict | None = None) -> WorkflowEngine:
+def _get_engine(config: dict | None = None):
     global _engine
     if _engine is None:
+        from spectre.workflow_engine.engine import WorkflowEngine
+
         settings = load_settings()
         cfg = config or {}
         cfg.setdefault("ollama_url", settings.ollama.url)
