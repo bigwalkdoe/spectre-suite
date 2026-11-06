@@ -1,0 +1,48 @@
+# Dashboard Actions Backend (4b)
+
+Minimal, **allowlisted**, token-protected trigger service for the web dashboard quick actions.
+
+## Security model
+
+- **Allowlist only**: maps action names to fixed repo-relative scripts. No user-supplied arguments are passed to the shell.
+  - `backup` → `scripts/backups/run-missed-backups.sh`
+  - `maintenance` → `scripts/maintenance/run-maintenance.sh`
+  - `security-scan` → `scripts/security/scan-docker-images.sh`
+- **Token required**: when `DASHBOARD_ACTION_TOKEN` is set, requests must include `X-Dashboard-Action-Token`. If unset, the service rejects all action requests (`503`).
+- **No in-container execution**: the container **queues trigger files** to `/triggers` and returns `202 Accepted`. A **host handler** runs the allowlisted scripts. This avoids granting the container docker/host/root privileges.
+
+## Components
+
+- `web-dashboard/actions-backend/server.py` — stdlib Python HTTP service (`/healthz`, `POST /<action>`).
+- `docker-compose.monitoring.yml` service `dashboard-actions` — builds the backend, mounts `./dashboard-actions/triggers` and the repo read-only.
+- `web-dashboard/nginx.conf` — proxies `/actions/` → `dashboard-actions:8090`.
+- `web-dashboard/dashboard.js` — posts to `/actions/<name>` (configurable via `?actionsBase=`; `actionsBase=off` disables), prompts/stores token in `sessionStorage` on `401`.
+- Host handler: `scripts/dashboard-actions/process-triggers.sh` consumes queued triggers.
+- Systemd templates: `systemd/dashboard-actions/spectre-dashboard-actions.{path,service}` (user units, adjust repo path if needed).
+
+## Setup
+
+1. Set a token in `.env`:
+   ```bash
+   # generate a token, then set DASHBOARD_ACTION_TOKEN in .env
+   python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+   ```
+2. Start/rebuild the monitoring stack (includes `dashboard-actions`):
+   ```bash
+   docker compose -f docker-compose.monitoring.yml up -d --build dashboard-actions web-dashboard
+   ```
+3. Install the **host trigger handler** (required for actions to actually execute). The provided systemd units are templates under `systemd/dashboard-actions/` and assume the repo at `%h/dev/github/spectre-suite` — copy/edit paths if different:
+   ```bash
+   mkdir -p ~/.config/systemd/user
+   cp systemd/dashboard-actions/spectre-dashboard-actions.{path,service} ~/.config/systemd/user/
+   systemctl --user daemon-reload
+   systemctl --user enable --now spectre-dashboard-actions.path
+   ```
+4. In the dashboard, trigger an action; if prompted, enter `DASHBOARD_ACTION_TOKEN` (stored for the browser session).
+
+## Operational notes
+
+- Trigger files: `dashboard-actions/triggers/*.json` → moved to `processed/` or `failed/` by the host handler. Runtime contents are gitignored.
+- Scripts may require root/sudo, docker access, or host paths (`/backups`). Review/adjust the allowlisted scripts and the handler's execution context for your host.
+- The dashboard itself remains unauthenticated and localhost-bound by default; treat the action token as sensitive.
+- To disable actions in the UI: open with `?actionsBase=off`.
