@@ -26,7 +26,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-import git
+try:
+    import git  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover - optional dep (GitPython)
+    git = None  # type: ignore[assignment]
 
 from spectre.dispatch.registry import Job
 
@@ -69,40 +72,32 @@ def repo_root() -> Path:
 
 
 def actions_root() -> Path:
-    """Where actions live: `$SPECTRE_ACTIONS_ROOT`, else `<repo>/scripts`.
+    """Where actions live: `$SPECTRE_ACTIONS_ROOT`, else the unified/suite layout.
 
-    Absolute and fully resolved in *both* branches, because every caller compares
-    a resolved path against it. A checkout is free to make its actions directory
-    a symlink — which `<repo>/scripts` is allowed to be, and which
-    `<repo>/spectre/actions` will be after the repository merge — and comparing
-    against the unresolved root would refuse every job with "resolves outside the
-    actions root", naming a path that looks entirely legitimate. Resolving here
-    rather than at each call site means no caller can forget.
-
-    An empty variable is treated as unset: `Path("")` resolves to the working
-    directory, which would make the whole checkout the actions root.
+    Unified layout (Phase 1): `<repo>/spectre/actions`. Compatibility: `<repo>/scripts`.
+    Legacy: `<repo>/actions`. Absolute and fully resolved in all branches.
     """
     configured = os.environ.get("SPECTRE_ACTIONS_ROOT")
     if configured:
         return Path(configured).resolve()
-    return (repo_root() / "actions").resolve()
+    root = repo_root()
+    for candidate in (root / "spectre" / "actions", root / "scripts", root / "actions"):
+        if candidate.is_dir():
+            return candidate.resolve()
+    return (root / "spectre" / "actions").resolve()
 
 
 def _provenance(root: Path) -> tuple[str, bool]:
     """(short HEAD sha, dirty) for the repository holding `root`; ("", False)
-    when there is none.
-
-    Dirty is the whole checkout's, not just the root's: a run record claims a
-    commit, and "that commit" means the tree the checkout was in.
-
-    A repository with no commits raises ValueError from gitpython rather than
-    reporting an invalid repository, and it is just as legitimately
-    provenance-less as no repository at all.
+    when there is none or GitPython is unavailable.
     """
+    if git is None:
+        return "", False
     try:
         repo = git.Repo(root, search_parent_directories=True)
         return repo.head.commit.hexsha[:_SHORT_SHA_LENGTH], repo.is_dirty()
-    except (git.InvalidGitRepositoryError, ValueError):
+    except Exception:
+        # InvalidGitRepositoryError, ValueError (no commits), or other git issues
         return "", False
 
 
