@@ -20,6 +20,7 @@ NGINX_CONF="$PROJECT_ROOT/web-dashboard/nginx.conf"
 ALERTMANAGER="$PROJECT_ROOT/prometheus/alertmanager.yml"
 RULES="$PROJECT_ROOT/prometheus/alert_rules.yml"
 EXPORTER="$PROJECT_ROOT/prometheus/business-metrics-exporter.sh"
+EXPORTER_IMPL="$PROJECT_ROOT/spectre/monitoring/exporters/business-metrics-exporter.sh"
 BACKUP_DB="$PROJECT_ROOT/scripts/backups/backup-databases.sh"
 # Phase 1 compat: if scripts/ paths are forwarders, also check spectre/actions impls
 BACKUP_DB_IMPL="$PROJECT_ROOT/spectre/actions/backups/backup-databases.sh"
@@ -125,10 +126,13 @@ done
 # breaks every dashboard query while Prometheus itself looks healthy.
 if [ -f "$NGINX_CONF" ]; then
     nginx_upstreams=$(
-        grep -oE 'proxy_pass[[:space:]]+https?://[^/]+' "$NGINX_CONF" \
-            | sed -E 's#.*https?://([^/:]+).*#\1#' | sort -u
+        {
+            grep -oE 'proxy_pass[[:space:]]+https?://[^/]+' "$NGINX_CONF" || true
+            awk '/^[[:space:]]*set[[:space:]]+\$[A-Za-z_][A-Za-z0-9_]*[[:space:]]+https?:\/\//{gsub(/;/,"",$3); print "proxy_pass "$3}' "$NGINX_CONF" || true
+        } | sed -E 's#.*https?://([^/:]+).*#\1#' | sort -u
     )
     for host in $nginx_upstreams; do
+        [ -z "$host" ] && continue
         check_host "$host" "web-dashboard/nginx.conf"
     done
 fi
@@ -322,8 +326,8 @@ stray=$(awk '
   # forever, and nothing says the two are looking in different directories. The
   # default also has to be writable by whoever runs the cron jobs -- /var/lib is
   # root-only, so a non-root exporter could never read a root-written marker.
-  if [ -f "$EXPORTER" ] && { [ -f "$BACKUP_DB" ] || [ -f "${BACKUP_DB_IMPL:-}" ]; }; then
-      exporter_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$EXPORTER" | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
+  if { [ -f "$EXPORTER" ] || [ -f "${EXPORTER_IMPL:-}" ]; } && { [ -f "$BACKUP_DB" ] || [ -f "${BACKUP_DB_IMPL:-}" ]; }; then
+      exporter_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$EXPORTER" "${EXPORTER_IMPL:-/dev/null}" 2>/dev/null | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
       backup_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$BACKUP_DB" "${BACKUP_DB_IMPL:-/dev/null}" 2>/dev/null | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
       if [ -z "$exporter_state" ] || [ -z "$backup_state" ]; then
           echo "ERROR: could not read the BACKUP_STATE_DIR default from the exporter" >&2

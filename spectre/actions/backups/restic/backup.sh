@@ -29,8 +29,10 @@ EOF
     *) ;;
   esac
 done
+: "${JSON_OUTPUT} ${QUIET} ${DO_HEALTH}"  # reserved flags
 
 START_TS=$(date +%s)
+: "${START_TS}"  # reserved
 resolve_restic_dirs
 load_restic_env || true
 
@@ -106,7 +108,7 @@ fi
 if [ "$RESTIC_SKIP_CONTAINERS" != "1" ] && [ "$CONTAINERS_ENABLED" = "true" ]; then
   info "Collecting container configuration..."
   cdir="$DUMPS_DIR/container-config"; mkdir -p "$cdir"
-  if command -v docker >/dev/null 2>&1; then docker ps -a --format '{{json .}}' > "$cdir/docker-ps.json" 2>/dev/null || true; docker inspect $(docker ps -aq 2>/dev/null) > "$cdir/docker-inspect.json" 2>/dev/null || true; fi
+  if command -v docker >/dev/null 2>&1; then docker ps -a --format '{{json .}}' > "$cdir/docker-ps.json" 2>/dev/null || true; docker ps -aq 2>/dev/null | xargs -r docker inspect > "$cdir/docker-inspect.json" 2>/dev/null || true; fi
   if command -v podman >/dev/null 2>&1; then podman ps -a --format json > "$cdir/podman-ps.json" 2>/dev/null || true; podman inspect --all > "$cdir/podman-inspect.json" 2>/dev/null || true; fi
   find /etc/containers "$HOME/.config/containers" -maxdepth 3 -type f 2>/dev/null | while IFS= read -r f; do
     rel="${f#/}"; mkdir -p "$cdir/$(dirname "$rel")"; cp "$f" "$cdir/$rel" 2>/dev/null || true
@@ -144,7 +146,7 @@ dedup_arr BACKUP_TARGETS; dedup_arr REMOTE_TARGETS
 for p in "${BACKUP_TARGETS[@]}" "${REMOTE_TARGETS[@]}"; do refuse_repo_path "$p" || { write_marker last-health "0" "$(date +%s)"; exit 1; }; done
 
 RESTIC_ARGS=(backup)
-# shellcheck disable=SC2206
+# shellcheck disable=SC2206,SC2207
 RESTIC_ARGS+=( $(restic_backup_args "$RESTIC_REPOSITORY_LOCAL") )
 # restic_backup_args already includes -r; we need repo-specific runs. Override -r per call.
 if [ -f "$EXCLUDE_FILE" ] && [ -s "$EXCLUDE_FILE" ]; then RESTIC_ARGS+=(--exclude-file "$EXCLUDE_FILE"); fi
@@ -200,6 +202,7 @@ fi
 if [ "$RESTIC_SKIP_OFFSITE" = "1" ]; then
   info "Offsite backup skipped (RESTIC_SKIP_OFFSITE=1)"
 else
+  # shellcheck disable=SC2034  # reserved
   OFFSITE_ATTEMPTED=1
   if [ "${#REMOTE_TARGETS[@]}" -eq 0 ]; then
     warn "No offsite targets; skipping offsite leg"
@@ -218,7 +221,7 @@ fi
 
 # --- Phase 7: tag-scoped retention ---
 if [ "$NO_PRUNE" != "true" ]; then
-  # shellcheck disable=SC2046
+  # shellcheck disable=SC2046,SC2207
   FORGET=(forget $(restic_forget_args) --prune)
   if [ "$LOCAL_OK" = "1" ]; then restic -r "$RESTIC_REPOSITORY_LOCAL" "${FORGET[@]}" || warn "Local forget/prune reported issues"; fi
   if [ "$OFFSITE_OK" = "1" ]; then restic -r "$RESTIC_REPOSITORY" "${FORGET[@]}" || warn "Offsite forget/prune reported issues"; fi

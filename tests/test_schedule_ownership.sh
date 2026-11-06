@@ -237,8 +237,10 @@ done < <(printf '%s\n' "$scheduled" | grep -oE '[^[:space:]]+\.sh' | sort -u || 
 # 3. The destructive maintenance scripts must accept --dry-run. Their whole
 #    value as scheduled jobs is that they are unattended, so being able to see
 #    what they would remove first is the only review available.
+# Consolidation: canonical implementations live under spectre/actions/; scripts/
+# paths may be forwarders.
 for script in cleanup-unused-resources cleanup-temp cleanup-cache cleanup-downloads; do
-    path="$PROJECT_ROOT/scripts/maintenance/$script.sh"
+    path="$PROJECT_ROOT/spectre/actions/maintenance/$script.sh"
     if [ ! -f "$path" ]; then
         fail "expected maintenance script is missing: $script.sh"
         continue
