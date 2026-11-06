@@ -38,8 +38,11 @@ RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-/backups/spectre-backup}"
 export RESTIC_REPOSITORY
 
 command -v restic >/dev/null 2>&1 || { echo "FAIL: restic not installed" >&2; exit 1; }
-if [ -z "${RESTIC_PASSWORD:-}" ] && [ -z "${RESTIC_PASSWORD_FILE:-}" ]; then
-  echo "FAIL: set RESTIC_PASSWORD or RESTIC_PASSWORD_FILE" >&2; exit 1
+if [ -z "${RESTIC_PASSWORD:-}" ] && [ -z "${RESTIC_PASSWORD_FILE:-}" ] && [ -z "${RESTIC_PASSWORD_COMMAND:-}" ]; then
+  case "$RESTIC_REPOSITORY" in
+    /*|.*|~*) echo "FAIL: set RESTIC_PASSWORD, RESTIC_PASSWORD_FILE, or RESTIC_PASSWORD_COMMAND" >&2; exit 1 ;;
+    *) echo "note: no RESTIC_PASSWORD* set; relying on backend/restic configuration" >&2 ;;
+  esac
 fi
 
 case "$cmd" in

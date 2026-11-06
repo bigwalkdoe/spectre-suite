@@ -482,22 +482,26 @@ Container vulnerability scanning is the Trivy job in
 
 ## Restic (optional, default A)
 
-Optional restic integration that **keeps existing backup producers and
-`check-backup-health.sh` intact**: restic snapshots the existing `/backups`
-artifacts (same manifest scope as `replicate-backups.sh` — DB dumps and
-`${PROJECT_PREFIX}_*.tar.gz` docker volumes; optionally configs/projects).
+Optional, **versatile** restic integration (local path, SFTP, REST server, S3,
+B2, rclone — set `RESTIC_REPOSITORY` accordingly) that **keeps existing backup
+producers and `check-backup-health.sh` intact**. It snapshots existing `/backups`
+artifacts (manifest-aligned with `replicate-backups.sh`: DB dumps and
+`${PROJECT_PREFIX}_*.tar.gz` docker volumes; optionally configs/projects via
+`RESTIC_INCLUDE_CONFIGS=1`).
 
 ```bash
-# Requires restic + RESTIC_PASSWORD or RESTIC_PASSWORD_FILE in env (or RESTIC_CONFIG).
-export RESTIC_REPOSITORY=/backups/spectre-backup   # default
-scripts/backups/restic-backup.sh --init            # init repo if needed, then backup
-scripts/backups/restic-backup.sh --check           # verify repo
+# Local-only quickstart (this dev machine). Store secrets outside the repo.
+# cp scripts/backups/restic.env.example ~//.secrets/restic.env  # edit values
+# chmod 600 ~//.secrets/restic-repo-password
+export RESTIC_CONFIG=~//.secrets/restic.env
+scripts/backups/restic-backup.sh --init
+scripts/backups/restic-backup.sh --check
 scripts/backups/restic-maintenance.sh snapshots
 scripts/backups/restic-maintenance.sh forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune --dry-run
 ```
 
-Store credentials outside the repo (e.g. `~//.secrets/backup-config.env`,
-referenced by `RESTIC_CONFIG`); **never commit secrets**. `BACKUP_REPO_DIR` /
+See `scripts/backups/restic.env.example` (no secrets). **Never commit
+`RESTIC_PASSWORD*`, keys, or backend credentials.** `BACKUP_REPO_DIR` /
 restic repo growth metrics in `prometheus/business-metrics-exporter.sh`
 auto-detect `/backups/spectre-backup` when present.
 

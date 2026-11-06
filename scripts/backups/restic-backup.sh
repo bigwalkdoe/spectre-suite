@@ -74,9 +74,14 @@ if ! command -v restic >/dev/null 2>&1; then
   log "FAIL: restic not installed"
   exit 1
 fi
-if [ -z "${RESTIC_PASSWORD:-}" ] && [ -z "${RESTIC_PASSWORD_FILE:-}" ]; then
-  log "FAIL: set RESTIC_PASSWORD or RESTIC_PASSWORD_FILE (do not put secrets in this repo)"
-  exit 1
+# Restic supports multiple auth methods (password, password-file/command, or
+# backend-specific credentials for S3/B2/etc.). Require an explicit password
+# source for the common local case; otherwise let restic validate.
+if [ -z "${RESTIC_PASSWORD:-}" ] && [ -z "${RESTIC_PASSWORD_FILE:-}" ] && [ -z "${RESTIC_PASSWORD_COMMAND:-}" ]; then
+  case "$RESTIC_REPOSITORY" in
+    /*|.*|~*) log "FAIL: set RESTIC_PASSWORD, RESTIC_PASSWORD_FILE, or RESTIC_PASSWORD_COMMAND" ; exit 1 ;;
+    *) log "note: no RESTIC_PASSWORD* set; relying on backend/restic configuration" ;;
+  esac
 fi
 
 if [ "$DO_INIT" -eq 1 ]; then
