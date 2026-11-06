@@ -527,5 +527,77 @@
     "sudo": true,
     "mutates": true,
     "concurrency": "forbid"
+  },
+  {
+    "name": "backups/restic/backup",
+    "action": "backups/restic/backup.sh",
+    "group": "backups",
+    "summary": "Run restic backup (local+offsite) with tag scoping and markers",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": null,
+    "replaces": [
+      "unit:spectre-restic-backup.service"
+    ]
+  },
+  {
+    "name": "backups/restic/verify",
+    "action": "backups/restic/verify.sh",
+    "group": "backups",
+    "summary": "Verify restic repository integrity and write verify marker",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": null,
+    "replaces": [
+      "unit:spectre-restic-verify.service"
+    ]
+  },
+  {
+    "name": "backups/run-missed-backups",
+    "action": "backups/run-missed-backups.sh",
+    "group": "backups",
+    "summary": "Catch up missed backup runs (artifact catch-up)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": null,
+    "replaces": [
+      "unit:spectre-backup-catchup.service"
+    ]
+  },
+  {
+    "name": "dashboard-actions/process-triggers",
+    "action": "dashboard-actions/process-triggers.sh",
+    "group": "maintenance",
+    "summary": "Process queued dashboard action triggers (host handler)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": null,
+    "replaces": [
+      "unit:spectre-dashboard-actions.service"
+    ]
+  },
+  {
+    "name": "prometheus/business-metrics-exporter",
+    "action": "prometheus/business-metrics-exporter.sh",
+    "group": "monitoring",
+    "summary": "Export business/restic marker metrics for Prometheus textfile collector",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*/5 * * * *",
+    "replaces": [
+      "crontab:*/5 * * * *"
+    ]
+  },
+  {
+    "name": "prometheus/security-metrics-exporter",
+    "action": "prometheus/security-metrics-exporter.sh",
+    "group": "monitoring",
+    "summary": "Export security metrics for Prometheus textfile collector",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*/5 * * * *",
+    "replaces": [
+      "crontab:*/5 * * * *"
+    ]
   }
 ]
