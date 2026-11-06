@@ -110,10 +110,16 @@
             <!-- Active Alerts -->
             <section class="card" id="alertsCard">
                 <div class="card-header">
-                    <h2><i class="fas fa-bell"></i> Active Alerts</h2>
+                    <h2><i class="fas fa-bell"></i> Active Alerts <a href="http://localhost:9093" target="_blank" rel="noopener" class="card-link" title="Open Alertmanager"><i class="fas fa-external-link-alt"></i></a></h2>
                     <span class="badge badge-warning" id="alertCount">0</span>
                 </div>
                 <div class="card-body" aria-live="polite">
+                    <div class="alert-filters" id="alertFilters">
+                        <button class="btn btn-sm active" data-severity="all">All</button>
+                        <button class="btn btn-sm" data-severity="critical">Critical</button>
+                        <button class="btn btn-sm" data-severity="warning">Warning</button>
+                        <button class="btn btn-sm" data-severity="info">Info</button>
+                    </div>
                     <div class="alerts-list" id="alertsList">
                         <div class="no-alerts">No active alerts</div>
                     </div>
@@ -155,7 +161,7 @@
             <!-- Container Status -->
             <section class="card" id="containersCard">
                 <div class="card-header">
-                    <h2><i class="fas fa-cubes"></i> Container Status</h2>
+                    <h2><i class="fas fa-cubes"></i> Container Status <a href="http://localhost:9090/targets" target="_blank" rel="noopener" class="card-link" title="Open Prometheus targets"><i class="fas fa-external-link-alt"></i></a></h2>
                     <span class="badge" id="containerStatus">Running</span>
                 </div>
                 <div class="card-body" aria-live="polite">
@@ -168,7 +174,7 @@
             <!-- Resource Trends -->
             <section class="card full-width" id="chartCard">
                 <div class="card-header">
-                    <h2><i class="fas fa-chart-line"></i> Resource Trends</h2>
+                    <h2><i class="fas fa-chart-line"></i> Resource Trends <a href="http://localhost:9090/graph" target="_blank" rel="noopener" class="card-link" title="Open Prometheus"><i class="fas fa-external-link-alt"></i></a></h2>
                     <div class="chart-controls">
                         <button class="btn btn-sm active" data-range="1h">1H</button>
                         <button class="btn btn-sm" data-range="6h">6H</button>

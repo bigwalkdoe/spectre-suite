@@ -276,6 +276,18 @@ body {
     gap: 8px;
 }
 
+.card-link {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+    text-decoration: none;
+    opacity: 0.7;
+}
+.card-link:hover {
+    color: var(--accent);
+    opacity: 1;
+}
+
 .card-body {
     padding: 20px;
 }
@@ -327,6 +339,13 @@ body {
 }
 
 /* Alerts */
+.alert-filters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
 .alerts-list {
     max-height: 300px;
     overflow-y: auto;
@@ -340,9 +359,19 @@ body {
     border-radius: 4px;
 }
 
+.alert-item.critical {
+    border-left-color: #dc2626;
+    background: #fee2e2;
+}
+
 .alert-item.warning {
     border-left-color: #f59e0b;
     background: #fef3c7;
+}
+
+.alert-item.info {
+    border-left-color: #3b82f6;
+    background: #dbeafe;
 }
 
 .alert-title {
@@ -356,10 +385,27 @@ body {
     color: var(--muted);
 }
 
-.alert-time {
+.alert-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+
+.alert-time, .alert-age {
     font-size: 11px;
     color: var(--muted);
-    margin-top: 5px;
+}
+
+.alert-severity-tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.06);
 }
 
 .no-alerts {
@@ -428,6 +474,11 @@ body {
 .container-status.stopped {
     background: #fee2e2;
     color: #991b1b;
+}
+
+.container-status.no-data {
+    background: #e5e7eb;
+    color: #374151;
 }
 
 /* Chart */
@@ -577,10 +628,25 @@ body {
     background: rgba(239, 68, 68, 0.15);
     border-left-color: #ef4444;
 }
+[data-theme="dark"] .alert-item.critical,
+.dark .alert-item.critical {
+    background: rgba(239, 68, 68, 0.18);
+    border-left-color: #dc2626;
+}
 [data-theme="dark"] .alert-item.warning,
 .dark .alert-item.warning {
     background: rgba(245, 158, 11, 0.15);
     border-left-color: #f59e0b;
+}
+[data-theme="dark"] .alert-item.info,
+.dark .alert-item.info {
+    background: rgba(59, 130, 246, 0.15);
+    border-left-color: #3b82f6;
+}
+[data-theme="dark"] .container-status.no-data,
+.dark .container-status.no-data {
+    background: #334155;
+    color: #94a3b8;
 }
 [data-theme="dark"] .no-alerts,
 .dark .no-alerts {
