@@ -483,3 +483,68 @@ groups:
             The oldest unresolved finding was recorded
             {{ $value | humanizeDuration }} ago. Findings that are never resolved
             make the unresolved counts less useful as a signal.
+
+  - name: restic_backup_alerts
+    rules:
+      - alert: ResticBackupMissing
+        expr: restic_last_success_timestamp == 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "No restic snapshot has been recorded"
+          description: "restic_last_success_timestamp is 0; the adopted restic backup has never reported success."
+
+      - alert: ResticBackupStale
+        expr: restic_last_success_timestamp > 0 and time() - restic_last_success_timestamp > 129600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restic backup is stale"
+          description: "Last successful local restic snapshot is {{ $value | humanizeDuration }} ago (>36h)."
+
+      - alert: ResticOffsiteMissing
+        expr: restic_last_offsite_success_timestamp == 0 and restic_last_success_timestamp > 0
+        for: 72h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No offsite restic snapshot recorded"
+          description: "Local restic backups succeed but no offsite snapshot has been recorded."
+
+      - alert: ResticOffsiteStale
+        expr: restic_last_offsite_success_timestamp > 0 and time() - restic_last_offsite_success_timestamp > 259200
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Offsite restic backup is stale"
+          description: "Last successful offsite restic snapshot is {{ $value | humanizeDuration }} ago (>72h)."
+
+      - alert: ResticHealthFailed
+        expr: restic_health_timestamp > 0 and restic_health_ok == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restic health check failed or degraded"
+          description: "The last restic backup run reported a failed or degraded health verdict."
+
+      - alert: ResticVerifyFailed
+        expr: restic_verify_timestamp > 0 and restic_verify_ok == 0
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Restic repository verification failed"
+          description: "restic verify reported a failure; check repository integrity before relying on backups."
+
+      - alert: ResticVerifyStale
+        expr: restic_verify_timestamp > 0 and time() - restic_verify_timestamp > 691200
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restic verification is stale"
+          description: "Last restic verify is {{ $value | humanizeDuration }} ago (>8d)."

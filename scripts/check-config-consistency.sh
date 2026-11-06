@@ -152,7 +152,8 @@ postgres-exporter:128m
 redis:128m
 postgres:512m
 blackbox-exporter:1g
-web-dashboard:128m"
+web-dashboard:128m
+dashboard-actions:64m"
 
 actual_limits=$(
     awk '
