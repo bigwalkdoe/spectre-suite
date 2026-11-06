@@ -14,6 +14,7 @@ let chartRequestToken = 0; // Monotonic token to discard stale updateChart respo
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
+    initializeTheme();
     initializeDashboard();
     updateTimestamp();
     setInterval(updateTimestamp, 1000);
@@ -21,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Event listeners
     document.getElementById('refreshBtn').addEventListener('click', fetchAllMetrics);
+    document.getElementById('themeToggle').addEventListener('click', toggleDarkMode);
     
     // Chart range buttons
     document.querySelectorAll('.chart-controls .btn').forEach(btn => {
@@ -31,6 +33,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function initializeTheme() {
+    const html = document.documentElement;
+    const savedTheme = localStorage.getItem('spectre-theme');
+    const toggle = document.getElementById('themeToggle');
+    const icon = toggle.querySelector('i');
+
+    if (savedTheme === 'dark') {
+        html.classList.add('dark');
+        icon.classList.replace('fa-moon', 'fa-sun');
+    } else {
+        html.classList.remove('dark');
+        icon.classList.replace('fa-sun', 'fa-moon');
+    }
+}
+
+function toggleDarkMode() {
+    const html = document.documentElement;
+    const isDark = html.classList.toggle('dark');
+    const toggle = document.getElementById('themeToggle');
+    const icon = toggle.querySelector('i');
+
+    if (isDark) {
+        icon.classList.replace('fa-moon', 'fa-sun');
+        localStorage.setItem('spectre-theme', 'dark');
+    } else {
+        icon.classList.replace('fa-sun', 'fa-moon');
+        localStorage.setItem('spectre-theme', 'light');
+    }
+}
 
 function initializeDashboard() {
     fetchAllMetrics();
