@@ -62,6 +62,9 @@ export NOTIFY_ENABLED=false
 export PG_ENABLED=false
 export CONTAINERS_ENABLED=false
 export BACKUP_LOG_STDOUT=1
+# Prevent load_restic_env from sourcing the real workstation env (it would override
+# temp repo/password). Tests control all required vars explicitly.
+export RESTIC_CONFIG="$CONFIG_DIR/restic.env.nonexistent"
 
 # Local backup success
 set +e
