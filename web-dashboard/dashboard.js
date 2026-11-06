@@ -103,14 +103,16 @@ async function fetchAllMetrics() {
         queryPrometheus('rate(node_network_receive_bytes_total[5m])'),
         queryPrometheus('rate(node_network_transmit_bytes_total[5m])'),
         queryPrometheus('node_load1'),
-        queryPrometheus('node_boot_time_seconds')
+        queryPrometheus('node_boot_time_seconds'),
+        queryPrometheus('node_processes_total'),
+        queryPrometheus('avg(node_hwmon_temp_celsius)')
     ]);
 
     updateCPUMetrics(metrics[0]);
     updateMemoryMetrics(metrics[1]);
     updateDiskMetrics(metrics[2]);
     updateNetworkMetrics(metrics[3], metrics[4]);
-    updateSystemHealth(metrics[5], metrics[6]);
+    updateSystemHealth(metrics[5], metrics[6], metrics[7], metrics[8]);
     updateContainerStatus();
     checkAlerts();
 }
@@ -186,7 +188,7 @@ function updateNetworkMetrics(networkIn, networkOut) {
 }
 
 // Update System Health
-function updateSystemHealth(systemLoad, bootTime) {
+function updateSystemHealth(systemLoad, bootTime, processCount, temperature) {
     if (systemLoad !== null) {
         document.getElementById('systemLoad').textContent = systemLoad.toFixed(2);
         
@@ -209,9 +211,17 @@ function updateSystemHealth(systemLoad, bootTime) {
         document.getElementById('uptime').textContent = uptime;
     }
 
-    // Simulated values for demonstration
-    document.getElementById('processes').textContent = Math.floor(Math.random() * 200 + 100);
-    document.getElementById('temperature').textContent = Math.floor(Math.random() * 20 + 40) + '°C';
+    if (processCount !== null) {
+        document.getElementById('processes').textContent = Math.floor(processCount);
+    } else {
+        document.getElementById('processes').textContent = 'No data';
+    }
+
+    if (temperature !== null) {
+        document.getElementById('temperature').textContent = Math.floor(temperature) + '°C';
+    } else {
+        document.getElementById('temperature').textContent = 'No data';
+    }
 }
 
 function formatUptime(seconds) {
