@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/business-metrics}"
 BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/backups/backup-state}"
 BACKUP_REPO_DIR="${BACKUP_REPO_DIR:-/backups/fedora-back-up/data}"
+RESTIC_MARKER_DIR="${RESTIC_MARKER_DIR:-${HOME:-/home/deon}/.local/state/spectre-suite/backups}"
 mkdir -p "$OUTPUT_DIR"
 
 # Prints exactly one number: the count of non-empty lines on stdin, or 0.
@@ -72,6 +73,24 @@ HEALTH_WHEN=$(printf '%s' "$HEALTH_LINE" | awk '{print $2}')
 case "$HEALTH_WHEN" in
     ''|*[!0-9]*) HEALTH_WHEN=0 ;;
 esac
+
+# Restic snapshot markers (spectre-suite adopted engine). Missing/unparseable => 0.
+read_marker_num() {
+    local f="$1" n="${2:-1}" v=""
+    [ -r "$f" ] || { printf '0\n'; return; }
+    v=$(awk -v n="$n" '{print $n}' "$f" 2>/dev/null || true)
+    case "$v" in
+        ''|*[!0-9]*) [ -s "$f" ] && echo "business-metrics: restic marker parse failed: $f" >&2; printf '0\n' ;;
+        *) printf '%s\n' "$v" ;;
+    esac
+}
+RESTIC_LAST_ATTEMPT=$(read_marker_num "$RESTIC_MARKER_DIR/last-attempt" 1)
+RESTIC_LAST_SUCCESS=$(read_marker_num "$RESTIC_MARKER_DIR/last-success" 1)
+RESTIC_LAST_OFFSITE=$(read_marker_num "$RESTIC_MARKER_DIR/last-offsite-success" 1)
+RESTIC_HEALTH_OK=$(read_marker_num "$RESTIC_MARKER_DIR/last-health" 1)
+RESTIC_HEALTH_TS=$(read_marker_num "$RESTIC_MARKER_DIR/last-health" 2)
+RESTIC_VERIFY_OK=$(read_marker_num "$RESTIC_MARKER_DIR/last-verify" 1)
+RESTIC_VERIFY_TS=$(read_marker_num "$RESTIC_MARKER_DIR/last-verify" 2)
 
 # Repository growth. Nothing published the repo size, so an unbounded restic repo
 # was invisible until HighDiskUsage fired on / at 93% -- which cannot tell a
@@ -157,6 +176,27 @@ backup_repo_fs_size_bytes $REPO_FS_SIZE
 # HELP backup_repo_fs_free_bytes Bytes available on the filesystem holding the restic repository
 # TYPE backup_repo_fs_free_bytes gauge
 backup_repo_fs_free_bytes $REPO_FS_FREE
+# HELP restic_last_attempt_timestamp Unix timestamp of the last restic backup attempt, 0 if none
+# TYPE restic_last_attempt_timestamp gauge
+restic_last_attempt_timestamp $RESTIC_LAST_ATTEMPT
+# HELP restic_last_success_timestamp Unix timestamp of the last successful local restic snapshot, 0 if none
+# TYPE restic_last_success_timestamp gauge
+restic_last_success_timestamp $RESTIC_LAST_SUCCESS
+# HELP restic_last_offsite_success_timestamp Unix timestamp of the last successful offsite restic snapshot, 0 if none
+# TYPE restic_last_offsite_success_timestamp gauge
+restic_last_offsite_success_timestamp $RESTIC_LAST_OFFSITE
+# HELP restic_health_ok 1 if last restic health verdict was ok (exit 0), 0 otherwise
+# TYPE restic_health_ok gauge
+restic_health_ok $RESTIC_HEALTH_OK
+# HELP restic_health_timestamp Unix timestamp of the last restic health verdict, 0 if none
+# TYPE restic_health_timestamp gauge
+restic_health_timestamp $RESTIC_HEALTH_TS
+# HELP restic_verify_ok 1 if last restic verify passed, 0 if failed or never run
+# TYPE restic_verify_ok gauge
+restic_verify_ok $RESTIC_VERIFY_OK
+# HELP restic_verify_timestamp Unix timestamp of the last restic verify, 0 if never run
+# TYPE restic_verify_timestamp gauge
+restic_verify_timestamp $RESTIC_VERIFY_TS
 EOF
 
 # System metrics
