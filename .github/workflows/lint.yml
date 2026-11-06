@@ -114,6 +114,7 @@ jobs:
           GRAFANA_ADMIN_PASSWORD: ci-placeholder
           POSTGRES_PASSWORD: ci-placeholder
           REDIS_PASSWORD: ci-placeholder
+          DASHBOARD_ACTION_TOKEN: ci-placeholder
           POSTGRES_EXPORTER_DSN: postgresql://postgres:ci@postgres:5432/postgres?sslmode=disable
         run: |
           docker compose -f docker-compose.monitoring.yml config -q

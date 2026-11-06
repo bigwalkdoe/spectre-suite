@@ -30,7 +30,7 @@ stage() {
     local dest
     dest="$(mktemp -d)"
     mkdir -p "$dest/scripts" "$dest/prometheus" "$dest/web-dashboard"
-    cp "$PROJECT_ROOT/scripts/check-config-consistency.sh" "$dest/scripts/"
+    cp "$PROJECT_ROOT/spectre/actions/check-config-consistency.sh" "$dest/scripts/"
     cp "$PROJECT_ROOT/prometheus/prometheus.yml" "$dest/prometheus/"
     cp "$PROJECT_ROOT/prometheus/alert_rules.yml" "$dest/prometheus/"
     cp "$PROJECT_ROOT/prometheus/alertmanager.yml" "$dest/prometheus/"
