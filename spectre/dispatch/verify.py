@@ -128,7 +128,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from spectre.dispatch import registry
-from spectre.dispatch.resolve import actions_root
+from spectre.dispatch.resolve import actions_root, repo_root
 
 # The seven codes, in the order findings are reported: what would break a run
 # first, then what is left over from the migration.
@@ -627,18 +627,16 @@ def _references(inventory: HostInventory) -> list[Reference]:
 def _suite_tree(root: Path) -> Path:
     """The tree a reference is judged against besides the actions root itself.
 
-    The actions root is `$SPECTRE_ACTIONS_ROOT`, else `<repo>/scripts`; its parent
-    is the suite root that holds the actions, which is also where the rest of the
-    suite lives once the actions move to `<repo>/spectre/actions`. A suite's own
-    scripts are not confined to the actions directory — on the host this was
-    written against, the two five-minute Prometheus exporters still running from
-    cron live in the suite's `prometheus/` directory, and they are as much
-    Spectre's leftover work as any registry job is.
-
-    A root whose parent is itself (only reachable if `SPECTRE_ACTIONS_ROOT` were
-    `/`) collapses to the root, because otherwise every absolute path on the host
-    would count as ours.
+    In the unified layout actions live at `<repo>/spectre/actions`, so the
+    suite tree is the repo root (covering `scripts/`, `prometheus/`, etc.).
+    Legacy: `<repo>/actions` or `<repo>/scripts` => parent is repo root.
     """
+    rr = repo_root()
+    try:
+        if root.is_relative_to(rr):
+            return rr
+    except Exception:
+        pass
     parent = root.parent
     return parent if parent != root else root
 
