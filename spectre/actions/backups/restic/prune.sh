@@ -23,7 +23,7 @@ RESTIC_REPOSITORY_LOCAL="${RESTIC_REPOSITORY_LOCAL:-/backups/spectre-backup}"
 RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-rclone:spectre-backup:}"
 [ -n "${RESTIC_PASSWORD_FILE:-}" ] && [ -f "$RESTIC_PASSWORD_FILE" ] && export RESTIC_PASSWORD_FILE
 
-# shellcheck disable=SC2046
+# shellcheck disable=SC2046,SC2207
 args=(forget $(restic_forget_args) --prune)
 [ "$DRY_RUN" = true ] && args+=(--dry-run)
 
@@ -39,7 +39,7 @@ case "$REPO_MODE" in
   offsite) run_one "$RESTIC_REPOSITORY" offsite ;;
   all)
     [ -n "${RESTIC_REPOSITORY_LOCAL:-}" ] && run_one "$RESTIC_REPOSITORY_LOCAL" local
-    [ -n "${RESTIC_REPOSITORY:-}" ] && [ "$DRY_RUN" = true -o -n "${RESTIC_REPOSITORY_LOCAL:-}" ] && run_one "$RESTIC_REPOSITORY" offsite || true
+    [ -n "${RESTIC_REPOSITORY:-}" ] && { [ "$DRY_RUN" = true ] || [ -n "${RESTIC_REPOSITORY_LOCAL:-}" ]; } && run_one "$RESTIC_REPOSITORY" offsite || true
     ;;
   *) error "unknown --repo: $REPO_MODE"; exit 2 ;;
 esac
