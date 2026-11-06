@@ -10,7 +10,9 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-WRAPPER="$PROJECT_ROOT/scripts/backups/run-missed-backups.sh"
+# Consolidation: scripts/backups/run-missed-backups.sh is a forwarder; the sandbox
+# needs the real control flow with sibling stubs.
+WRAPPER="$PROJECT_ROOT/spectre/actions/backups/run-missed-backups.sh"
 INSTALLER="$PROJECT_ROOT/scripts/systemd/install-backup-catchup-timer.sh"
 
 PASSED=0
