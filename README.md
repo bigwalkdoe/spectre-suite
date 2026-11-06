@@ -480,32 +480,36 @@ scripts/maintenance/system-health-check.sh        # Host health
 Container vulnerability scanning is the Trivy job in
 `.github/workflows/security-scanning.yml`; it is not wrapped in a local script.
 
-## Restic (optional, default A)
+## Restic (adopted, optional)
 
-Optional, **versatile** restic integration (local path, SFTP, REST server, S3,
-B2, rclone — set `RESTIC_REPOSITORY` accordingly) that **keeps existing backup
-producers and `check-backup-health.sh` intact**. It snapshots existing `/backups`
-artifacts (manifest-aligned with `replicate-backups.sh`: DB dumps and
-`${PROJECT_PREFIX}_*.tar.gz` docker volumes; optionally configs/projects via
-`RESTIC_INCLUDE_CONFIGS=1`).
+Optional restic integration (local path, SFTP, REST server, S3, B2, rclone —
+set `RESTIC_REPOSITORY`/`RESTIC_REPOSITORY_LOCAL` accordingly) that **keeps
+existing backup producers and `check-backup-health.sh` intact**. It is
+local-first and tag-scoped (`spectre-suite,workstation`); offsite failures are
+degraded and never block local backup success.
 
 ```bash
-# Local-only quickstart (this dev machine). Store secrets outside the repo.
-# cp scripts/backups/restic.env.example /home/deon/.secrets/restic.env  # edit values
-# chmod 600 /home/deon/.secrets/restic-repo-password
-export RESTIC_CONFIG=/home/deon/.secrets/restic.env
-scripts/backups/restic-backup.sh --init
-scripts/backups/restic-backup.sh --check
-scripts/backups/restic-maintenance.sh snapshots
-scripts/backups/restic-maintenance.sh forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune --dry-run
+# Quickstart. Store secrets outside the repo.
+cp config/backups/restic/env.example "$HOME/.secrets/spectre-suite-backups.env"
+chmod 600 "$HOME/.secrets/spectre-suite-backups.env"  # and your password file
+export RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env"
+
+scripts/backups/restic/backup.sh           # local + offsite (degraded)
+scripts/backups/restic/backup.sh --health  # also run health check if available
+scripts/backups/restic/verify.sh           # repo check, writes last-verify marker
+scripts/backups/restic/verify.sh --full    # read-data subset check
+scripts/backups/restic/prune.sh --dry-run --repo local   # tag-scoped forget+prune
+scripts/backups/restic/restore.sh --latest --target /tmp/restore --dry-run
 ```
 
-Optional scheduling (user systemd timers, require configured `RESTIC_CONFIG`): `scripts/systemd/install-restic-timer.sh` (daily backup) and `scripts/systemd/install-restic-maintenance-timer.sh` (weekly `restic-forget-prune.sh`; verify `RESTIC_FORGET_ARGS` and dry-run first).
+Optional scheduling (per-user systemd timers, require configured
+`RESTIC_CONFIG`; never touches `spectre-backup-catchup`):
+- `scripts/systemd/install-restic-timer.sh` — daily adopted backup (default 04:10)
+- `scripts/systemd/install-restic-verify-timer.sh` — weekly adopted verify (default Sun 05:30)
 
-See `scripts/backups/restic.env.example` (no secrets). **Never commit
-`RESTIC_PASSWORD*`, keys, or backend credentials.** `BACKUP_REPO_DIR` /
-restic repo growth metrics in `prometheus/business-metrics-exporter.sh`
-auto-detect `/backups/spectre-backup` when present.
+See `config/backups/restic/` (templates only, no secrets). **Never commit
+`RESTIC_PASSWORD*`, keys, or backend credentials.** The business-metrics
+exporter reads restic markers for Prometheus (last-backup/last-verify).
 
 ## Documentation
 
