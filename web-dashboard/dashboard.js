@@ -701,22 +701,27 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
 // Update Container Status
 async function updateContainerStatus() {
     try {
-        // Derive real per-container state from cAdvisor instead of assuming it.
-        // cAdvisor reports last seen; an empty label set means no recent data.
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(
-            'count by (name) (container_last_seen{name!=""})'
-        )}`);
+        // Real per-container state from cAdvisor: use container_last_seen series
+        // with a 24h recency window (same window the Grafana resource dashboard
+        // uses: container_last_seen > (time() - 86400)). Containers with recent
+        // activity are reported running; an empty set means no recent data.
+        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent('container_last_seen')}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        const live = new Map((data.data && data.data.result || [])
-            .map(r => [r.metric.name, r.value[1]]));
-        const expected = ['prometheus', 'grafana', 'alertmanager',
-                          'node-exporter', 'cadvisor', 'redis-exporter',
-                          'postgres-exporter', 'blackbox-exporter'];
-        const containers = expected.map(name => ({
-            name,
-            status: live.has(name) ? 'running' : 'no-data'
-        }));
+        if (data.status !== 'success') throw new Error('Invalid container response');
+
+        const now = Math.floor(Date.now() / 1000);
+        const windowSeconds = 86400;
+        const seen = new Map();
+        for (const series of (data.data?.result || [])) {
+            const lastSeen = series.value?.[1];
+            if (!lastSeen || lastSeen < now - windowSeconds) continue;
+            const name = series.metric?.name || series.metric?.container_name;
+            if (name) seen.set(name, lastSeen);
+        }
+
+        const containerNames = [...seen.keys()].sort();
+        const containers = containerNames.map(name => ({ name, status: 'running' }));
 
         const grid = document.getElementById('containersGrid');
         grid.innerHTML = containers.map(container => `
@@ -727,15 +732,20 @@ async function updateContainerStatus() {
         `).join('');
 
         const containerStatus = document.getElementById('containerStatus');
-        const allRunning = containers.every(c => c.status === 'running');
-        containerStatus.textContent = allRunning ? 'All Running' : 'Issues';
-        containerStatus.className = allRunning ? 'badge badge-success' : 'badge badge-warning';
+        const hasData = containerNames.length > 0;
+        containerStatus.textContent = hasData ? `${containerNames.length} Running` : 'No data';
+        containerStatus.className = hasData ? 'badge badge-success' : 'badge';
         clearCardError('containersCard');
         setCardUpdated('containersCard');
     } catch (error) {
         console.error('Error fetching container status:', error);
         setCardError('containersCard', 'Container data unavailable');
         document.getElementById('containersGrid').innerHTML = '<div class="no-alerts">Unable to fetch container status</div>';
+        const containerStatus = document.getElementById('containerStatus');
+        if (containerStatus) {
+            containerStatus.textContent = 'No data';
+            containerStatus.className = 'badge';
+        }
     }
 }
 
@@ -904,6 +914,14 @@ function initializeChart() {
                     backgroundColor: 'rgba(79, 172, 254, 0.1)',
                     fill: true,
                     tension: 0.4
+                },
+                {
+                    label: 'Network I/O (B/s)',
+                    data: [],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.4
                 }
             ]
         },
@@ -945,7 +963,8 @@ async function updateChart(range) {
     const queries = [
         '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))',
         '100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))',
-        '100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'
+        '100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))',
+        'rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m])'
     ];
 
     // Bump the in-flight token; any in-progress fetch is now stale.
