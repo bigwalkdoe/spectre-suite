@@ -1,9 +1,7 @@
 #!/bin/bash
-# Install per-user systemd timers for optional restic backups (default: local-only).
-#
-# Secrets stay outside the repo: set RESTIC_CONFIG to an env file containing
-# RESTIC_REPOSITORY and RESTIC_PASSWORD/RESTIC_PASSWORD_FILE (see
-# scripts/backups/restic.env.example). The service fails clearly if unconfigured.
+# Install per-user systemd timer for the adopted spectre-suite restic backup.
+# Runs scripts/backups/restic/backup.sh daily (default 04:10). Never touches
+# spectre-backup-catchup (suite artifact catch-up).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,27 +9,25 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 USER_UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 SERVICE_NAME="spectre-restic-backup.service"
 TIMER_NAME="spectre-restic-backup.timer"
-BACKUP_SCRIPT="$PROJECT_ROOT/scripts/backups/restic-backup.sh"
-RESTIC_CONFIG_DEFAULT="${RESTIC_CONFIG:-~//.secrets/restic.env}"
-ON_CALENDAR="${RESTIC_ON_CALENDAR:-*-*-* 04:15:00}"
+BACKUP_SCRIPT="$PROJECT_ROOT/scripts/backups/restic/backup.sh"
+RESTIC_CONFIG_DEFAULT="${RESTIC_CONFIG:-$HOME/.secrets/spectre-suite-backups.env}"
+ON_CALENDAR="${RESTIC_ON_CALENDAR:-*-*-* 04:10:00}"
 
 usage() {
-    cat <<EOF
+  cat <<EOF
 Usage: $(basename "$0") [--print|--uninstall]
-
-Installs a user timer that runs restic-backup.sh daily (default $ON_CALENDAR).
-Set RESTIC_CONFIG (default $RESTIC_CONFIG_DEFAULT) and RESTIC_ON_CALENDAR to override.
-
+Installs a user timer that runs the adopted restic backup (default $ON_CALENDAR).
+Set RESTIC_CONFIG (default $RESTIC_CONFIG_DEFAULT) to the env file with repo/password settings.
   --print      Print the generated units without installing them.
-  --uninstall  Stop, disable, and remove the timer and service.
+  --uninstall  Stop, disable, and remove only $TIMER_NAME/$SERVICE_NAME.
 EOF
 }
 
 service_unit() {
-    cat <<EOF
+  cat <<EOF
 [Unit]
-Description=Spectre Suite restic backup (optional)
-Documentation=file://$PROJECT_ROOT/README.md
+Description=Spectre Suite adopted restic backup
+Documentation=file://$PROJECT_ROOT/docs/migration/2026-11-06-absorb-spectre-backup.md
 Wants=network-online.target
 After=network-online.target
 
@@ -48,10 +44,10 @@ EOF
 }
 
 timer_unit() {
-    cat <<EOF
+  cat <<EOF
 [Unit]
-Description=Spectre Suite daily restic backup
-Documentation=file://$PROJECT_ROOT/README.md
+Description=Spectre Suite daily adopted restic backup
+Documentation=file://$PROJECT_ROOT/docs/migration/2026-11-06-absorb-spectre-backup.md
 
 [Timer]
 OnCalendar=$ON_CALENDAR
@@ -65,38 +61,26 @@ EOF
 }
 
 case "${1:-}" in
-    --print)
-        echo "# $SERVICE_NAME"; service_unit; echo; echo "# $TIMER_NAME"; timer_unit; exit 0 ;;
-    --uninstall)
-        if command -v systemctl >/dev/null 2>&1; then
-            systemctl --user stop "$TIMER_NAME" 2>/dev/null || true
-            systemctl --user disable "$TIMER_NAME" 2>/dev/null || true
-        fi
-        rm -f "$USER_UNIT_DIR/$TIMER_NAME" "$USER_UNIT_DIR/$SERVICE_NAME"
-        if command -v systemctl >/dev/null 2>&1; then systemctl --user daemon-reload 2>/dev/null || true; fi
-        echo "Removed $TIMER_NAME and $SERVICE_NAME from $USER_UNIT_DIR"; exit 0 ;;
-    -h|--help) usage; exit 0 ;;
-    "") ;;
-    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  --print) echo "# $SERVICE_NAME"; service_unit; echo; echo "# $TIMER_NAME"; timer_unit; exit 0 ;;
+  --uninstall)
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl --user stop "$TIMER_NAME" 2>/dev/null || true
+      systemctl --user disable "$TIMER_NAME" 2>/dev/null || true
+    fi
+    rm -f "$USER_UNIT_DIR/$TIMER_NAME" "$USER_UNIT_DIR/$SERVICE_NAME"
+    command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload 2>/dev/null || true
+    echo "Removed $TIMER_NAME and $SERVICE_NAME from $USER_UNIT_DIR"; exit 0 ;;
+  -h|--help) usage; exit 0 ;; "") ;; *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
 esac
 
-if ! command -v systemctl >/dev/null 2>&1; then echo "systemctl is not available" >&2; exit 1; fi
-if ! systemctl --user show-environment >/dev/null 2>&1; then echo "systemd user manager is not available" >&2; exit 1; fi
-if [ ! -x "$BACKUP_SCRIPT" ]; then echo "missing or not executable: $BACKUP_SCRIPT" >&2; exit 1; fi
-if [ ! -f "$RESTIC_CONFIG_DEFAULT" ]; then
-    echo "WARNING: RESTIC_CONFIG not found at $RESTIC_CONFIG_DEFAULT (service will fail until configured)" >&2
-fi
+command -v systemctl >/dev/null 2>&1 || { echo "systemctl unavailable" >&2; exit 1; }
+systemctl --user show-environment >/dev/null 2>&1 || { echo "systemd user manager unavailable" >&2; exit 1; }
+[ -x "$BACKUP_SCRIPT" ] || { echo "missing/not executable: $BACKUP_SCRIPT" >&2; exit 1; }
+[ -f "$RESTIC_CONFIG_DEFAULT" ] || echo "WARNING: $RESTIC_CONFIG_DEFAULT not found; configure before enabling" >&2
 
 mkdir -p "$USER_UNIT_DIR"
 service_unit > "$USER_UNIT_DIR/$SERVICE_NAME"
 timer_unit > "$USER_UNIT_DIR/$TIMER_NAME"
 systemctl --user daemon-reload
 systemctl --user enable --now "$TIMER_NAME"
-
-if command -v loginctl >/dev/null 2>&1; then
-    linger=$(loginctl show-user "$USER" -p Linger --value 2>/dev/null || true)
-    if [ "$linger" != "yes" ]; then
-        echo "WARNING: enable lingering if needed: sudo loginctl enable-linger $USER" >&2
-    fi
-fi
-echo "Installed $TIMER_NAME ($ON_CALENDAR). Configure RESTIC_CONFIG and restic credentials before it runs."
+echo "Installed $TIMER_NAME ($ON_CALENDAR)."

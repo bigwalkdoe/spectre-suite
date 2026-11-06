@@ -12,7 +12,7 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 | **Security** | Fail2Ban brute force protection, OPA policy enforcement |
 | **Secrets** | Environment-based secret injection, .env template with secure permissions; **`.env`/secret files are excluded from all backup paths** |
 | **Network** | WireGuard VPN, network segmentation (internal/DMZ), DDoS protection, firewall hardening |
-| **CI/CD** | GitHub Actions workflows for syntax check, security scanning, DR test, load testing, multi-distro testing |
+| **CI/CD** | GitHub Actions workflows for Trivy filesystem scanning, OPA policy checks, and backup/DR script verification |
 | **DR** | RTO/RPO definitions, 10 incident runbooks, backup verification, DR testing schedule |
 | **Database** | Automated vacuum/analyze |
 | **Audit** | auditd rules, centralized audit trail, compliance reports, sudo command logging, access reviews |
@@ -71,10 +71,12 @@ boot or resume:
 | 01:00 | Database backup | Daily |
 | 02:00 | Full backup (Sat) / Docker volume backup | Daily/Weekly |
 | 02:30 | PostgreSQL vacuum & analyze (`vacuum-databases.sh`) | Daily |
+| 04:10 | Adopted restic backup (`scripts/backups/restic/backup.sh`, user timer) | Daily (`Persistent=true`) |
 | 04:30 | Off-site backup replication | Daily |
 | 04:40 | Off-site backup replication (`replicate-backups.sh`) | Daily |
 | 04:50 | Backup health check (`check-backup-health.sh`) | Daily |
 | 05:00 | Missed-backup catch-up (`run-missed-backups.sh`) | Daily, plus after boot/resume |
+| 05:30 | Adopted restic verify (`scripts/backups/restic/verify.sh`, user timer) | Weekly (Sun, `Persistent=true`) |
 | 08:00 | Compliance report (`scripts/maintenance/compliance-report.sh`) | Weekly (Mon), if scheduled |
 | 09:00 | Access review | Weekly (Mon) |
 | 10:00 | OPA policy evaluation | Weekly (Mon) |
@@ -141,7 +143,6 @@ docker compose -f docker-compose.monitoring.yml up -d
 #   Alertmanager: http://localhost:9093
 #   Blackbox:     http://localhost:9115
 #   Dashboard:    http://localhost:8081
-#   Loki:         http://localhost:3100   (logging stack)
 ```
 
 Redis and PostgreSQL are **not** published to the host at all; they are reachable
@@ -392,9 +393,9 @@ scripts/maintenance/check-disk-space.sh
 ## CI/CD Pipeline
 
 Three GitHub Actions workflows:
-- **ci-cd.yml**: Syntax check, tests, Trivy scan, Docker build, multi-distro test, deployment
-- **security-scanning.yml**: Weekly Trivy scan, OPA policy check
-- **disaster-recovery-test.yml**: Weekly backup verification, DR documentation check
+- **ci-cd.yml**: Trivy filesystem scan on push/PR (SARIF upload)
+- **security-scanning.yml**: Weekly Trivy scan + OPA policy check; includes a gated load-test job (`vars.SPECTRE_LOAD_TEST_URL`) that expects an in-repo k6 load-test script (none shipped)
+- **disaster-recovery-test.yml**: Weekly backup/restore script presence and integrity checks
 
 ## Project Structure
 
@@ -480,32 +481,36 @@ scripts/maintenance/system-health-check.sh        # Host health
 Container vulnerability scanning is the Trivy job in
 `.github/workflows/security-scanning.yml`; it is not wrapped in a local script.
 
-## Restic (optional, default A)
+## Restic (adopted, optional)
 
-Optional, **versatile** restic integration (local path, SFTP, REST server, S3,
-B2, rclone — set `RESTIC_REPOSITORY` accordingly) that **keeps existing backup
-producers and `check-backup-health.sh` intact**. It snapshots existing `/backups`
-artifacts (manifest-aligned with `replicate-backups.sh`: DB dumps and
-`${PROJECT_PREFIX}_*.tar.gz` docker volumes; optionally configs/projects via
-`RESTIC_INCLUDE_CONFIGS=1`).
+Optional restic integration (local path, SFTP, REST server, S3, B2, rclone —
+set `RESTIC_REPOSITORY`/`RESTIC_REPOSITORY_LOCAL` accordingly) that **keeps
+existing backup producers and `check-backup-health.sh` intact**. It is
+local-first and tag-scoped (`spectre-suite,workstation`); offsite failures are
+degraded and never block local backup success.
 
 ```bash
-# Local-only quickstart (this dev machine). Store secrets outside the repo.
-# cp scripts/backups/restic.env.example ~//.secrets/restic.env  # edit values
-# chmod 600 ~//.secrets/restic-repo-password
-export RESTIC_CONFIG=~//.secrets/restic.env
-scripts/backups/restic-backup.sh --init
-scripts/backups/restic-backup.sh --check
-scripts/backups/restic-maintenance.sh snapshots
-scripts/backups/restic-maintenance.sh forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune --dry-run
+# Quickstart. Store secrets outside the repo.
+cp config/backups/restic/env.example "$HOME/.secrets/spectre-suite-backups.env"
+chmod 600 "$HOME/.secrets/spectre-suite-backups.env"  # and your password file
+export RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env"
+
+scripts/backups/restic/backup.sh           # local + offsite (degraded)
+scripts/backups/restic/backup.sh --health  # also run health check if available
+scripts/backups/restic/verify.sh           # repo check, writes last-verify marker
+scripts/backups/restic/verify.sh --full    # read-data subset check
+scripts/backups/restic/prune.sh --dry-run --repo local   # tag-scoped forget+prune
+scripts/backups/restic/restore.sh --latest --target /tmp/restore --dry-run
 ```
 
-Optional scheduling (user systemd timers, require configured `RESTIC_CONFIG`): `scripts/systemd/install-restic-timer.sh` (daily backup) and `scripts/systemd/install-restic-maintenance-timer.sh` (weekly `restic-forget-prune.sh`; verify `RESTIC_FORGET_ARGS` and dry-run first).
+Optional scheduling (per-user systemd timers, require configured
+`RESTIC_CONFIG`; never touches `spectre-backup-catchup`):
+- `scripts/systemd/install-restic-timer.sh` — daily adopted backup (default 04:10)
+- `scripts/systemd/install-restic-verify-timer.sh` — weekly adopted verify (default Sun 05:30)
 
-See `scripts/backups/restic.env.example` (no secrets). **Never commit
-`RESTIC_PASSWORD*`, keys, or backend credentials.** `BACKUP_REPO_DIR` /
-restic repo growth metrics in `prometheus/business-metrics-exporter.sh`
-auto-detect `/backups/spectre-backup` when present.
+See `config/backups/restic/` (templates only, no secrets). **Never commit
+`RESTIC_PASSWORD*`, keys, or backend credentials.** The business-metrics
+exporter reads restic markers for Prometheus (last-backup/last-verify).
 
 ## Documentation
 
