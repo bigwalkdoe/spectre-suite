@@ -500,6 +500,8 @@ scripts/backups/restic-maintenance.sh snapshots
 scripts/backups/restic-maintenance.sh forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune --dry-run
 ```
 
+Optional scheduling (user systemd timer, requires configured `RESTIC_CONFIG`): `scripts/systemd/install-restic-timer.sh --print|--uninstall`.
+
 See `scripts/backups/restic.env.example` (no secrets). **Never commit
 `RESTIC_PASSWORD*`, keys, or backend credentials.** `BACKUP_REPO_DIR` /
 restic repo growth metrics in `prometheus/business-metrics-exporter.sh`
