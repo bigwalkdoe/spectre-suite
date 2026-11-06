@@ -480,6 +480,27 @@ scripts/maintenance/system-health-check.sh        # Host health
 Container vulnerability scanning is the Trivy job in
 `.github/workflows/security-scanning.yml`; it is not wrapped in a local script.
 
+## Restic (optional, default A)
+
+Optional restic integration that **keeps existing backup producers and
+`check-backup-health.sh` intact**: restic snapshots the existing `/backups`
+artifacts (same manifest scope as `replicate-backups.sh` — DB dumps and
+`${PROJECT_PREFIX}_*.tar.gz` docker volumes; optionally configs/projects).
+
+```bash
+# Requires restic + RESTIC_PASSWORD or RESTIC_PASSWORD_FILE in env (or RESTIC_CONFIG).
+export RESTIC_REPOSITORY=/backups/spectre-backup   # default
+scripts/backups/restic-backup.sh --init            # init repo if needed, then backup
+scripts/backups/restic-backup.sh --check           # verify repo
+scripts/backups/restic-maintenance.sh snapshots
+scripts/backups/restic-maintenance.sh forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune --dry-run
+```
+
+Store credentials outside the repo (e.g. `~//.secrets/backup-config.env`,
+referenced by `RESTIC_CONFIG`); **never commit secrets**. `BACKUP_REPO_DIR` /
+restic repo growth metrics in `prometheus/business-metrics-exporter.sh`
+auto-detect `/backups/spectre-backup` when present.
+
 ## Documentation
 
 | Document | Description |
