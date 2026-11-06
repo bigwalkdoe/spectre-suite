@@ -394,7 +394,7 @@ scripts/maintenance/check-disk-space.sh
 
 Three GitHub Actions workflows:
 - **ci-cd.yml**: Trivy filesystem scan on push/PR (SARIF upload)
-- **security-scanning.yml**: Weekly Trivy scan + OPA policy check; includes a gated load-test job (`vars.SPECTRE_LOAD_TEST_URL`) that expects a k6 script under `scripts/performance/load-testing/` (no in-repo harness shipped)
+- **security-scanning.yml**: Weekly Trivy scan + OPA policy check; includes a gated load-test job (`vars.SPECTRE_LOAD_TEST_URL`) that expects an in-repo k6 load-test script (none shipped)
 - **disaster-recovery-test.yml**: Weekly backup/restore script presence and integrity checks
 
 ## Project Structure
