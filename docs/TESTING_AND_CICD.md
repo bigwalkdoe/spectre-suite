@@ -326,10 +326,12 @@ bash -n tests/test_backup.sh
 - **Coverage.py**: Python coverage tool
 
 ### Quality Tools
-- **SonarQube**: Code quality analysis
-- **ESLint**: JavaScript linting
-- **Prettier**: Code formatting
-- **Black**: Python code formatting
+- **ShellCheck**: Bash script linting (used in practice via CI/local checks)
+- **ESLint**: JavaScript linting (if configured per project)
+- **Prettier**: Code formatting (if configured)
+- **Black**: Python code formatting (if configured)
+
+> SonarQube is not configured in this repository.
 
 ### Security Tools
 - **Trivy**: Container vulnerability scanning

@@ -12,7 +12,7 @@ A comprehensive system maintenance, security, monitoring, and disaster recovery 
 | **Security** | Fail2Ban brute force protection, OPA policy enforcement |
 | **Secrets** | Environment-based secret injection, .env template with secure permissions; **`.env`/secret files are excluded from all backup paths** |
 | **Network** | WireGuard VPN, network segmentation (internal/DMZ), DDoS protection, firewall hardening |
-| **CI/CD** | GitHub Actions workflows for syntax check, security scanning, DR test, load testing, multi-distro testing |
+| **CI/CD** | GitHub Actions workflows for Trivy filesystem scanning, OPA policy checks, and backup/DR script verification |
 | **DR** | RTO/RPO definitions, 10 incident runbooks, backup verification, DR testing schedule |
 | **Database** | Automated vacuum/analyze |
 | **Audit** | auditd rules, centralized audit trail, compliance reports, sudo command logging, access reviews |
@@ -143,7 +143,6 @@ docker compose -f docker-compose.monitoring.yml up -d
 #   Alertmanager: http://localhost:9093
 #   Blackbox:     http://localhost:9115
 #   Dashboard:    http://localhost:8081
-#   Loki:         http://localhost:3100   (logging stack)
 ```
 
 Redis and PostgreSQL are **not** published to the host at all; they are reachable
@@ -394,9 +393,9 @@ scripts/maintenance/check-disk-space.sh
 ## CI/CD Pipeline
 
 Three GitHub Actions workflows:
-- **ci-cd.yml**: Syntax check, tests, Trivy scan, Docker build, multi-distro test, deployment
-- **security-scanning.yml**: Weekly Trivy scan, OPA policy check
-- **disaster-recovery-test.yml**: Weekly backup verification, DR documentation check
+- **ci-cd.yml**: Trivy filesystem scan on push/PR (SARIF upload)
+- **security-scanning.yml**: Weekly Trivy scan + OPA policy check; includes a gated load-test job (`vars.SPECTRE_LOAD_TEST_URL`) that expects a k6 script under `scripts/performance/load-testing/` (no in-repo harness shipped)
+- **disaster-recovery-test.yml**: Weekly backup/restore script presence and integrity checks
 
 ## Project Structure
 
