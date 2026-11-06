@@ -10,27 +10,39 @@ SNAPSHOT="latest"
 DRY_RUN=false
 USE_LOCAL=false
 TARGET=""
-for arg in "${@:-}"; do
+INCLUDES=()
+EXPECT=""
+set -- "${@:-}"
+while [ "${1+x}" = x ]; do
+  arg="$1"; shift || true
+  if [ -n "$EXPECT" ]; then
+    case "$EXPECT" in
+      snapshot) SNAPSHOT="$arg" ;;
+      target) TARGET="$arg" ;;
+      include) INCLUDES+=("$arg") ;;
+    esac
+    EXPECT=""; continue
+  fi
   case "$arg" in
     --list|--snapshots) JUST_LIST=true ;;
     --snapshot=*) SNAPSHOT="${arg#*=}" ;;
-    --snapshot) SNAPSHOT="next" ;;
+    --snapshot) EXPECT=snapshot ;;
     --dry-run) DRY_RUN=true ;;
     --local) USE_LOCAL=true ;;
     --target=*) TARGET="${arg#*=}" ;;
-    --target) TARGET="next" ;;
+    --target) EXPECT=target ;;
+    --include=*) INCLUDES+=("${arg#*=}") ;;
+    --include) EXPECT=include ;;
     --help|-h)
       cat <<EOF
-Usage: $(basename "$0") [--list] [--snapshot <id>] [--dry-run] [--target <dir>] [--local]
+Usage: $(basename "$0") [--list] [--snapshot <id>] [--dry-run] [--target <dir>] [--local] [--include <path>|path ...]
+Extra path arguments (or --include=<path>) limit restore to matching paths.
 EOF
       exit 0 ;;
-    *)
-      if [ "$SNAPSHOT" = "next" ]; then SNAPSHOT="$arg";
-      elif [ "$TARGET" = "next" ]; then TARGET="$arg"; fi ;;
+    *) INCLUDES+=("$arg") ;;
   esac
 done
-[ "$SNAPSHOT" = "next" ] && SNAPSHOT="latest"
-[ "$TARGET" = "next" ] && TARGET=""
+[ -n "$EXPECT" ] && { echo "missing value for --$EXPECT" >&2; exit 2; }
 
 resolve_restic_dirs
 load_restic_env || true
@@ -51,4 +63,5 @@ fi
 args=(-r "$repo" restore "$SNAPSHOT")
 [ -n "$TARGET" ] && args+=(--target "$TARGET")
 [ "$DRY_RUN" = true ] && args+=(--dry-run)
+for inc in ${INCLUDES[@]+"${INCLUDES[@]}"}; do args+=(--include "$inc"); done
 restic "${args[@]}"
