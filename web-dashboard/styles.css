@@ -72,6 +72,8 @@ body {
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .status-indicator {
@@ -247,6 +249,11 @@ body {
     box-shadow: var(--shadow);
     overflow: hidden;
     border: 1px solid var(--border);
+    transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card {
+    transition: transform 0.3s, opacity 0.2s ease, border-color 0.2s ease;
 }
 
 .card.full-width {
@@ -727,6 +734,50 @@ body {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* Per-card updated timestamp */
+.card-updated {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-card .card-updated {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: none;
+    font-size: 10px;
+}
+
+/* Empty states */
+.empty-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px 16px;
+    font-size: 13px;
+}
+
+.empty-state i {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+.no-data-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: normal;
 }
 
 /* Focus-visible rings for keyboard navigation */

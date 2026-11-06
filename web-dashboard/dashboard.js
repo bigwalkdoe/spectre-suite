@@ -148,6 +148,20 @@ function updateLastRefreshed() {
     el.textContent = ` | Last refreshed: ${now.toLocaleTimeString()}`;
 }
 
+function setCardUpdated(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    let el = card.querySelector('.card-updated');
+    const text = `Updated ${new Date().toLocaleTimeString()}`;
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'card-updated';
+        const target = card.querySelector('.stat-content') || card.querySelector('.card-body') || card;
+        target.appendChild(el);
+    }
+    el.innerHTML = `<i class="fas fa-clock"></i> ${text}`;
+}
+
 function formatBytes(bytes) {
     if (bytes === null || bytes === undefined || isNaN(bytes)) return 'No data';
     if (bytes === 0) return '0 B';
@@ -285,6 +299,8 @@ function updateCPUMetrics(cpuUsage) {
             change.textContent = 'Normal';
             change.className = 'stat-change positive';
         }
+        clearCardError('cpuCard');
+        setCardUpdated('cpuCard');
     }
 }
 
@@ -303,6 +319,8 @@ function updateMemoryMetrics(memoryUsage) {
             change.textContent = 'Normal';
             change.className = 'stat-change positive';
         }
+        clearCardError('memoryCard');
+        setCardUpdated('memoryCard');
     }
 }
 
@@ -321,6 +339,8 @@ function updateDiskMetrics(diskUsage) {
             change.textContent = 'Normal';
             change.className = 'stat-change positive';
         }
+        clearCardError('diskCard');
+        setCardUpdated('diskCard');
     }
 }
 
@@ -337,6 +357,8 @@ function updateNetworkMetrics(networkIn, networkOut) {
             change.textContent = 'Normal';
             change.className = 'stat-change positive';
         }
+        clearCardError('networkCard');
+        setCardUpdated('networkCard');
     }
 }
 
@@ -375,6 +397,8 @@ function updateSystemHealth(systemLoad, bootTime, processCount, temperature) {
     } else {
         document.getElementById('temperature').textContent = 'No data';
     }
+    clearCardError('healthCard');
+    setCardUpdated('healthCard');
 }
 
 function formatUptime(seconds) {
@@ -428,6 +452,7 @@ function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes) {
         if (healthTs) statusEl.title = `Last health check: ${new Date(healthTs * 1000).toLocaleString()}`;
     }
     clearCardError('backupCard');
+    setCardUpdated('backupCard');
 }
 
 // Update Security Status
@@ -498,6 +523,7 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
         }
     }
     clearCardError('securityCard');
+    setCardUpdated('securityCard');
 }
 
 // Update Container Status
@@ -533,6 +559,7 @@ async function updateContainerStatus() {
         containerStatus.textContent = allRunning ? 'All Running' : 'Issues';
         containerStatus.className = allRunning ? 'badge badge-success' : 'badge badge-warning';
         clearCardError('containersCard');
+        setCardUpdated('containersCard');
     } catch (error) {
         console.error('Error fetching container status:', error);
         setCardError('containersCard', 'Container data unavailable');
@@ -575,6 +602,7 @@ async function checkAlerts() {
             }).join('');
         }
         clearCardError('alertsCard');
+        setCardUpdated('alertsCard');
     } catch (error) {
         console.error('Error checking alerts:', error);
         setCardError('alertsCard', 'Alerts unavailable');
@@ -756,6 +784,7 @@ async function updateChart(range) {
         });
         chart.update();
         clearCardError('chartCard');
+        setCardUpdated('chartCard');
     } catch (e) {
         if (myToken === chartRequestToken) {
             console.error('Error updating chart:', e);
