@@ -13,6 +13,8 @@ let chart = null;
 let chartRequestToken = 0; // Monotonic token to discard stale updateChart responses
 let isRefreshing = false;
 let lastPrometheusConnected = null;
+let currentAlerts = [];
+let activeAlertFilter = 'all';
 
 // UI helpers: loading states, error states, and toasts
 function setCardLoading(cardId, isLoading) {
@@ -86,6 +88,17 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.chart-controls .btn').forEach(b => b.classList.remove('active'));
             target.classList.add('active');
             updateChart(target.dataset.range);
+        });
+    });
+
+    // Alert severity filters
+    document.querySelectorAll('#alertFilters .btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = e.currentTarget;
+            document.querySelectorAll('#alertFilters .btn').forEach(b => b.classList.remove('active'));
+            target.classList.add('active');
+            activeAlertFilter = target.dataset.severity || 'all';
+            renderAlerts();
         });
     });
 });
@@ -637,6 +650,70 @@ async function updateContainerStatus() {
     }
 }
 
+function parseAlertTime(value) {
+    if (!value) return null;
+    if (typeof value === 'number') return value * 1000;
+    const t = Date.parse(value);
+    return isNaN(t) ? null : t;
+}
+
+function formatAlertAge(startMs) {
+    if (!startMs) return '';
+    const diff = Math.floor((Date.now() - startMs) / 1000);
+    if (diff < 60) return `firing ${diff}s`;
+    if (diff < 3600) return `firing ${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `firing ${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
+    return `firing ${Math.floor(diff / 86400)}d`;
+}
+
+function renderAlerts() {
+    const alertsList = document.getElementById('alertsList');
+    if (!alertsList) return;
+
+    const filtered = activeAlertFilter === 'all'
+        ? currentAlerts
+        : currentAlerts.filter(a => (a.labels?.severity || 'info') === activeAlertFilter);
+
+    const countEl = document.getElementById('alertCount');
+    countEl.textContent = String(currentAlerts.length);
+    const hasCritical = currentAlerts.some(a => (a.labels?.severity || '') === 'critical');
+    const hasWarning = currentAlerts.some(a => (a.labels?.severity || '') === 'warning');
+    countEl.className = hasCritical ? 'badge badge-danger' : hasWarning ? 'badge badge-warning' : 'badge badge-success';
+
+    if (currentAlerts.length === 0) {
+        alertsList.innerHTML = '<div class="no-alerts"><i class="fas fa-check-circle"></i> No active alerts</div>';
+        return;
+    }
+    if (filtered.length === 0) {
+        alertsList.innerHTML = `<div class="empty-state"><i class="fas fa-filter"></i>No ${activeAlertFilter} alerts</div>`;
+        return;
+    }
+
+    alertsList.innerHTML = filtered.map(alert => {
+        const severity = alert.labels?.severity || 'info';
+        const name = alert.labels?.alertname || 'Unnamed alert';
+        const description = alert.annotations?.description || alert.annotations?.summary || '';
+        const startMs = parseAlertTime(alert.activeAt || alert.startsAt);
+        const safeName = document.createElement('span');
+        safeName.textContent = name;
+        const safeDesc = document.createElement('span');
+        safeDesc.textContent = description;
+        const timeStr = startMs ? new Date(startMs).toLocaleString() : 'Unknown time';
+        const ageStr = formatAlertAge(startMs);
+        return `
+        <div class="alert-item ${severity}">
+            <div class="alert-title">${safeName.innerHTML}</div>
+            <div class="alert-description">${safeDesc.innerHTML}</div>
+            <div class="alert-meta">
+                <span class="alert-severity-tag">${severity}</span>
+                <span class="alert-age">${ageStr}</span>
+                <span class="alert-time">${timeStr}</span>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
 // Check Alerts
 async function checkAlerts() {
     try {
@@ -647,34 +724,13 @@ async function checkAlerts() {
             throw new Error('Invalid alerts response');
         }
 
-        const activeAlerts = data.data.alerts.filter(alert => alert.state === 'firing');
-        document.getElementById('alertCount').textContent = activeAlerts.length;
-
-        const alertsList = document.getElementById('alertsList');
-        if (activeAlerts.length === 0) {
-            alertsList.innerHTML = '<div class="no-alerts">No active alerts</div>';
-        } else {
-            alertsList.innerHTML = activeAlerts.map(alert => {
-                const severity = alert.labels?.severity || 'info';
-                const name = alert.labels?.alertname || 'Unnamed alert';
-                const description = alert.annotations?.description || '';
-                const safeName = document.createElement('span');
-                safeName.textContent = name;
-                const safeDesc = document.createElement('span');
-                safeDesc.textContent = description;
-                return `
-                <div class="alert-item ${severity}">
-                    <div class="alert-title">${safeName.innerHTML}</div>
-                    <div class="alert-description">${safeDesc.innerHTML}</div>
-                    <div class="alert-time">${new Date(alert.startsAt * 1000).toLocaleString()}</div>
-                </div>
-            `;
-            }).join('');
-        }
+        currentAlerts = data.data.alerts.filter(alert => alert.state === 'firing');
+        renderAlerts();
         clearCardError('alertsCard');
         setCardUpdated('alertsCard');
     } catch (error) {
         console.error('Error checking alerts:', error);
+        currentAlerts = [];
         setCardError('alertsCard', 'Alerts unavailable');
         document.getElementById('alertsList').innerHTML = '<div class="no-alerts">Unable to fetch alerts</div>';
     }
