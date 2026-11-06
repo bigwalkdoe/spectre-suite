@@ -78,7 +78,15 @@ epoch=$(read_marker_epoch "$STATE_DIR/last-success")
 snap_json=$(RESTIC_PASSWORD_FILE="$pw" restic -r "$repo" snapshots --latest 1 --json)
 echo "$snap_json" | grep -q '"spectre-suite"' || fail "snapshot missing spectre-suite tag: $snap_json"
 echo "$snap_json" | grep -q '"workstation"' || fail "snapshot missing workstation tag: $snap_json"
+sid=$(echo "$snap_json" | jq -r '.[0].short_id // .[0].id')
 pass "local backup creates tagged snapshot and success markers"
+
+# verify + restore wrappers
+export BACKUP_LOG_STDOUT=1
+bash "$PROJECT_ROOT/scripts/backups/restic/verify.sh" --local >/dev/null 2>&1 || fail "verify.sh failed on temp repo"
+[ -f "$STATE_DIR/last-verify" ] || fail "verify.sh did not write last-verify"
+bash "$PROJECT_ROOT/scripts/backups/restic/restore.sh" --snapshot "$sid" --dry-run --target "$tmp/restore-target" --local >/dev/null 2>&1 || fail "restore.sh --dry-run failed"
+pass "verify and restore wrappers work on tagged snapshot"
 
 # Degraded offsite (local must still succeed) - Review Focus 4
 export RESTIC_SKIP_OFFSITE=0
