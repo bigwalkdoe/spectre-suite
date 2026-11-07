@@ -22,6 +22,7 @@ HOME="$EMPTY_HOME" XDG_STATE_HOME="$EMPTY_HOME/.state" \
 [ "$(metric 'spectre_security_baseline_unknown' "$OUT/security_baseline_metrics.prom")" = "1" ] || fail "expected unknown=1"
 [ "$(metric 'spectre_security_baseline_stale' "$OUT/security_baseline_metrics.prom")" = "0" ] || fail "never-run must not be stale"
 [ "$(metric 'spectre_security_baseline_last_run_timestamp_seconds' "$OUT/security_baseline_metrics.prom")" = "0" ] || fail "never-run last_run must be 0"
+[ "$(metric 'spectre_security_baseline_opa_compat_report_ok' "$OUT/security_baseline_metrics.prom")" = "-1" ] || fail "expected opa_compat_report_ok=-1 when never run"
 pass "never-run/unknown emits explicit state (no fabricated timestamp)"
 
 # 2) Fresh evidence with clear pass/fail markers
@@ -30,6 +31,7 @@ cat > "$LOGD/baseline.log" <<'EOF'
 [baseline] Phase 1a: OPA check (suite policies)
 OPA check: OK
 Phase 1b: OPA policy tests (compat)
+OPA compat: SKIPPED (set SECURITY_OPA_COMPAT=1 for Option A adapter report; suite-native OPA gate remains canonical)
 Phase 2: security hardening
 Hardening: COMPLETED
 Phase 9: drift detection
@@ -47,6 +49,7 @@ HOME="$EMPTY_HOME" XDG_STATE_HOME="$EMPTY_HOME/.state" SECURITY_BASELINE_LOG_DIR
 [ "$(metric 'spectre_security_baseline_opa_check_ok' "$OUT2/security_baseline_metrics.prom")" = "1" ] || fail "expected opa_check_ok=1"
 [ "$(metric 'spectre_security_baseline_hardening_ok' "$OUT2/security_baseline_metrics.prom")" = "1" ] || fail "expected hardening_ok=1"
 [ "$(metric 'spectre_security_baseline_drift_detected' "$OUT2/security_baseline_metrics.prom")" = "0" ] || fail "expected no drift"
+[ "$(metric 'spectre_security_baseline_opa_compat_report_ok' "$OUT2/security_baseline_metrics.prom")" = "-1" ] || fail "expected opa_compat_report_ok=-1 when skipped"
 pass "fresh evidence reports pass/no-drift states"
 
 # 3) Stale evidence + drift/failure markers
@@ -69,5 +72,32 @@ HOME="$EMPTY_HOME" XDG_STATE_HOME="$EMPTY_HOME/.state" SECURITY_BASELINE_LOG_DIR
 [ "$(metric 'spectre_security_baseline_drift_detected' "$OUT3/security_baseline_metrics.prom")" = "1" ] || fail "expected drift detected"
 [ "$(metric 'spectre_security_baseline_gitleaks_ok' "$OUT3/security_baseline_metrics.prom")" = "0" ] || fail "expected gitleaks findings/failure"
 pass "stale evidence and failures are explicit (stale != clean)"
+
+# 4) SECURITY_OPA_COMPAT Option A report semantics (report-ran, NOT "no denials")
+COMPAT="$TMP/compat-logs"; mkdir -p "$COMPAT"
+cat > "$COMPAT/baseline.log" <<'EOF'
+OPA check: OK
+OPA compat report: COMPLETED (see /tmp/opa-compat-report.log)
+DETAILS="hardening=0 opa_tests=0 opa_compat=0,on trivy_fs=0 wazuh=0 aide=0 gitleaks=0 image=0 sbom=0 drift=0 run_id=x log_dir=x"
+EOF
+touch "$COMPAT/baseline.log"
+OUT4="$TMP/out4"; mkdir -p "$OUT4"
+HOME="$EMPTY_HOME" XDG_STATE_HOME="$EMPTY_HOME/.state" SECURITY_BASELINE_LOG_DIR="$COMPAT" \
+  SPECTRE_SECURITY_ROOT="$TMP/no-security-repo" SECURITY_BASELINE_COMPAT_LOG_DIR="$TMP/no-compat" \
+  SPECTRE_SECURITY_BASELINE_STALE_SECONDS=999999 "$EXPORTER" "$OUT4" >/dev/null 2>&1
+[ "$(metric 'spectre_security_baseline_opa_compat_report_ok' "$OUT4/security_baseline_metrics.prom")" = "1" ] || fail "expected opa_compat_report_ok=1 (report produced; denials irrelevant)"
+
+cat > "$COMPAT/baseline.log" <<'EOF'
+OPA check: OK
+OPA compat report: issues (exit 2); see /tmp/opa-compat-report.log
+DETAILS="hardening=0 opa_tests=0 opa_compat=2,on trivy_fs=0 wazuh=0 aide=0 gitleaks=0 image=0 sbom=0 drift=0 run_id=x log_dir=x"
+EOF
+touch "$COMPAT/baseline.log"
+OUT5="$TMP/out5"; mkdir -p "$OUT5"
+HOME="$EMPTY_HOME" XDG_STATE_HOME="$EMPTY_HOME/.state" SECURITY_BASELINE_LOG_DIR="$COMPAT" \
+  SPECTRE_SECURITY_ROOT="$TMP/no-security-repo" SECURITY_BASELINE_COMPAT_LOG_DIR="$TMP/no-compat" \
+  SPECTRE_SECURITY_BASELINE_STALE_SECONDS=999999 "$EXPORTER" "$OUT5" >/dev/null 2>&1
+[ "$(metric 'spectre_security_baseline_opa_compat_report_ok' "$OUT5/security_baseline_metrics.prom")" = "0" ] || fail "expected opa_compat_report_ok=0 (helper/exec issues)"
+pass "opa_compat_report_ok is report-ran semantics (1 produced, 0 issues, -1 off; denials do not affect)"
 
 echo "All security baseline metrics tests passed."
