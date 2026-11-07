@@ -34,5 +34,5 @@ pass "retired suite restic stubs removed"
 
 # catch-up must remain
 { [ -f "$PROJECT_ROOT/spectre/actions/backups/run-missed-backups.sh" ] || [ -f "$PROJECT_ROOT/scripts/backups/run-missed-backups.sh" ]; } || fail "catch-up action missing"
-{ [ -f "$PROJECT_ROOT/spectre/actions/systemd/install-backup-catchup-timer.sh" ] || [ -f "$PROJECT_ROOT/scripts/systemd/install-backup-catchup-timer.sh" ]; } || fail "catch-up timer installer missing"
+[ -f "$PROJECT_ROOT/spectre/actions/systemd/install-backup-catchup-timer.sh" ] || fail "catch-up timer installer missing"
 pass "spectre-backup-catchup assets preserved"

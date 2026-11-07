@@ -13,7 +13,7 @@ This document outlines the security practices, vulnerability disclosure process,
 - **Alertmanager does not expand `${VAR}` in its config file**, so notification
   credentials cannot be interpolated there. They are written as one-value files
   at mode `0600` under `prometheus/alertmanager-secrets/` by
-  `scripts/setup-notification-channels.sh`, which is gitignored and bind-mounted
+  `spectre run setup-notification-channels` (`spectre/actions/setup-notification-channels.sh`), which is gitignored and bind-mounted
   read-only. Do not edit credentials into `prometheus/alertmanager.yml`.
 - Dependencies are scanned regularly with Trivy
 - Code is linted with shellcheck before commit, enforced by CI
