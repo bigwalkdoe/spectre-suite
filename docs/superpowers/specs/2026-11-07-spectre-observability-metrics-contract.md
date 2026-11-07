@@ -1,6 +1,6 @@
 # Spectre Observability Metrics Contract (draft)
 
-**Date:** 2027-11? (correct: 2026-11-07)  
+**Date:** 2026-11-07  
 **Status:** draft, implementation in progress (observability-first, additive)  
 **Scope:** Canonical metric families for integrating Spectre agent runtime signals and spectre-security/suite security-baseline pipeline evidence.
 
@@ -37,8 +37,9 @@ Emitted by `spectre/monitoring/exporters/security-baseline-metrics-exporter.sh` 
 
 ### Phase/result gauges (v1)
 Values use explicit status codes where helpful: `1=pass/clean/ok`, `0=fail/findings/drift/issue`, `-1=unknown/skipped/not applicable` (or use `*_unknown`/`*_skipped` companion gauges). v1 keeps it simple:
-- `spectre_security_baseline_opa_check_ok{source}` = 1 pass, 0 fail/issues, -1 unknown/skipped.
-- `spectre_security_baseline_opa_tests_ok{source}` = 1 pass, 0 fail, -1 unknown/skipped.
+- `spectre_security_baseline_opa_check_ok{source}` = 1 pass, 0 fail/issues, -1 unknown/skipped (suite-native OPA check).
+- `spectre_security_baseline_opa_tests_ok{source}` = 1 pass, 0 fail, -1 unknown/skipped (legacy compat policy tests).
+- `spectre_security_baseline_opa_compat_report_ok{source}` = 1 **Option A compat report produced/ran** when `SECURITY_OPA_COMPAT=1` (**report-only; denials do not make this 0**), 0 helper/exec issues, -1 off/unknown/skipped. Distinct from `opa_tests_ok` and from policy denials.
 - `spectre_security_baseline_hardening_ok{source}` = 1 ok, 0 fail, -1 unknown/skipped.
 - `spectre_security_baseline_drift_detected{source}` = 1 drift detected, 0 no drift (positive evidence), -1 unknown/skipped.
 - `spectre_security_baseline_sbom_ok{source}` = 1 ok, 0 fail/issues, -1 unknown/skipped.
