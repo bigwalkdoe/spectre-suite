@@ -89,6 +89,7 @@ def test_k8s_admission_report_batch_and_versions_index(tmp_path: Path):
     # read-only versions index surfacing (if present on host)
     if (Path("/home/deon/dev/github/spectre-security/security/opa/versions/index.json").exists()):
         assert "policy_versions_index" in d
+        assert d["policy_versions_index_summary"]["policy_count"] >= 1
     # summary-only omits per-fixture denial messages
     p3 = subprocess.run(
         [sys.executable, str(TOOL), "--summary-only", str(tmp_path)],
