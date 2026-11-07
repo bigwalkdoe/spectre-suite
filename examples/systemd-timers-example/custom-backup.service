@@ -7,8 +7,9 @@ Type=oneshot
 User=root
 WorkingDirectory=/opt/spectre-suite
 
-# Run the backup script
-ExecStart=/opt/spectre-suite/scripts/backups/backup-all.sh
+# Run the backup job (preferred dispatch; requires spectre installed on PATH).
+# Alternative: ExecStart=/opt/spectre-suite/spectre/actions/backups/backup-all.sh
+ExecStart=/usr/local/bin/spectre run backups/backup-all
 
 # Environment variables
 Environment="BACKUP_RETENTION_DAYS=7"

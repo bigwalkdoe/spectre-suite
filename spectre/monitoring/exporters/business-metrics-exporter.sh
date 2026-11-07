@@ -54,16 +54,18 @@ read_marker() {
 }
 
 # Backup metrics.
-# Sourced from markers that scripts/backups/backup-databases.sh writes when a
-# run starts and when it completes. The previous implementation reported the
-# mtime of /backups/databases as "last successful backup", which was wrong
-# twice over: the directory mtime also advances when retention deletes an old
-# file, so a directory with no recent backup still looked fresh, and a failed
-# backup could not be distinguished from a stale one.
+# Sourced from markers that spectre/actions/backups/backup-databases.sh
+# (`spectre run backups/backup-databases`) writes when a run starts and when it
+# completes. The previous implementation reported the mtime of /backups/databases
+# as "last successful backup", which was wrong twice over: the directory mtime
+# also advances when retention deletes an old file, so a directory with no
+# recent backup still looked fresh, and a failed backup could not be
+# distinguished from a stale one.
 LAST_BACKUP=$(read_marker "$BACKUP_STATE_DIR/last-db-backup-success")
 LAST_ATTEMPT=$(read_marker "$BACKUP_STATE_DIR/last-db-backup-attempt")
 
-# Verdict of scripts/backups/check-backup-health.sh, which inspects the backup
+# Verdict of spectre/actions/backups/check-backup-health.sh
+# (`spectre run backups/check-backup-health`), which inspects the backup
 # archives themselves. Published so a failing health check can raise an alert
 # rather than only writing to a cron log nobody reads: a cron job that just exits
 # non-zero is still a silent failure, which is how 81 empty archives survived.
