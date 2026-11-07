@@ -4,20 +4,28 @@
 **Coordination:** cross-repo + host + org. **No destructive host mutations, no spectre-security repo deletion/archive on GitHub, no systemd repointing performed without explicit confirmation.**  
 **Canonical plan:** `2026-11-07-spectre-security-ops-dedupe-retirement-plan.md`
 
-## Step 1 — Decide & document (coordination) — **documented; decision confirmation required**
-- **Recommended (recorded):** follow Option A now (suite contract canonical, adapters/compat reporting), evolve to C (shared core + adapters) selectively; treat `spectre-security` as **maintenance/read-only-candidate** until per-capability checklist is satisfied, then **archive read-only** (coordinated). See `2026-11-07-opa-governance-unification-plan.md` §6.
-- **Status as of 2026-11-07:** suite has absorbed baseline phase jobs/runner compat path, OPA adapter-tested slices (backup/network/docker evidence+metadata/security-compliance boundaries), isolated k8s admission + versions-index reporting, `spectre_security_baseline_*` observability (exporter/alerts/dashboard/tests, `opa_compat_report_ok` report-ran semantics). CI/OPA gates **38/0**, `actions verify` green.
-- **Decision still required (owner/org):** formal A/B/C confirmation; spectre-security status (active/maintenance/superseded) in org workflows; k8s admission/versions final placement + CI treatment (currently isolated, not in `data.security[k].deny`); disposition of SonarQube/ZAP hosted services/compose (operational deps vs retire).
+## Step 1 — Decide & document (coordination) — **decisions recorded (2026-11-07)**
+- **Decisions (confirmed):**
+  - **Status:** **Superseded** (plan for retirement/read-only archival once per-capability checklist satisfied, coordinated)
+  - **OPA governance:** **C now** (shared core + adapters) — define Spectre security contract + adapters (suite flat-baseline, spectre-security nested/test-data, k8s admission) and run core gates + adapter-specific tests; keep isolated paths separate from `data.security[k].deny` aggregation until explicitly integrated.
+  - **SonarQube/ZAP/hosted services:** **Evaluate separately** (treat as operational deps to evaluate/disposition; do not retire with repo until decided)
+- **Status as of 2026-11-07:** suite has absorbed baseline phase jobs/runner compat path, OPA Option A adapter-tested slices (backup/network/docker evidence+metadata/security-compliance boundaries), isolated k8s admission + versions-index reporting, `spectre_security_baseline_*` observability (exporter/alerts/dashboard/tests, `opa_compat_report_ok` report-ran semantics). CI/OPA gates **38/0**, `actions verify` green.
+- **Remaining coordination:** concrete adapter/core schema/versioning work for path C, k8s admission/versions final placement + CI treatment (currently isolated), hosted infra disposition tracking, full dependency removal plan.
 
 ## Step 2 — Remove hard runtime dependency on the repo path — **repo prep done (graceful/explicit); asset promotion decision-dependent**
-- **Finding:** `SPECTRE_SECURITY_ROOT` defaults to `~//dev/github/spectre-security` in compat/isolated tools (adapter report fallbacks, baseline runner/drift/exporter compat, k8s/versions reports). This is an **optional/compat dependency** by design; tools must fail clearly or degrade gracefully when absent.
+- **Decisions (confirmed 2026-11-07):**
+  - **Approach:** **Keep explicit/optional with graceful fallback** — compat/isolated tools use `SPECTRE_SECURITY_ROOT` with clear errors/degradation when absent; **do not fail hard** in compat modes.
+- **Finding:** `SPECTRE_SECURITY_ROOT` defaults to `~//dev/github/spectre-security` in compat/isolated tools (adapter report fallbacks, baseline runner/drift/exporter compat, k8s/versions reports). This is an **optional/compat dependency** by design.
 - **Executed (additive):** improved graceful/explicit behavior and docs — `versions-index-report`/`kubernetes-admission-report` report explicit missing-root/path errors and remain isolated; dependency documented here and in governance/ops docs. Tests skip when spectre-security assets absent.
-- **Not done (requires decision):** copying/promoting spectre-security OPA policies/versions/test-data into suite as canonical assets (governance decision). To fully remove the path dependency, either (a) make suite self-contained by promoting the *minimum* required assets with ownership/license/CI decisions, or (b) keep the dependency explicit/versioned for compat-only paths and document retirement precondition. **Default:** do not silently change canon; keep compat tools explicit.
+- **Not done (requires decision):** copying/promoting spectre-security OPA policies/versions/test-data into suite as canonical assets (governance decision under path C) if full removal is needed. Current approach keeps dependency explicit/versioned for compat-only paths.
 
-## Step 3 — Per-capability parity + host repointing — **repo prep; host/decision confirmation required**
-- **Repo-side (present):** `security/baseline/run` and phase jobs registered/verified; `prometheus/security-baseline-metrics-exporter` action + implementation registered; alerts/dashboard/docs/tests in place. OPA/k8s/versions reporting isolated (no `data.security[k].deny` gate impact).
-- **Host migration (NOT performed; explicit confirmation required):** repoint/migrate spectre-security baseline systemd exporter/timer/units to suite `prometheus/security-baseline-metrics-exporter` + canonical textfile wiring/templates. Verify no active schedulers reference spectre-security paths before/after.
-- **Decision/gap:** live infra input generation (`evaluate-policies.sh` shape differs) and full OPA porting/k8s+versions CI placement remain per governance plan.
+## Step 3 — Per-capability parity + host repointing — **repo prep; host decisions recorded (migration pending approval)**
+- **Decisions (confirmed 2026-11-07):**
+  - **3a (host):** Legacy system `security-baseline-http-exporter.{service,timer}` is **masked/inactive**; no suite template found. **Executed:** created/enabled user timer `spectre-security-baseline-metrics.timer` → `spectre-security-baseline-metrics.service` running `spectre/monitoring/exporters/security-baseline-metrics-exporter.sh` (every 5 min, `~/.config/systemd/user/`), writing to `prometheus/business-metrics/security_baseline_metrics.prom` (verified: wrote metrics, `source=spectre_security`). Left masked legacy system units unchanged.
+  - **3b (OPA path C / k8s):** **Keep k8s admission/versions isolated + separate CI for now** (not merged into `data.security[k].deny` aggregation). Path C core schema/adapters to be designed incrementally.
+- **Repo-side (present):** `security/baseline/run` and phase jobs registered/verified; `prometheus/security-baseline-metrics-exporter` action + implementation registered; alerts/dashboard/docs/tests in place. Textfile dir: `prometheus/business-metrics` (scraped via node_exporter textfile collector).
+- **Host migration:** suite user timer installed and active; masked legacy HTTP exporter untouched. No further host mutation performed.
+- **Decision/gap:** concrete path C contract/schema/versioning, k8s+versions final CI integration (if ever), live infra input generation parity.
 
 ## Step 4 — Triage remaining 12 `/usr/local/bin` legacy scripts — **triaged (read-only); NO action taken**
 **Evidence (2026-11-07):** after archiving `setup-backup-cron.sh` + `check-performance-wrapper.sh`, 12 files remain with `~//scripts` refs (root-owned, Jul 26, hashes differ from current spectre-security copies — likely installed legacy state).
