@@ -113,6 +113,7 @@ def main() -> int:
     ap.add_argument("--policy", default="", help="kubernetes-admission.rego file or policy dir (default: $SPECTRE_SECURITY_ROOT/security/opa/policies)")
     ap.add_argument("--version-metadata", default="", help="metadata.json path or versions/kubernetes-admission dir (default: auto under $SPECTRE_SECURITY_ROOT; read-only, report-only)")
     ap.add_argument("--include-versions-index", action="store_true", help="include spectre-security OPA versions/index.json (read-only, isolated; not in data.security[k].deny)")
+    ap.add_argument("--summary-only", action="store_true", help="batch mode: omit per-fixture denial messages (keep counts/errors)")
     ap.add_argument("--fail-on-deny", action="store_true", help="exit 1 if any denials are present (default: report-only, exit 0)")
     args = ap.parse_args()
     policy = find_policy(args.policy)
@@ -144,7 +145,8 @@ def main() -> int:
                 item["error"] = error
                 had_errors = True
             if denials:
-                item["denials"] = denials
+                if not args.summary_only:
+                    item["denials"] = denials
                 total_denials += len(denials)
             results.append(item)
         report = {
