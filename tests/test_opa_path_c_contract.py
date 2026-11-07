@@ -19,6 +19,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "spectre" / "policies" / "contract" / "mapping.v1.json"
+CONTRACT_SCHEMA = ROOT / "spectre" / "policies" / "contract" / "mapping.v1.schema.json"
 POLICY_DIR = ROOT / "spectre" / "policies"
 LINT_WORKFLOW = ROOT / ".github" / "workflows" / "lint.yml"
 
@@ -76,6 +77,18 @@ def test_contract_mapping_exists_and_is_valid_json():
     assert m["core"]["policy_dir"] == "spectre/policies"
     assert m["adapters"]["nested_infra_to_suite_flat"]["mappings"]
     assert m["adapters"]["k8s_admission"]["isolated"] is True
+
+
+def test_contract_mapping_validates_against_schema():
+    """Track 2 (core/contract evolution): formal schema validation, additive."""
+    assert CONTRACT_SCHEMA.exists(), f"missing {CONTRACT_SCHEMA}"
+    try:
+        import jsonschema  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        pytest.skip(f"jsonschema unavailable: {exc}")
+    schema = json.loads(CONTRACT_SCHEMA.read_text(encoding="utf-8"))
+    mapping = load_mapping()
+    jsonschema.Draft202012Validator(schema).validate(mapping)
 
 
 def test_core_ci_invariants_match_policy_contract():
