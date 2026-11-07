@@ -635,6 +635,22 @@ groups:
             Treat as evidence of policy/contract drift; review compat test logs.
             Unknown/skipped (-1) does not trigger this alert.
 
+      - alert: SecurityBaselineOPACompatReportIssues
+        expr: spectre_security_baseline_opa_compat_report_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline OPA compat report (Option A) had helper/exec issues"
+          description: >-
+            The Option A OPA compat report (SECURITY_OPA_COMPAT, report-only)
+            reported helper/exec issues (source={{ $labels.source }},
+            opa_compat_report_ok=0). Report-ran semantics: 1 = report
+            produced/ran (policy denials do NOT make this 0), 0 = issues,
+            -1 = off/unknown/skipped (does not trigger). Review
+            opa-compat-report.log/baseline evidence; this is not an indication
+            of policy denials and is distinct from opa_check_ok/opa_tests_ok.
+
       - alert: SecurityBaselineHardeningFailed
         expr: spectre_security_baseline_hardening_ok == 0
         for: 15m
