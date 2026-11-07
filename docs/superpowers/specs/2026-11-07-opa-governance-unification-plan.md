@@ -54,10 +54,11 @@
 6. **Deprecate legacy contract:** once parity is proven, retire `test-opa-policies.sh`/security-repo-only contracts or keep them behind explicit compat.
 
 ## 5. Immediate next tasks (additive)
-- [ ] Produce control-mapping matrix (CSV/MD) for suite `security.*` vs spectre-security packages/tests.
-- [ ] Implement a **nested→suite input adapter** for `current-infrastructure.json`-style data (enables `SECURITY_OPA_COMPAT` to run meaningfully against suite policies or a bridged ruleset).
-- [ ] Decide k8s admission/versions location and CI treatment.
-- [ ] Only after mapping+tests: merge/rename packages with CI count/baseline updates in the same, verified change.
+- [x] Produce control-mapping matrix (MD) for suite `security.*` vs spectre-security packages/tests — `docs/superpowers/specs/2026-11-07-opa-control-mapping-matrix.md` (2026-11-07).
+- [x] Implement a **nested→suite input adapter** for `current-infrastructure.json`-style data — `spectre/actions/security/baseline/opa-contract-adapter.py` (+ `tests/test_opa_contract_adapter.py`). Adapts to suite canonical flat fields; unmapped controls remain absent (fail-closed). Verified: adapted security-repo example yields 27 denials vs 38 on empty input (11 mappable controls asserted); `actions verify`/OPA gates unaffected.
+- [ ] Decide k8s admission/versions location and CI treatment (separate from `data.security[k].deny` aggregation unless explicitly integrated).
+- [ ] Port overlapping policies/tests in slices (docker/compliance/backup/network), keeping CI fail-closed count/baseline green per reviewed change.
+- [ ] Add compat runner that evaluates adapted nested data against suite policies (and reports mapped/unmapped) for `SECURITY_OPA_COMPAT`.
 
 ## 6. Decision needed
 Please choose **A**, **B**, or **C** (or constraints). Default recommendation: **A now, evolve to C** (shared core + adapters) once the control-mapping matrix and adapter tests are green. I will not change OPA packages/gates in a breaking way without this decision and passing CI checks.
