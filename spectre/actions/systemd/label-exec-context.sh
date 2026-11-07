@@ -39,7 +39,7 @@
 # The user's own `.local/bin` and home files are untouched -- this only touches
 # repository scripts referenced by system units.
 #
-# Usage:  sudo ./scripts/systemd/label-exec-context.sh [--check]
+# Usage:  sudo ./spectre/actions/systemd/label-exec-context.sh [--check]
 #         --check reports the current labels and exits non-zero if any
 #         system-unit script is not executable by the system domain. Safe to
 #         run unprivileged.

@@ -197,7 +197,6 @@ fi
 # This delegates to the label script's own --check, which reports the exact
 # paths and stays quiet where SELinux is not enforcing.
 _label_check="$PROJECT_ROOT/spectre/actions/systemd/label-exec-context.sh"
-[ -x "$_label_check" ] || _label_check="$PROJECT_ROOT/scripts/systemd/label-exec-context.sh"
 if [ -x "$_label_check" ]; then
     if "$_label_check" --check >/tmp/spectre-label-check.$$ 2>&1; then
         pass "repository scripts carry an exec label a system unit can use"
