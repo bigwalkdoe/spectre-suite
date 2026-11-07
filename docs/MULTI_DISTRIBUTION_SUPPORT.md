@@ -34,10 +34,10 @@ The system automatically detects the Linux distribution using the `/etc/os-relea
 
 ### Detection Script
 
-The detection logic is implemented in `scripts/detect-distribution.sh`:
+The detection logic is implemented in `spectre/actions/detect-distribution.sh`:
 
 ```bash
-source scripts/detect-distribution.sh
+source spectre/actions/detect-distribution.sh
 detect_distribution
 set_package_manager
 ```
@@ -101,9 +101,9 @@ set_package_manager
 All scripts in the suite have been updated to support multiple distributions:
 
 ### Updated Scripts
-- `scripts/maintenance/cleanup-system.sh` - Distribution-aware cleanup
-- `scripts/security/docker-security-hardening.sh` - Package manager-aware tool installation
-- `scripts/network/optimize-network-config.sh` - Distribution-specific network configuration
+- `spectre/actions/maintenance/cleanup-unused-resources.sh` - Distribution-aware cleanup
+- `spectre/actions/security/docker-security-hardening.sh` - Package manager-aware tool installation
+- `spectre/actions/network/optimize-network-config.sh` - Distribution-specific network configuration
 
 ### Adaptation Pattern
 
@@ -198,7 +198,7 @@ All modern distributions use NetworkManager, but some may use alternatives:
 
 To add support for a new distribution:
 
-1. Update `scripts/detect-distribution.sh`:
+1. Update `spectre/actions/detect-distribution.sh`:
    ```bash
    your-distro)
        PKG_MANAGER="package-manager"

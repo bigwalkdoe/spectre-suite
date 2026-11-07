@@ -1,268 +1,175 @@
 #!/bin/bash
 set -euo pipefail
-# Spectre Suite Installation Script
+# Spectre Suite installation (consolidation §8.2 aligned).
+#
+# Installs ONLY the `spectre` CLI into /usr/local/bin (as a wrapper to a managed
+# venv) and generates systemd units/timers that dispatch via `spectre run <job>`.
+# Does NOT copy action scripts to /usr/local/bin. Review before use on a host.
+
+PRINT_UNITS=0
+[ "${1:-}" = "--print-units" ] && PRINT_UNITS=1
 
 echo "==================================="
 echo "Spectre Suite Installation"
 echo "==================================="
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-   echo "Please run with sudo privileges"
-   exit 1
+if [ "$EUID" -ne 0 ] && [ "$PRINT_UNITS" -ne 1 ]; then
+  echo "Please run with sudo privileges" >&2
+  exit 1
 fi
 
-# Determine user home directory and the unprivileged account services should run as.
-# When run under `sudo`, SUDO_USER is the invoking account. Otherwise we fall back
-# to root so this script also works when executed directly as root.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${SPECTRE_REPO_ROOT:-$SCRIPT_DIR}"
+
+# Unprivileged account for scheduled jobs (when run via sudo).
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
-    USER_NAME="$SUDO_USER"
-    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-    if [ -z "$USER_HOME" ]; then
-        echo "Could not determine home directory for $SUDO_USER" >&2
-        exit 1
-    fi
+  USER_NAME="$SUDO_USER"
+  USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
 else
-    USER_NAME="root"
-    USER_HOME="$HOME"
+  USER_NAME="${USER_NAME:-root}"
+  USER_HOME="${HOME:-/root}"
+fi
+[ -n "${USER_HOME:-}" ] || USER_HOME="/root"
+
+SPECTRE_VENV="${SPECTRE_VENV:-/usr/local/share/spectre-venv}"
+SPECTRE_BIN="${SPECTRE_BIN:-/usr/local/bin/spectre}"
+
+# Backup directories (private)
+ensure_backup_dirs() {
+  echo "Creating backup directories..."
+  mkdir -p /backups/{databases,docker-volumes,configurations,projects}
+  chown -R "$USER_NAME:$USER_NAME" /backups
+  chmod -R 700 /backups
+  chmod 700 /backups /backups/{databases,docker-volumes,configurations,projects}
+}
+
+
+unit_out() {
+  local path="$1"
+  if [ "$PRINT_UNITS" -eq 1 ]; then cat > "/dev/stdout"; else cat > "$path"; fi
+}
+
+write_job_unit() {
+  local unit="$1" desc="$2" job="$3" after="${4:-network.target}"
+  if [ "$PRINT_UNITS" -eq 1 ]; then echo "### ${unit}.service"; fi
+  cat << EOF | unit_out "/etc/systemd/system/${unit}.service"
+[Unit]
+Description=$desc
+After=$after
+
+[Service]
+Type=oneshot
+ExecStart=$SPECTRE_BIN run $job
+WorkingDirectory=$REPO_ROOT
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+User=$USER_NAME
+Group=$USER_NAME
+EOF
+}
+
+write_timer() {
+  local unit="$1" desc="$2" calendar="$3"
+  if [ "$PRINT_UNITS" -eq 1 ]; then echo "### ${unit}.timer"; fi
+  cat << EOF | unit_out "/etc/systemd/system/${unit}.timer"
+[Unit]
+Description=$desc
+Requires=${unit}.service
+
+[Timer]
+OnCalendar=$calendar
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+}
+
+if [ "$PRINT_UNITS" -eq 1 ]; then
+  write_job_unit backup "Comprehensive System Backup" backups/backup-all "network.target docker.service"
+  write_job_unit maintenance "System Maintenance Service" maintenance/run-maintenance "network.target docker.service"
+  write_job_unit performance-check "Performance Monitoring Service" performance/check-performance
+  write_job_unit network-monitor "Network Monitoring Service" network/monitor-network
+  write_job_unit disk-space-check "Disk Space Monitoring Service" maintenance/check-disk-space
+  write_job_unit security-scan "Security Vulnerability Scanner" security/run-security-hardening "network.target"
+  exit 0
 fi
 
-# Create directories
-echo "Creating directories..."
-mkdir -p /backups/{databases,docker-volumes,configurations,projects}
+# Install spectre CLI into a managed venv and expose only /usr/local/bin/spectre
+install_spectre_cli() {
+  echo "Installing spectre CLI into $SPECTRE_VENV ..."
+  if [ ! -f "$REPO_ROOT/pyproject.toml" ]; then
+    echo "ERROR: $REPO_ROOT/pyproject.toml not found. Run from repo root or set SPECTRE_REPO_ROOT." >&2
+    exit 1
+  fi
+  python3 -m venv "$SPECTRE_VENV"
+  "$SPECTRE_VENV/bin/pip" install --upgrade pip >/dev/null
+  "$SPECTRE_VENV/bin/pip" install "$REPO_ROOT"
+  cat > "$SPECTRE_BIN" <<EOF
+#!/bin/bash
+exec "$SPECTRE_VENV/bin/spectre" "\$@"
+EOF
+  chmod 0755 "$SPECTRE_BIN"
+  echo "Installed $SPECTRE_BIN"
+}
 
-# Set permissions
-# Backups hold database dumps and volume archives, so they must not be
-# world-readable. 700 keeps them private to the owning account.
-echo "Setting permissions..."
-chown -R "$USER_NAME:$USER_NAME" /backups
-chmod -R 700 /backups
-chmod 700 /backups /backups/{databases,docker-volumes,configurations,projects}
+if [ "${SKIP_PIP_INSTALL:-0}" = "1" ]; then
+  echo "SKIP_PIP_INSTALL=1: writing $SPECTRE_BIN wrapper to $SPECTRE_VENV/bin/spectre (venv/package not created)."
+  mkdir -p "$(dirname "$SPECTRE_BIN")"
+  cat > "$SPECTRE_BIN" <<EOF
+#!/bin/bash
+exec "$SPECTRE_VENV/bin/spectre" "\$@"
+EOF
+  chmod 0755 "$SPECTRE_BIN"
+else
+  install_spectre_cli
+fi
 
-# Copy scripts to /usr/local/bin
-echo "Installing scripts..."
-install -m 0755 -o root -g root scripts/backups/*.sh /usr/local/bin/
-install -m 0755 -o root -g root scripts/performance/*.sh /usr/local/bin/
-install -m 0755 -o root -g root scripts/maintenance/*.sh /usr/local/bin/
-install -m 0755 -o root -g root scripts/network/*.sh /usr/local/bin/
-install -m 0755 -o root -g root scripts/security/*.sh /usr/local/bin/
+ensure_backup_dirs
 
-# Note: an earlier version copied every *.sh under the invoking user's ~/scripts
-# into /usr/local/bin and then executed some of them as root below. That let a
-# user-writable file run with root privileges. User scripts are no longer
-# installed automatically; drop them in place yourself if you need them.
-
-# Create systemd directory
+echo "Installing systemd units/timers (dispatch via spectre run)..."
 mkdir -p /etc/systemd/system
+write_job_unit backup "Comprehensive System Backup" backups/backup-all "network.target docker.service"
+write_timer backup "Daily Backup Timer" "*-*-* 02:00:00"
+write_job_unit maintenance "System Maintenance Service" maintenance/run-maintenance "network.target docker.service"
+write_timer maintenance "Weekly System Maintenance" "Sun *-*-* 03:00:00"
+write_job_unit performance-check "Performance Monitoring Service" performance/check-performance
+write_timer performance-check "Performance Monitoring Timer" "hourly"
+write_job_unit network-monitor "Network Monitoring Service" network/monitor-network
+write_timer network-monitor "Network Monitoring Timer" "hourly"
+write_job_unit disk-space-check "Disk Space Monitoring Service" maintenance/check-disk-space
+write_timer disk-space-check "Disk Space Monitoring Timer" "*-*-* 00:00:00"
+write_job_unit security-scan "Security Vulnerability Scanner" security/run-security-hardening "network.target"
+write_timer security-scan "Weekly Security Scanner" "Sat *-*-* 04:00:00"
 
-# Copy systemd services
-echo "Installing systemd services..."
-
-# Backup service
-cat > /etc/systemd/system/backup.service << EOF
-[Unit]
-Description=Comprehensive System Backup
-After=network.target docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/backup-all.sh
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-User=$USER_NAME
-Group=$USER_NAME
-EOF
-
-# Backup timer (daily at 2 AM)
-cat > /etc/systemd/system/backup.timer << 'EOF'
-[Unit]
-Description=Daily Backup Timer
-Requires=backup.service
-
-[Timer]
-OnCalendar=*-*-* 02:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Maintenance service
-cat > /etc/systemd/system/maintenance.service << EOF
-[Unit]
-Description=System Maintenance Service
-After=network.target docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/run-maintenance.sh
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-User=$USER_NAME
-Group=$USER_NAME
-EOF
-
-# Maintenance timer (weekly Sundays at 3 AM)
-cat > /etc/systemd/system/maintenance.timer << 'EOF'
-[Unit]
-Description=Weekly System Maintenance
-Requires=maintenance.service
-
-[Timer]
-OnCalendar=Sun *-*-* 03:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Performance check service
-cat > /etc/systemd/system/performance-check.service << EOF
-[Unit]
-Description=Performance Monitoring Service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/check-performance.sh
-User=$USER_NAME
-Group=$USER_NAME
-EOF
-
-# Performance check timer (hourly)
-cat > /etc/systemd/system/performance-check.timer << 'EOF'
-[Unit]
-Description=Performance Monitoring Timer
-
-[Timer]
-OnCalendar=hourly
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Network monitor service
-cat > /etc/systemd/system/network-monitor.service << EOF
-[Unit]
-Description=Network Monitoring Service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/network-monitor.sh
-User=$USER_NAME
-Group=$USER_NAME
-EOF
-
-# Network monitor timer (hourly)
-cat > /etc/systemd/system/network-monitor.timer << 'EOF'
-[Unit]
-Description=Network Monitoring Timer
-
-[Timer]
-OnCalendar=hourly
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Disk space check service
-cat > /etc/systemd/system/disk-space-check.service << EOF
-[Unit]
-Description=Disk Space Monitoring Service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/check-disk-space.sh
-User=$USER_NAME
-Group=$USER_NAME
-EOF
-
-# Disk space check timer (daily at midnight)
-cat > /etc/systemd/system/disk-space-check.timer << 'EOF'
-[Unit]
-Description=Disk Space Monitoring Timer
-
-[Timer]
-OnCalendar=*-*-* 00:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Security scan service
-cat > /etc/systemd/system/security-scan.service << EOF
-[Unit]
-Description=Security Vulnerability Scanner
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/run-security-hardening.sh
-User=$USER_NAME
-Group=$USER_NAME
-EOF
-
-# Security scan timer (weekly Saturdays at 4 AM)
-cat > /etc/systemd/system/security-scan.timer << 'EOF'
-[Unit]
-Description=Weekly Security Scanner
-
-[Timer]
-OnCalendar=Sat *-*-* 04:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Reload systemd
-echo "Reloading systemd daemon..."
+echo "Reloading systemd..."
 systemctl daemon-reload
-
-# Enable timers
 echo "Enabling timers..."
-systemctl enable backup.timer
-systemctl enable maintenance.timer
-systemctl enable performance-check.timer
-systemctl enable network-monitor.timer
-systemctl enable disk-space-check.timer
-systemctl enable security-scan.timer
-
-# Start timers
+systemctl enable backup.timer maintenance.timer performance-check.timer network-monitor.timer disk-space-check.timer security-scan.timer
 echo "Starting timers..."
-systemctl start backup.timer
-systemctl start maintenance.timer
-systemctl start performance-check.timer
-systemctl start network-monitor.timer
-systemctl start disk-space-check.timer
-systemctl start security-scan.timer
+systemctl start backup.timer maintenance.timer performance-check.timer network-monitor.timer disk-space-check.timer security-scan.timer
 
-# Apply system performance optimizations and network hardening.
-# These mutate live system state (sysctl, firewall rules, docker daemon), so
-# they are opt-in rather than an automatic side effect of installing.
+# Optional hardening (mutates live system state). Uses spectre run, not /usr/local/bin scripts.
 if [ "${APPLY_HARDENING:-0}" = "1" ]; then
-    echo "Applying system performance optimizations..."
-    /usr/local/bin/optimize-system-performance.sh
-    echo "Applying network security hardening..."
-    /usr/local/bin/network-security-hardening.sh
+  echo "Applying system performance optimizations via spectre..."
+  "$SPECTRE_BIN" run performance/optimize-system-performance || true
+  echo "Applying network security hardening via spectre..."
+  "$SPECTRE_BIN" run maintenance/network-security-hardening || "$SPECTRE_BIN" run network/harden-network-security || true
 else
-    echo "Skipping system hardening (set APPLY_HARDENING=1 to apply)."
-    echo "  optimize-system-performance.sh    # tune sysctl/limits"
-    echo "  network-security-hardening.sh     # apply firewall rules"
+  echo "Skipping system hardening (set APPLY_HARDENING=1 to apply)."
+  echo "  spectre run performance/optimize-system-performance"
+  echo "  spectre run maintenance/network-security-hardening"
 fi
 
-# Configure Docker security. Backs up any existing daemon.json first: the
-# previous version overwrote it unconditionally and restarted the daemon, so a
-# customised config was lost on every install.
+# Docker daemon.json handling (backs up existing config first).
 if command -v docker >/dev/null 2>&1; then
-    DAEMON_JSON=/etc/docker/daemon.json
-    if [ -f "$DAEMON_JSON" ]; then
-        BACKUP="${DAEMON_JSON}.spectre-backup.$(date +%Y%m%d%H%M%S)"
-        cp -a "$DAEMON_JSON" "$BACKUP"
-        echo "Backed up existing $DAEMON_JSON to $BACKUP"
-    fi
-
-    cat > "$DAEMON_JSON" << 'EOF'
+  DAEMON_JSON=/etc/docker/daemon.json
+  if [ -f "$DAEMON_JSON" ]; then
+    BACKUP="${DAEMON_JSON}.spectre-backup.$(date +%Y%m%d%H%M%S)"
+    cp -a "$DAEMON_JSON" "$BACKUP"
+    echo "Backed up existing $DAEMON_JSON to $BACKUP"
+  fi
+  mkdir -p /etc/docker
+  cat > "$DAEMON_JSON" << 'EOF'
 {
   "log-driver": "json-file",
   "log-opts": {
@@ -275,38 +182,15 @@ if command -v docker >/dev/null 2>&1; then
   "icc": false
 }
 EOF
-    chmod 0644 "$DAEMON_JSON"
-
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-        systemctl restart docker
-    else
-        echo "Docker daemon not running; skipped restart. Reload it yourself when ready."
-    fi
+  chmod 0644 "$DAEMON_JSON"
+  if docker info >/dev/null 2>&1; then
+    systemctl restart docker
+  else
+    echo "Docker daemon not running; skipped restart. Reload it yourself when ready."
+  fi
 fi
 
-# Create verification script
-cat > /usr/local/bin/verify-installation.sh << 'EOF'
-#!/bin/bash
-echo "=== Installation Verification ==="
-
-echo "Checking timers..."
-systemctl list-timers --all
-
-echo "Checking script permissions..."
-ls -la /usr/local/bin/*.sh
-
-echo "Checking directories..."
-ls -la /backups
-
-echo "Checking logs..."
-ls -la /var/log/
-
-echo "Installation verification complete!"
-EOF
-
-chmod +x /usr/local/bin/verify-installation.sh
-
 echo "==================================="
-echo "Installation Complete!"
+echo "Installation complete (§8.2: only $SPECTRE_BIN installed to /usr/local/bin)."
+echo "Verify: $SPECTRE_BIN actions verify"
 echo "==================================="
-echo "Run verification: /usr/local/bin/verify-installation.sh"

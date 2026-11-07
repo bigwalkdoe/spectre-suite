@@ -27,14 +27,18 @@ Thumbs.db
 
 # Build artifacts (Python)
 __pycache__/
-*.pyc
-*.pyo
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 .venv/
 venv/
 dist/
 build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
 
 # Build artifacts (Node)
 node_modules/

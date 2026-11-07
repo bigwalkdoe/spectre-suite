@@ -12,17 +12,22 @@ echo "==========================================" >> "$BACKUP_LOG"
 echo "Multi-Project Backup - $DATE" >> "$BACKUP_LOG"
 echo "==========================================" >> "$BACKUP_LOG"
 
+_run_action() { # $1 rel
+  local a="$REPO_ROOT/spectre/actions/$1"
+  [ -f "$a" ] || a="$REPO_ROOT/scripts/$1"
+  "$a"
+}
 # Run Guardrail-AI backup
 echo "Running Guardrail-AI backup..." >> "$BACKUP_LOG"
 set +e
-"$REPO_ROOT/scripts/backups/backup-projects.sh" >> "$BACKUP_LOG" 2>&1
+_run_action "backups/backup-projects.sh" >> "$BACKUP_LOG" 2>&1
 GUARDRAIL_STATUS=$?
 set -e
 
 # Run Modelink backup
 echo "Running Modelink backup..." >> "$BACKUP_LOG"
 set +e
-"$REPO_ROOT/scripts/project-specific/backup-modelink.sh" >> "$BACKUP_LOG" 2>&1
+_run_action "project-specific/backup-modelink.sh" >> "$BACKUP_LOG" 2>&1
 MODELINK_STATUS=$?
 set -e
 

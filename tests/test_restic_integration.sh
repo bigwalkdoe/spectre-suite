@@ -9,9 +9,9 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BACKUP="$PROJECT_ROOT/scripts/backups/restic/backup.sh"
-# shellcheck source=../scripts/backups/restic/common.sh
-. "$PROJECT_ROOT/scripts/backups/restic/common.sh"
+if [ -f "$PROJECT_ROOT/spectre/actions/backups/restic/backup.sh" ]; then BACKUP="$PROJECT_ROOT/spectre/actions/backups/restic/backup.sh"; else BACKUP="$PROJECT_ROOT/scripts/backups/restic/backup.sh"; fi
+# shellcheck source=../spectre/actions/backups/restic/common.sh
+if [ -f "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh" ]; then . "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh"; else . "$PROJECT_ROOT/scripts/backups/restic/common.sh"; fi
 
 pass() { echo "✅ $1"; }
 fail() { echo "❌ $1"; exit 1; }
@@ -86,9 +86,9 @@ pass "local backup creates tagged snapshot and success markers"
 
 # verify + restore wrappers
 export BACKUP_LOG_STDOUT=1
-bash "$PROJECT_ROOT/scripts/backups/restic/verify.sh" --local >/dev/null 2>&1 || fail "verify.sh failed on temp repo"
+bash "$PROJECT_ROOT/spectre/actions/backups/restic/verify.sh" --local >/dev/null 2>&1 || fail "verify.sh failed on temp repo"
 [ -f "$STATE_DIR/last-verify" ] || fail "verify.sh did not write last-verify"
-bash "$PROJECT_ROOT/scripts/backups/restic/restore.sh" --snapshot "$sid" --dry-run --target "$tmp/restore-target" --local >/dev/null 2>&1 || fail "restore.sh --dry-run failed"
+bash "$PROJECT_ROOT/spectre/actions/backups/restic/restore.sh" --snapshot "$sid" --dry-run --target "$tmp/restore-target" --local >/dev/null 2>&1 || fail "restore.sh --dry-run failed"
 pass "verify and restore wrappers work on tagged snapshot"
 
 # Degraded offsite (local must still succeed) - Review Focus 4

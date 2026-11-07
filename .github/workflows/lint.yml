@@ -163,14 +163,14 @@ jobs:
         # could not fail. It lives here because this workflow runs on every
         # branch push, whereas security-scanning.yml only runs on main and pull
         # requests. Needs no Docker: it only reads the config files.
-        run: bash scripts/check-config-consistency.sh
+        run: bash spectre/actions/check-config-consistency.sh
 
       - name: Documented commands resolve to real files
         # The README told readers to run ~20 scripts that do not exist here, so
         # the documented quick start failed on the first command. Nothing
         # checked it. Unimplemented capabilities are now described in prose
         # without a path, which satisfies this check.
-        run: bash scripts/check-docs-references.sh
+        run: bash spectre/actions/check-docs-references.sh
 
       - name: Required secrets are actually required
         # Guards the fail-closed behaviour: compose must refuse to render when
@@ -193,14 +193,14 @@ jobs:
           version: v0.68.0
 
       - name: Check Rego syntax
-        run: opa check scripts/security/opa/policies/
+        run: opa check spectre/policies/
 
       # Empty input must deny every control: a policy that passes when its
       # input is absent fails open and is worse than no policy at all.
       - name: Policies fail closed
         run: |
           count=$(opa eval --format raw \
-            --data scripts/security/opa/policies \
+            --data spectre/policies \
             --input <(echo '{}') \
             'count([m | data.security[k].deny[m]])')
           echo "denials on empty input: $count"
@@ -212,8 +212,8 @@ jobs:
       - name: Declared baseline has no violations
         run: |
           denials=$(opa eval --format raw \
-            --data scripts/security/opa/policies \
-            --input scripts/security/opa/baseline.json \
+            --data spectre/policies \
+            --input spectre/policies/baseline.json \
             '[m | data.security[k].deny[m]]' | tail -1)
           echo "baseline denials: $denials"
           if [ "$denials" != "[]" ]; then

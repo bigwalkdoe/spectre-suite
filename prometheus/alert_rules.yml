@@ -285,7 +285,7 @@ groups:
             exist. BackupStale cannot evaluate while this holds, meaning failed
             or missing backups are currently invisible. Check the cron entry
             installed by scripts/deploy-enhanced-monitoring.sh, and run
-            prometheus/business-metrics-exporter.sh manually to confirm.
+            spectre/monitoring/exporters/business-metrics-exporter.sh manually to confirm.
 
   # check-backup-health.sh inspects the backup archives themselves: it verifies
   # each one is a real dump rather than a valid archive of nothing, that it is
@@ -322,7 +322,7 @@ groups:
       # unpruned garbage -- a prune reclaimed 7.1 GiB -- so these watch a
       # condition that genuinely occurred here, not a hypothetical one.
       # backup_repo_size_bytes and the filesystem figures come from
-      # prometheus/business-metrics-exporter.sh.
+      # spectre/monitoring/exporters/business-metrics-exporter.sh.
 
       - alert: BackupRepoFreeSpaceLow
         # Absolute headroom rather than a percentage. node_filesystem_* already
@@ -371,7 +371,7 @@ groups:
             paths) the right lever.
 
   # Security findings from the Spectre agent, published by
-  # prometheus/security-metrics-exporter.sh from GET /api/security/summary.
+  # spectre/monitoring/exporters/security-metrics-exporter.sh from GET /api/security/summary.
   #
   # Every value is read from the agent. The exporter that previously carried these
   # names emitted hardcoded zeros plus a security_last_scan_timestamp set to the

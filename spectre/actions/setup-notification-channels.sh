@@ -64,7 +64,7 @@ err()  { printf '  ERROR: %s\n' "$*" >&2; fail=1; }
 # directory outside the repository and writing credentials into it.
 if [ ! -f "$REPO_ROOT/prometheus/alertmanager.yml" ]; then
     echo "ERROR: resolved repository root '$REPO_ROOT' has no prometheus/alertmanager.yml." >&2
-    echo "  Expected the script to live in <repo>/scripts/." >&2
+    echo "  Expected to run from the spectre-suite repo (or set SPECTRE_REPO_ROOT)." >&2
     exit 1
 fi
 
