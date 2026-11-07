@@ -1,7 +1,7 @@
 # OPA Path C — Spectre Security Core Contract (v1, draft)
 
 **Date:** 2026-11-07  
-**Status:** draft (Path C groundwork, additive). **No CI/gate/aggregation changes.**  
+**Status:** implemented (Path C groundwork, additive; isolated k8s CI gate added via `.github/workflows/opa-isolated-k8s.yml`). **No core CI/gate/aggregation changes.**  
 **Decision:** Path C now (shared core + adapters), keep k8s admission/versions **isolated + separate CI for now** (not merged into `data.security[k].deny` aggregation).
 
 ## 1. Core (suite-canonical, enforced)
