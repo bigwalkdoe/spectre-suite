@@ -9,9 +9,9 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-if [ -f "$PROJECT_ROOT/spectre/actions/backups/restic/backup.sh" ]; then BACKUP="$PROJECT_ROOT/spectre/actions/backups/restic/backup.sh"; else BACKUP="$PROJECT_ROOT/scripts/backups/restic/backup.sh"; fi
+BACKUP="$PROJECT_ROOT/spectre/actions/backups/restic/backup.sh"
 # shellcheck source=../spectre/actions/backups/restic/common.sh
-if [ -f "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh" ]; then . "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh"; else . "$PROJECT_ROOT/scripts/backups/restic/common.sh"; fi
+. "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh"
 
 pass() { echo "✅ $1"; }
 fail() { echo "❌ $1"; exit 1; }
