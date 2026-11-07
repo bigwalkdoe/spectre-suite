@@ -68,6 +68,9 @@ check_server_health() {
 }
 
 # Function to deploy maintenance scripts to remote server
+# Transitional: copies canonical spectre/actions and installs selected *.sh into
+# /usr/local/bin on the remote (legacy §8.2 model). Prefer installing the spectre
+# CLI on the remote and dispatching via `spectre run <job>` instead.
 deploy_maintenance_scripts() {
     local server_name=${1:-}
     local ssh_user=${2:-}
@@ -76,13 +79,12 @@ deploy_maintenance_scripts() {
     
     echo "Deploying maintenance scripts to $server_name..."
     
-    # Copy maintenance scripts directory
-    if [ -d "$REPO_ROOT/spectre/actions" ]; then
-        scp -P "$ssh_port" -r "$REPO_ROOT/spectre/actions/" "$ssh_user@$ssh_host:/tmp/spectre-actions/"
-        scp -P "$ssh_port" -r "$REPO_ROOT/scripts/" "$ssh_user@$ssh_host:/tmp/maintenance-scripts/" 2>/dev/null || true
-    else
-        scp -P "$ssh_port" -r "$REPO_ROOT/scripts/" "$ssh_user@$ssh_host:/tmp/maintenance-scripts/"
+    if [ ! -d "$REPO_ROOT/spectre/actions" ]; then
+        echo "ERROR: canonical actions not found: $REPO_ROOT/spectre/actions" >&2
+        echo "       (legacy scripts/ deploy source removed; install spectre on remote instead)" >&2
+        return 1
     fi
+    scp -P "$ssh_port" -r "$REPO_ROOT/spectre/actions/" "$ssh_user@$ssh_host:/tmp/spectre-actions/"
     
     # Install scripts on remote server
     execute_on_server "$server_name" "$ssh_user" "$ssh_host" "$ssh_port" "
@@ -94,17 +96,12 @@ deploy_maintenance_scripts() {
                 [ -d /tmp/spectre-actions/\$d ] && sudo cp /tmp/spectre-actions/\$d/*.sh /usr/local/bin/ 2>/dev/null || true
             done
             sudo chmod +x /usr/local/bin/*.sh 2>/dev/null || true
-            sudo rm -rf /tmp/spectre-actions /tmp/maintenance-scripts
+            sudo rm -rf /tmp/spectre-actions
+            echo 'Maintenance scripts deployed (transitional, from canonical spectre/actions)'
         else
-            sudo cp /tmp/maintenance-scripts/backups/*.sh /usr/local/bin/
-            sudo cp /tmp/maintenance-scripts/maintenance/*.sh /usr/local/bin/
-            sudo cp /tmp/maintenance-scripts/performance/*.sh /usr/local/bin/
-            sudo cp /tmp/maintenance-scripts/network/*.sh /usr/local/bin/
-            sudo cp /tmp/maintenance-scripts/security/*.sh /usr/local/bin/
-            sudo chmod +x /usr/local/bin/*.sh
-            sudo rm -rf /tmp/maintenance-scripts
+            echo 'ERROR: /tmp/spectre-actions missing on remote' >&2
+            exit 1
         fi
-        echo 'Maintenance scripts deployed successfully'
     "
 }
 

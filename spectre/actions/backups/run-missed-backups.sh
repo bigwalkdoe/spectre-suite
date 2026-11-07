@@ -27,7 +27,10 @@ fi
 
 # The timer and cron can otherwise overlap. This is deliberately a best-effort
 # check: cron does not take the lock above, so look for its processes directly.
-if pgrep -f "$PROJECT_ROOT/scripts/backups/(backup-all|backup-databases|backup-docker-volumes|backup-configurations)[.]sh" >/dev/null 2>&1; then
+# Match legacy scripts/ and canonical spectre/actions paths, plus spectre run dispatch.
+backup_jobs='backup-all|backup-databases|backup-docker-volumes|backup-configurations'
+backup_procs="($PROJECT_ROOT/(scripts|spectre/actions)/backups/($backup_jobs)\.sh|(spectre([[:space:]].*)?[[:space:]]run|python3?[[:space:]].*spectre\.cli\.main[[:space:]]+run)[[:space:]]+backups/($backup_jobs)([[:space:]]|\$))"
+if pgrep -f "$backup_procs" >/dev/null 2>&1; then
     log "a scheduled backup is already running; skipping"
     exit 0
 fi
