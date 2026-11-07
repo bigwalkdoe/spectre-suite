@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""SECURITY_OPA_COMPAT report: adapt nested spectre-security infra JSON to suite
+flat contract and evaluate against canonical spectre/policies (Option A).
+
+Reports mapped/unmapped controls and denials. Does NOT modify policies/gates.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+SUITE_ROOT = SCRIPT_DIR.parents[3]  # .../spectre-suite repo root
+ADAPTER = SCRIPT_DIR / "opa-contract-adapter.py"
+POLICY_DIR = SUITE_ROOT / "spectre" / "policies"
+
+
+def run(cmd, **kw):
+    return subprocess.run(cmd, text=True, capture_output=True, **kw)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("input", nargs="?", default="", help="nested current-infrastructure.json (or set SECURITY_BASELINE_FILE)")
+    ap.add_argument("--policy-dir", default=str(POLICY_DIR))
+    args = ap.parse_args()
+    src = args.input or str(Path.home() / ".local/state/spectre/security-baseline/current-infrastructure.json")
+    if not Path(src).exists():
+        # compat fallback
+        cand = Path("/home/deon/dev/github/spectre-security/security/test-data/current-infrastructure.json")
+        if cand.exists():
+            src = str(cand)
+        else:
+            print(f"input not found: {src}", file=sys.stderr)
+            return 2
+    with tempfile.TemporaryDirectory() as td:
+        adapted = Path(td) / "adapted.json"
+        report = Path(td) / "report.json"
+        r = run([sys.executable, str(ADAPTER), src, "-o", str(adapted), "--report", str(report)])
+        if r.returncode != 0:
+            sys.stderr.write(r.stderr or r.stdout)
+            return r.returncode
+        mapping = json.loads(report.read_text())
+        eval_r = run(["opa", "eval", "--format", "raw", "--data", args.policy_dir, "--input", str(adapted), "[m | data.security[k].deny[m]]"])
+        denials = []
+        if eval_r.returncode == 0:
+            try:
+                denials = json.loads(eval_r.stdout)
+                if not isinstance(denials, list):
+                    denials = [str(denials)]
+            except Exception:
+                denials = [f"(parse error: {eval_r.stdout[:200]})"]
+        else:
+            denials = [f"(opa eval failed rc={eval_r.returncode}: {(eval_r.stderr or eval_r.stdout)[:300]})"]
+    summary = {
+        "input": src,
+        "policy_dir": args.policy_dir,
+        "mapped_count": len(mapping.get("mapped", [])),
+        "mapped_fields": [m["suite_field"] for m in mapping.get("mapped", [])],
+        "denial_count": len(denials),
+        "denials": denials,
+        "adapter_notes": mapping.get("notes", []),
+        "unmapped_suite_controls_note": mapping.get("unmapped_suite_controls_note", ""),
+    }
+    print(json.dumps(summary, indent=2))
+    # exit 0 = report produced (compat mode); denials are informational under Option A adapter.
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
