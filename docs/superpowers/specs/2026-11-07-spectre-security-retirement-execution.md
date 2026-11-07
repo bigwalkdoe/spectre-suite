@@ -27,25 +27,23 @@
 - **Host migration:** suite user timer installed and active; masked legacy HTTP exporter untouched. No further host mutation performed.
 - **Decision/gap:** concrete path C contract/schema/versioning, k8s+versions final CI integration (if ever), live infra input generation parity.
 
-## Step 4 — Triage remaining 12 `/usr/local/bin` legacy scripts — **triaged (read-only); NO action taken**
-**Evidence (2026-11-07):** after archiving `setup-backup-cron.sh` + `check-performance-wrapper.sh`, 12 files remain with `~//scripts` refs (root-owned, Jul 26, hashes differ from current spectre-security copies — likely installed legacy state).
-
-| Script | Observed purpose (from head) | Risk | Suggested disposition (requires explicit confirmation) |
-|---|---|---|---|
-| `centralized-log-shipper.sh` | ships logs to remote Loki/S3; reads `~//scripts/logging/log-shipper.env`, scans `~//scripts/logs` | Medium — may be used manually; stale paths | Confirm manual/external use; if unused, archive to `/usr/local/bin/.archived-spectre-security-*` (0644). Migrate to suite/observability logging path if needed. |
-| `container-logrotate.sh` | configures Docker daemon json-file log opts (`/etc/docker/daemon.json`, restarts Docker) and system logrotate for `~//scripts/logs` etc. | **High** — mutates Docker daemon config and restarts Docker; stale log paths | **Do not execute.** Confirm whether equivalent config is managed elsewhere; archive if unused. |
-| `run-zap-scan.sh` | OWASP ZAP scan, reports to `~//scripts/security/reports` | Medium — runtime helper, stale report path | Confirm use; archive or replace with suite security scan action/output path. |
-| `run-trivy-scan.sh` | Trivy image/fs/repo scans, reports to `~//scripts/security/reports` | Medium — overlaps suite security scanning/trivy-image-scan; stale paths | Confirm use; prefer suite `security/*/trivy-*` / baseline actions; archive if unused. |
-| `setup-logging.sh` | starts Loki stack from `~//scripts/logging/docker-compose.loki.yml`, creates `~//scripts/logs` | **High** — deploys stack from legacy path | **Do not execute.** Archive unless actively used via known workflow; reconcile with suite/compose observability. |
-| `setup-resource-monitoring.sh` | generates `~//scripts/performance/*` cost/resource scripts | **High** — generator targeting legacy paths | **Do not execute.** Archive unless confirmed needed. |
-| `setup-opa-policies.sh` | installs OPA to `/usr/local/bin/opa`, generates policies under `~//scripts/security/opa` | **High** — generator; conflicts with suite-canonical `spectre/policies`/OPA governance | **Do not execute.** Archive; use suite OPA governance. |
-| `setup-audit-logging.sh` | configures auditd/rules/rotation, references `~//scripts` paths | **High** — mutates system audit config | **Do not execute** without review. Confirm host audit config source of truth; archive if legacy. |
-| `setup-security-scanning.sh` | installs Trivy, generates `~//scripts/security/run-trivy-scan.sh` + scan setup | **High** — generator/install + legacy paths | **Do not execute.** Prefer suite security actions; archive. |
-| `setup-database-optimization.sh` | generates `~//scripts/performance/pg-vacuum.sh`; hardcodes `guardrail-ai-postgres-1` | **High** — generator targeting legacy paths + app-specific container | **Do not execute.** Archive unless confirmed. |
-| `setup-secrets-management.sh` | sets up env-based secrets under `~//.secrets` (and possibly Vault mode) | **High** — secrets/config handling | **Do not execute** without review. Confirm if `.secrets` pattern is in active use; archive/migrate carefully. |
-| `setup-intrusion-detection.sh` | installs/configures Fail2Ban/Wazuh/AIDE | **High** — mutates host security controls (IDS/IPS/AIDE) | **Do not execute** without review. Confirm active IDS/IPS source of truth; reconcile with suite security baseline/hardening before any archive. |
-
-**Rule:** no archive/remove/replace without explicit per-file (or explicitly scoped batch) confirmation. `setup-intrusion-detection.sh`, `setup-audit-logging.sh`, `setup-logging.sh`, `container-logrotate.sh` touch active security/daemon/stack config — treat with extra caution.
+## Step 4 — Triage remaining 12 `/usr/local/bin` legacy scripts — **COMPLETE (evidenced)**
+**Confirmed/evidenced (2026-11-07):**
+- Earlier: `setup-backup-cron.sh` (sha256 `82b1908517...d8c7`) + `check-performance-wrapper.sh` (sha256 `29365ac6ce...8896`) archived.
+- Now: all 12 remaining scripts archived to `/usr/local/bin/.archived-spectre-security-20261107/` (0644) with SHA256s recorded:
+  - `centralized-log-shipper.sh` `d8e7a275...3dad`
+  - `container-logrotate.sh` `c906cc1e...17ac`
+  - `run-zap-scan.sh` `a12e62ac...8b57`
+  - `run-trivy-scan.sh` `c40fd822...7420`
+  - `setup-audit-logging.sh` `de10cc6c...7e7b`
+  - `setup-database-optimization.sh` `87e8bc23...a754`
+  - `setup-intrusion-detection.sh` `5e123526...2a6e`
+  - `setup-logging.sh` `735d25d6...ea7d`
+  - `setup-opa-policies.sh` `3e8e17e9...8ad9` (conflicts with suite OPA governance)
+  - `setup-resource-monitoring.sh` `616c18f7...22fe`
+  - `setup-secrets-management.sh` `b5ee1663...5ef0`
+  - `setup-security-scanning.sh` `5129ee4c...8147`
+- **Verification:** spot-check removed; `rg -l ~//scripts /usr/local/bin` → **no refs remain**. Archive contains 14 files total (all non-executable). Note: archiving prevents execution from `/usr/local/bin` but does not undo any prior system changes made by these scripts.
 
 ## Step 5 — Archive spectre-security read-only (coordinated) — **NOT executed**
 **Preconditions (all required):** steps 1–4 completed/confirmed; retirement checklist satisfied per capability; no required consumers of the repo path remain (or dependency explicitly versioned/accepted); host schedulers/units repointed; GitHub/org workflow coordination complete.
