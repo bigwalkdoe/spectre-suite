@@ -19,7 +19,7 @@
       "id": 1,
       "options": {
         "mode": "markdown",
-        "content": "**Security baseline pipeline evidence** (`spectre_security_baseline_*`) \u2014 distinct from **Spectre agent runtime** (`spectre_agent_*` / `security_*` findings). States: `1` ok/clean/no-drift, `0` fail/findings/drift, `-1` unknown/skipped/not configured. **Never-run, unknown, and stale evidence must not be read as clean.** Source: suite baseline runner and/or spectre-security evidence (A/D hybrid)."
+        "content": "**Security baseline pipeline evidence** (`spectre_security_baseline_*`) \u2014 distinct from **Spectre agent runtime** (`spectre_agent_*` / `security_*` findings). States: `1` ok/clean/no-drift (or report ran for `opa_compat_report_ok`), `0` fail/findings/drift (or helper/exec issues for `opa_compat_report_ok`), `-1` unknown/skipped/not configured. **Never-run, unknown, and stale evidence must not be read as clean.** **OPA:** `opa_check_ok` = suite check; `opa_tests_ok` = legacy compat tests (failures = test/contract issues); `opa_compat_report_ok` = Option A report-ran (failures = helper/exec issues only, **not denials**). Runbook: `docs/runbooks/security-baseline-opa-alerts.md`."
       }
     },
     {
