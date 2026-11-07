@@ -125,6 +125,12 @@ def main() -> int:
             report["policy_version_metadata"] = meta
         if vindex is not None:
             report["policy_versions_index"] = vindex
+            policies = (vindex.get("policies") or {}) if isinstance(vindex, dict) else {}
+            report["policy_versions_index_summary"] = {
+                "policy_count": len(policies) if isinstance(policies, dict) else None,
+                "policies": sorted(policies.keys()) if isinstance(policies, dict) else [],
+                "current_version": vindex.get("current_version") if isinstance(vindex, dict) else None,
+            }
         print(json.dumps(report, indent=2))
         if had_errors:
             return 2
