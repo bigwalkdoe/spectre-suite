@@ -33,6 +33,15 @@ ALLOWED_HOSTS="localhost 127.0.0.1 ::1 host.docker.internal"
 
 fail=0
 
+# C1 guardrail: tracked legacy scripts/ tree was removed; reintroduction should
+# fail fast here (and in CI lint.yml) so canonical spectre/actions paths stay authoritative.
+if [ -n "$(git -C "$PROJECT_ROOT" ls-files scripts 2>/dev/null)" ]; then
+    echo "ERROR: tracked files reintroduced under scripts/ (C1 removed the legacy tree)." >&2
+    echo "  Move to spectre/actions (or canonical location) or remove:" >&2
+    git -C "$PROJECT_ROOT" ls-files scripts 2>/dev/null | sed 's/^/    /' >&2
+    fail=1
+fi
+
 # Service names from the `services:` block only. A plain `^  name:$` match would
 # also pick up the network and volume names further down the file, letting a
 # typo that happens to collide with a volume name pass.
