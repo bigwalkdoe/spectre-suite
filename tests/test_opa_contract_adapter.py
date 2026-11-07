@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,19 @@ def run_adapter(src: dict) -> dict:
         check=True,
     )
     return json.loads(p.stdout)
+
+
+def run_adapter_with_report(src: dict) -> tuple[dict, dict]:
+    with tempfile.NamedTemporaryFile(suffix=".json") as rf:
+        p = subprocess.run(
+            [sys.executable, str(ADAPTER), "-", "--report", rf.name],
+            input=json.dumps(src),
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        report = json.loads(Path(rf.name).read_text())
+    return json.loads(p.stdout), report
 
 
 def test_maps_direct_compliance_fields():
@@ -235,3 +249,117 @@ def test_network_slice_evidence_fields_not_invented_as_suite_controls():
     # vpn denied (mapped) + 4 suite-only fail-closed = 5
     assert len(denials) == 5
     assert any("no VPN is configured" in d for d in denials)
+
+
+# --- Option A adapter-tested slice: docker domain (spectre-security overlap, evidence) ---
+# Legacy docker.security is per-container (privileged/mounts/memory_limit/0.0.0.0 ports/healthcheck)
+# vs suite security.docker global/flat (5 controls). Adapter derives docker_privileged_disabled and
+# heuristically docker_resource_limits when ALL containers declare memory_limit>0. Sensitive mounts,
+# 0.0.0.0 exposure, and missing healthcheck are evidence-only (report metadata) with NO suite control
+# mapping/invention; docker_not_root/no_new_privileges/userland_proxy_disabled remain fail-closed.
+# Report metadata is emitted only via --report (out of policy input). No policy/gate changes.
+
+
+def suite_docker_deny(adapted: dict) -> list[str]:
+    p = subprocess.run(
+        [str(OPA), "eval", "--format", "raw", "--data", str(POLICY_DIR),
+         "--input", "/dev/stdin", "data.security.docker.deny"],
+        input=json.dumps(adapted),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    out = json.loads(p.stdout)
+    return out if isinstance(out, list) else [str(out)]
+
+
+def test_docker_slice_privileged_and_resource_limits_derived_to_suite():
+    """Derived globals map to suite; unmapped global controls remain fail-closed."""
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    # No privileged, all have memory limits -> 2 derived controls satisfied, 3 fail-closed.
+    denials = suite_docker_deny(run_adapter({"compliance": {}, "network": {}, "backup": {}, "docker": [
+        {"name": "a", "privileged": False, "memory_limit": 2147483648},
+        {"name": "b", "privileged": False, "memory_limit": 1073741824},
+    ]}))
+    assert not any("privileged containers" in d for d in denials)
+    assert not any("resource limits" in d for d in denials)
+    assert any("dockerd must not run as root" in d for d in denials)
+    assert any("no-new-privileges" in d for d in denials)
+    assert any("userland-proxy" in d for d in denials)
+    assert len(denials) == 3
+
+
+def test_docker_slice_privileged_container_denied_by_suite():
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    denials = suite_docker_deny(run_adapter({"compliance": {}, "network": {}, "backup": {}, "docker": [
+        {"name": "ok", "privileged": False, "memory_limit": 1024},
+        {"name": "priv-app", "privileged": True, "memory_limit": 1024},
+    ]}))
+    assert any("privileged containers are enabled" in d for d in denials)
+
+
+def test_docker_slice_resource_limits_not_asserted_when_any_missing_fail_closed():
+    """Heuristic only asserts docker_resource_limits when ALL containers declare memory_limit>0."""
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter({"compliance": {}, "network": {}, "backup": {}, "docker": [
+        {"name": "ok", "privileged": False, "memory_limit": 1024},
+        {"name": "nolimit", "privileged": False, "memory_limit": 0},
+    ]})
+    assert "docker_resource_limits" not in adapted  # not invented when heuristic not met
+    denials = suite_docker_deny(adapted)
+    assert any("containers have no resource limits" in d for d in denials)
+    assert not any("privileged containers" in d for d in denials)
+
+
+def test_docker_slice_evidence_only_findings_do_not_invent_suite_controls():
+    """Sensitive mounts, 0.0.0.0 ports, missing healthcheck -> report evidence only, no suite mapping."""
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter({"compliance": {}, "network": {}, "backup": {}, "docker": [
+        {"name": "risky", "privileged": False, "memory_limit": 1024,
+         "mounts": [{"source": "/etc/passwd"}],
+         "ports": [{"host_ip": "0.0.0.0", "host_port": 8080}],
+         "healthcheck": ""},
+    ]})
+    # Derived globals may be asserted (no privilege, has mem limit); never invent these:
+    for k in ("docker_not_root", "docker_no_new_privileges", "docker_userland_proxy_disabled",
+              "sensitive_bind_mounts", "exposed_all_interfaces", "missing_healthcheck",
+              "mounts", "ports", "healthcheck", "docker_evidence"):
+        assert k not in adapted
+    denials = suite_docker_deny(adapted)
+    # 2 derived satisfied + 3 unmapped global controls fail-closed = 3 (evidence issues not suite controls)
+    assert len(denials) == 3
+    assert not any("privileged containers" in d for d in denials)
+    assert not any("resource limits" in d for d in denials)
+
+
+def test_docker_slice_report_metadata_out_of_policy_input():
+    """--report carries docker_evidence metadata; adapted policy input does not."""
+    import pytest
+    adapted, report = run_adapter_with_report({"compliance": {}, "network": {}, "backup": {}, "docker": [
+        {"name": "bad-app", "privileged": True, "memory_limit": 0,
+         "mounts": [{"source": "/etc/passwd"}, {"source": "/data/app"}],
+         "ports": [{"host_ip": "0.0.0.0", "host_port": 8080}, {"host_ip": "127.0.0.1", "host_port": 9090}],
+         "healthcheck": ""},
+        {"name": "ok", "privileged": False, "memory_limit": 2048,
+         "mounts": [{"source": "/data/ok"}], "ports": [{"host_ip": "127.0.0.1", "host_port": 3000}],
+         "healthcheck": "curl -f http://localhost:3000/health"},
+    ]})
+    assert "docker_evidence" not in adapted
+    ev = report["docker_evidence"]
+    assert ev["report_only"] is True
+    assert ev["container_count"] == 2
+    assert ev["privileged_containers"] == ["bad-app"]
+    assert "bad-app" in ev["no_memory_limit"]
+    assert {"container": "bad-app", "source": "/etc/passwd"} in ev["sensitive_bind_mounts"]
+    assert all(m["source"] != "/data/app" for m in ev["sensitive_bind_mounts"])
+    assert {"container": "bad-app", "host_port": 8080} in ev["exposed_all_interfaces"]
+    assert "bad-app" in ev["missing_healthcheck"]
+    assert "ok" not in ev["missing_healthcheck"]
