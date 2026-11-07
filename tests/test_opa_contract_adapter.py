@@ -363,3 +363,115 @@ def test_docker_slice_report_metadata_out_of_policy_input():
     assert {"container": "bad-app", "host_port": 8080} in ev["exposed_all_interfaces"]
     assert "bad-app" in ev["missing_healthcheck"]
     assert "ok" not in ev["missing_healthcheck"]
+
+
+# --- Option A adapter-tested slice: security-compliance overlap (careful, not 1:1) ---
+# Legacy security.compliance maps selected compliance.* fields into flat fields consumed by
+# MULTIPLE suite packages (security.firewall/audit/intrusion_detection) — NOT into suite
+# security.compliance (which has different controls: baseline/cis/pci/assessments/patch).
+# security_scanning_enabled and fail2ban_active/fail2ban_configured (from IDS alone) are not
+# asserted/invented. Unmapped suite controls in each package remain fail-closed.
+# No policy/gate changes; fail-closed count/baseline.json unchanged.
+
+
+def _suite_deny(pkg: str, adapted: dict) -> list[str]:
+    p = subprocess.run(
+        [str(OPA), "eval", "--format", "raw", "--data", str(POLICY_DIR),
+         "--input", "/dev/stdin", f"data.security.{pkg}.deny"],
+        input=json.dumps(adapted),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    out = json.loads(p.stdout)
+    return out if isinstance(out, list) else [str(out)]
+
+
+LEGACY_COMPLIANT = {
+    "compliance": {
+        "firewall_enabled": True,
+        "ssh_password_auth": False,
+        "audit_logging_enabled": True,
+        "intrusion_detection_active": True,
+        "file_integrity_monitoring": True,
+        "security_scanning_enabled": True,  # unmapped in suite
+    },
+    "network": {}, "backup": {}, "docker": [],
+}
+
+
+def test_compliance_slice_maps_into_relevant_suite_packages_not_suite_compliance():
+    """Mapped legacy compliance fields satisfy their suite package controls; suite compliance pkg stays fail-closed (not 1:1)."""
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter(LEGACY_COMPLIANT)
+    # mapped flat fields present
+    assert adapted["firewall_enabled"] is True
+    assert adapted["ssh_password_auth"] is False
+    assert adapted["audit_logging_enabled"] is True
+    assert adapted["intrusion_detection_active"] is True
+    assert adapted["file_integrity_monitoring"] is True
+    assert "security_scanning_enabled" not in adapted  # no suite control
+
+    fw = _suite_deny("firewall", adapted)
+    assert not any("firewalld is not active" in d for d in fw)
+    assert not any("SSH password authentication is enabled" in d for d in fw)
+    # unmapped suite firewall controls remain fail-closed
+    assert any("SSH root login is enabled" in d for d in fw)
+    assert any("fail2ban is not active" in d for d in fw)
+    assert len(fw) == 2
+
+    audit = _suite_deny("audit", adapted)
+    assert not any("auditd/audit logging is not enabled" in d for d in audit)
+    assert any("retention is under 90 days" in d for d in audit)
+    assert any("sudo logging is not enabled" in d for d in audit)
+    assert len(audit) == 2
+
+    ids = _suite_deny("intrusion_detection", adapted)
+    assert not any("intrusion detection is not enabled" in d for d in ids)
+    assert not any("file integrity monitoring is not enabled" in d for d in ids)
+    # fail2ban_configured NOT asserted from intrusion_detection_active alone
+    assert any("fail2ban is not configured" in d for d in ids)
+    assert any("log monitoring is not enabled" in d for d in ids)
+    assert any("alert thresholds are not configured" in d for d in ids)
+    assert len(ids) == 3
+
+    # suite security.compliance has DIFFERENT controls; legacy fields do not satisfy/invent them
+    comp = _suite_deny("compliance", adapted)
+    assert len(comp) == 5
+    for k in ("security_baseline_compliant", "cis_benchmarks_followed", "pci_dss_compliant",
+              "security_assessments_scheduled", "patch_management_active"):
+        assert k not in adapted
+
+
+def test_compliance_slice_disabled_firewall_and_ssh_password_map_to_suite_firewall():
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter({"compliance": {"firewall_enabled": False, "ssh_password_auth": True},
+                           "network": {}, "backup": {}, "docker": []})
+    fw = _suite_deny("firewall", adapted)
+    assert any("firewalld is not active" in d for d in fw)
+    assert any("SSH password authentication is enabled" in d for d in fw)
+
+
+def test_compliance_slice_audit_and_ids_fields_map_to_suite_packages():
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter({"compliance": {"audit_logging_enabled": False, "intrusion_detection_active": False,
+                                          "file_integrity_monitoring": False},
+                           "network": {}, "backup": {}, "docker": []})
+    assert any("auditd/audit logging is not enabled" in d for d in _suite_deny("audit", adapted))
+    ids = _suite_deny("intrusion_detection", adapted)
+    assert any("intrusion detection is not enabled" in d for d in ids)
+    assert any("file integrity monitoring is not enabled" in d for d in ids)
+
+
+def test_compliance_slice_unmapped_security_scanning_not_invented():
+    adapted, report = run_adapter_with_report({"compliance": {"security_scanning_enabled": False},
+                                               "network": {}, "backup": {}, "docker": []})
+    assert "security_scanning_enabled" not in adapted
+    # no suite field invented; mapping report doesn't claim a suite field for it
+    assert all(m["suite_field"] != "security_scanning_enabled" for m in report.get("mapped", []))
