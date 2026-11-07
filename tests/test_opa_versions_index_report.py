@@ -32,3 +32,14 @@ def test_versions_index_report_compact_omits_full_index_body():
     assert "index" not in d
     s = d["index_summary"]
     assert s["present"] is True and "kubernetes-admission" in s["policies"]
+
+
+def test_versions_index_report_policy_filter():
+    if not SEC_ROOT.exists():
+        pytest.skip("spectre-security OPA versions root not available")
+    p = subprocess.run([sys.executable, str(TOOL), "--policy", "kubernetes-admission", "--compact"],
+                       text=True, capture_output=True, check=True)
+    d = json.loads(p.stdout)
+    assert d["isolated"] is True and d["policy_filter"] == "kubernetes-admission"
+    assert list(d["policies"].keys()) == ["kubernetes-admission"]
+    assert d["index_summary"]["policies"] == ["kubernetes-admission"]
