@@ -1,7 +1,7 @@
 # OPA Governance Unification Plan (spectre-security → spectre-suite)
 
 **Date:** 2026-11-07  
-**Status:** **Path C selected** (shared core + explicit adapters; k8s/versions isolated). Groundwork implemented additively; core gates green.  
+**Status:** **Path C groundwork — COMPLETE** (2026-11-07; shared core + explicit adapters; k8s/versions isolated; isolated CI gate added via `.github/workflows/opa-isolated-k8s.yml`). Core gates green.
 **Context:** Absorption program (suite-as-canonical). Keep suite CI/dispatch/provenance; preserve evidence quality and CI gates.
 
 ## 1. Current contracts (observed)
