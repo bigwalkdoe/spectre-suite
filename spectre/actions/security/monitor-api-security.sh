@@ -1,9 +1,12 @@
 #!/bin/bash
 # API Security Monitoring Script
 
-SECURITY_LOG="$HOME/.local/share/api-security.log"
+# Systemd units may run with a minimal environment (HOME unset).
+: "${HOME:=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 2>/dev/null || true)}"
+export HOME="${HOME:-/root}"
+SECURITY_LOG="${SECURITY_LOG:-$HOME/.local/share/api-security.log}"
 DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p $HOME/.local/share
+mkdir -p "$(dirname "$SECURITY_LOG")"
 
 echo "==========================================" >> "$SECURITY_LOG"
 echo "API Security Monitor - $DATE" >> "$SECURITY_LOG"

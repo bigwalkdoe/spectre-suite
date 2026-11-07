@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+# Systemd units may run with a minimal environment (HOME unset); avoid unbound
+# variable aborts under set -u while preserving explicit overrides.
+: "${HOME:=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 2>/dev/null || true)}"
+export HOME="${HOME:-/root}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Main Security Orchestration Script

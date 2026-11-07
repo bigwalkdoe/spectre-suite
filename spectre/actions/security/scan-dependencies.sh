@@ -1,5 +1,8 @@
 #!/bin/bash
 set -euo pipefail
+# Systemd units may run with a minimal environment (HOME unset).
+: "${HOME:=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 2>/dev/null || true)}"
+export HOME="${HOME:-/root}"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Application Dependency Vulnerability Scanner
 
