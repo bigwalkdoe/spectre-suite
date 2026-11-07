@@ -1,7 +1,7 @@
 # spectre-security Retirement — Systematic Execution Status
 
-**Date:** 2026-11-07 (executed stepwise; repo-only/additive where safe)  
-**Coordination:** cross-repo + host + org. **No destructive host mutations, no spectre-security repo deletion/archive on GitHub, no systemd repointing performed without explicit confirmation.**  
+**Date:** 2026-11-07 (executed stepwise; repo-only/additive where safe); **5b GitHub archival completed 2026-11-08** (explicit override).  
+**Coordination:** cross-repo + host + org. Host/systemd repointing and destructive host mutations were not performed without confirmation; GitHub archival of `bigwalkdoe/spectre-security` was performed on 2026-11-08 by explicit request (see Step 5b).  
 **Canonical plan:** `2026-11-07-spectre-security-ops-dedupe-retirement-plan.md`
 
 ## Step 1 — Decide & document (coordination) — **decisions recorded (2026-11-07)**
@@ -45,10 +45,10 @@
   - `setup-security-scanning.sh` `5129ee4c...8147`
 - **Verification:** spot-check removed; `rg -l /home/deon/scripts /usr/local/bin` → **no refs remain**. Archive contains 14 files total (all non-executable). Note: archiving prevents execution from `/usr/local/bin` but does not undo any prior system changes made by these scripts.
 
-## Step 5 — Archive spectre-security read-only (coordinated) — **partially executed (confirmed)**
-- **5b (GitHub `bigwalkdoe/spectre-security`):** **Not now** (confirmed) — no GitHub archival performed.
+## Step 5 — Archive spectre-security read-only (coordinated) — **COMPLETE (evidenced)**
+- **5b (GitHub `bigwalkdoe/spectre-security`):** **Complete (2026-11-08).** Archived via `gh repo archive bigwalkdoe/spectre-security -y` (explicit override of the prior “Not now” decision). Verified: `gh repo view bigwalkdoe/spectre-security --json isArchived` → `true` (public, default branch `main`, last push `2026-11-03T13:56:07Z`).
 - **5c (retirement marker):** README notice added and committed **locally** in spectre-security (`06f5a86`), **not pushed** (confirmed). Local clone removal means that unpushed commit and untracked `AGENTS.md` are **lost**.
 - **5a (local clone `/home/deon/dev/github/spectre-security`):** **Complete (evidenced 2026-11-07).** Initial `rm -rf` left 88 root-owned items (permission denied); `sudo rm -rf /home/deon/dev/github/spectre-security` completed removal — path no longer exists. Unpushed local README marker commit (`06f5a86`) and untracked `AGENTS.md` lost with clone removal.
-- **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path absent; expected.
+- **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path absent; expected. GitHub repo is archived/read-only.
 
-**GitHub repo remains not archived (per 5b).**
+**GitHub repo archived (5b complete).**
