@@ -83,11 +83,16 @@ hardening=$(phase_status "$LOGD/hardening.log" "COMPLETED|completed successfully
 if [ -f "$BLOG" ] && grep -q "Hardening: COMPLETED" "$BLOG" 2>/dev/null; then hardening=1; fi
 if [ -f "$BLOG" ] && grep -q "Hardening: FAILED" "$BLOG" 2>/dev/null; then hardening=0; fi
 
-# Drift: 0 detected/failed means no drift in spectre-security runner semantics? Check carefully.
+# Drift: 0 = no drift (positive evidence), 1 = drift detected, -1 = unknown/skipped.
 drift=-1
-if [ -f "$LOGD/drift.log" ] || [ -f "$LOGD/drift-detection.log" ] || grep -q "Phase 9: drift\|drift detection" "$BLOG" 2>/dev/null; then
-  if grep -Eq "NO DRIFT|No drift detected|Drift detection: NO DRIFT" "$LOGD/drift.log" "$LOGD/drift-detection.log" "$BLOG" 2>/dev/null; then drift=0; fi
-  if grep -Eq "DRIFT|Drift detected|WARNING: Drift detected" "$LOGD/drift.log" "$LOGD/drift-detection.log" "$BLOG" 2>/dev/null; then drift=1; fi
+drift_files=()
+for _df in "$LOGD/drift.log" "$LOGD/drift-detection.log" "$BLOG"; do [ -f "$_df" ] && drift_files+=("$_df"); done
+if [ ${#drift_files[@]} -gt 0 ] && grep -Eq "Phase 9: drift|[Dd]rift detect|NO DRIFT|WARNING: Drift detected" "${drift_files[@]}" 2>/dev/null; then
+  if grep -Eq "NO DRIFT|No drift detected|Drift detection: NO DRIFT" "${drift_files[@]}" 2>/dev/null; then
+    drift=0
+  elif grep -Eh "WARNING: Drift detected|[Dd]rift detected" "${drift_files[@]}" 2>/dev/null | grep -Ev "NO DRIFT|No drift detected" | grep -q .; then
+    drift=1
+  fi
 fi
 
 sbom=$(phase_status "$LOGD/sbom.log" "SBOM generation: COMPLETED|COMPLETED" "WARNING: SBOM generation|FAILED")
