@@ -1,7 +1,7 @@
-"""Validation for the isolated OPA CI gate workflow (Phase C groundwork).
+"""Validation for the merged isolated OPA CI gate in lint workflow (Phase 5 groundwork).
 
-Ensures `.github/workflows/opa-isolated-k8s.yml` contains the required isolated
-k8s-admission job steps and does not run the core aggregation gate.
+Ensures `.github/workflows/lint.yml` contains the required isolated k8s-admission
+job steps and does not run the core aggregation gate.
 """
 from __future__ import annotations
 
@@ -10,24 +10,19 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / ".github" / "workflows" / "opa-isolated-k8s.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "lint.yml"
 
 
 def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
 
 
-def test_isolated_ci_gate_workflow_exists():
-    assert WORKFLOW.exists(), f"missing isolated CI gate workflow: {WORKFLOW}"
-    d = _workflow()
-    assert str(d.get("name") or "").startswith("OPA Isolated")
-
-
-def test_isolated_ci_gate_has_k8s_job_with_required_steps():
+def test_merged_lint_workflow_contains_isolated_k8s_job():
+    assert WORKFLOW.exists(), f"missing lint workflow: {WORKFLOW}"
     d = _workflow()
     jobs = d.get("jobs") or {}
-    assert "k8s-admission" in jobs, "isolated CI gate must define job 'k8s-admission'"
-    steps = (jobs["k8s-admission"] or {}).get("steps") or []
+    assert "opa-isolated-k8s" in jobs, "merged lint workflow must define job 'opa-isolated-k8s'"
+    steps = (jobs["opa-isolated-k8s"] or {}).get("steps") or []
     runs = [s.get("run") or "" for s in steps if s.get("name")]
     joined = "\n".join(runs)
     assert "opa check spectre/policies/k8s/" in joined
@@ -40,9 +35,9 @@ def test_isolated_ci_gate_has_k8s_job_with_required_steps():
     assert "test_opa_contract_adapter.py" in joined
 
 
-def test_isolated_ci_gate_does_not_run_core_aggregation_gate():
+def test_merged_lint_workflow_does_not_run_core_aggregation_gate():
     d = _workflow()
     jobs = d.get("jobs") or {}
-    steps = (jobs["k8s-admission"] or {}).get("steps") or []
+    steps = (jobs["opa-isolated-k8s"] or {}).get("steps") or []
     runs = "\n".join(s.get("run") or "" for s in steps if s.get("name"))
-    assert "data.security[k].deny" not in runs, "isolated gate must not run the core aggregation gate"
+    assert "data.security[k].deny" not in runs, "isolated job must not run the core aggregation gate"
