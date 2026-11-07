@@ -2,7 +2,7 @@
 
 Spectre Suite is a consolidated Linux operations suite for automated backups, restic snapshot workflows, monitoring/alerting (Prometheus + Grafana + Alertmanager), security hardening/scanning helpers, maintenance jobs, and operational reporting. It provides a unified `spectre` CLI/dispatch layer so scheduled and manual jobs run through one command surface with provenance.
 
-> **Consolidation status:** schedulers on the reference host have been repointed to `spectre run <job>` and `spectre actions verify` reports 0 findings for the migrated inventory. Repo-root `scripts/` and top-level `prometheus/*-exporter.sh` paths currently exist as legacy forwarders/compatibility paths; canonical implementations live under `spectre/actions/` and `spectre/monitoring/exporters/`. See `docs/migration/` and `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md`.
+> **Project status (current tree):** The `spectre` CLI/dispatch layer is in place (reference-host schedulers repointed to `spectre run <job>`; dispatcher/registry verification reports 0 findings on the current inventory). Consolidation/migration (C1) is **in progress**: canonical implementations live under `spectre/actions/*` and `spectre/monitoring/exporters/*`, while repo-root `scripts/*.sh` and top-level `prometheus/*-exporter.sh` compatibility forwarders still exist in this tree. Canonical policy/config paths also live under `spectre/policies/*` and `spectre/actions/ml-anomaly/*`. Use `spectre run <job>` as the operator interface; verify actual state with `spectre actions list` / `spectre actions verify`. See `docs/migration/` and `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md`.
 
 ## Features
 
@@ -35,19 +35,19 @@ spectre run backups/backup-all -- --help  # pass args to the action after --
 ```
 
 ### Installation / migration note
-The consolidation design moves dispatch to the `spectre` CLI and stops installing arbitrary scripts to `/usr/local/bin` (only `spectre` should live there). **`install.sh` in this repo has not yet been fully aligned with that end-state** and still reflects legacy `/usr/local/bin` script/unit installation patterns — review it before use on a migrated host. Prefer the installed `spectre` CLI + `spectre run`/systemd timers that invoke `spectre run`.
+The consolidation design moves dispatch to the `spectre` CLI and stops installing arbitrary scripts to `/usr/local/bin` (only `spectre` should live there). `install.sh` is now **§8.2-aligned** (installs only `/usr/local/bin/spectre` and generates units that dispatch via `spectre run <job>`), but it is a **root/host-mutating** script — review before use. Prefer the installed `spectre` CLI + `spectre run`/systemd timers that invoke `spectre run`.
 
 On a workstation that sleeps, use the persistent catch-up timer (checks health first; runs only when stale):
 
 ```bash
-./scripts/systemd/install-backup-catchup-timer.sh
-# (legacy path works via forwarder; canonical impl: spectre/actions/systemd/install-backup-catchup-timer.sh)
+# canonical installer (generates a user timer that runs `spectre run backups/run-missed-backups`)
+./spectre/actions/systemd/install-backup-catchup-timer.sh
 ```
 
 ## Unified Dispatch Model
 
 - **Canonical action implementations:** `spectre/actions/<group>/<job>.sh` (and related ML/restic actions)
-- **Legacy compatibility paths:** `scripts/<...>.sh` and `prometheus/*-exporter.sh` are forwarders/compatibility copies during migration (C1 removal planned; see `docs/migration/2026-11-06-phase4-c1-repo-inventory-plan.md`)
+- **Legacy compatibility paths (C1, in progress):** repo-root `scripts/*.sh` and top-level `prometheus/*-exporter.sh` currently remain as Phase 1 compatibility forwarders that delegate to canonical implementations; treat them as transitional, not the operator interface. Canonical policy and ML action locations are `spectre/policies/*` and `spectre/actions/ml-anomaly/*` (untracked local artifacts, e.g. a local ML venv, may exist on disk but are not canonical). See `docs/migration/2026-11-06-phase4-c1-repo-inventory-plan.md`.
 - **Canonical exporter implementations:** `spectre/monitoring/exporters/*`
 - **Registry source of truth:** `spectre/dispatch/registry_data.json` / dispatch modules
 - **Verification:** `spectre actions verify` checks registry↔disk↔scheduler consistency and fails loudly on missing/unexecutable/bad syntax/unsafe scheduled-mutation cases (it never silently skips)
@@ -110,8 +110,8 @@ Alertmanager config does not perform `${VAR}` substitution. Use the repo’s not
 
 ```bash
 SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
-  scripts/setup-notification-channels.sh --test
-# (forwarder path; canonical impl under spectre/actions/)
+  spectre run setup-notification-channels -- --test
+# canonical action: spectre/actions/setup-notification-channels.sh
 ```
 
 The script writes the webhook secret to `prometheus/alertmanager-secrets/slack_webhook_url` (mode `0600`, gitignored), restarts/waits for Alertmanager, and `--test` verifies delivery behavior. `Watchdog` acts as a dead-man’s-switch alert. See `prometheus/alertmanager-secrets/README.md`.
@@ -128,11 +128,9 @@ spectre run security/scan-dependencies
 sudo spectre run security/docker-security-hardening
 spectre run security/api-security-hardening
 
-# Policy audit
-opa check scripts/security/opa/policies/
+# Policy audit (canonical)
+opa check spectre/policies/
 ```
-
-Some paths still live under `scripts/security/opa/policies/` in the repo tree; use the actual path present in your checkout and verify CI/workflow references.
 
 ## Security Metrics from the Spectre Agent
 
@@ -154,13 +152,14 @@ export RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env"
 
 spectre run backups/restic/backup
 spectre run backups/restic/verify
-scripts/backups/restic/prune.sh --dry-run --repo local   # tag-scoped forget+prune
-scripts/backups/restic/restore.sh --latest --target /tmp/restore --dry-run
+# direct action helpers (not registered as spectre jobs):
+spectre/actions/backups/restic/prune.sh --dry-run --repo local   # tag-scoped forget+prune
+spectre/actions/backups/restic/restore.sh --latest --target /tmp/restore --dry-run
 ```
 
 Optional per-user timers (require configured `RESTIC_CONFIG`; do not interfere with `spectre-backup-catchup`):
-- `scripts/systemd/install-restic-timer.sh` (daily adopted backup)
-- `scripts/systemd/install-restic-verify-timer.sh` (weekly verify)
+- `spectre/actions/systemd/install-restic-timer.sh` (daily adopted backup)
+- `spectre/actions/systemd/install-restic-verify-timer.sh` (weekly verify)
 
 See `config/backups/restic/` (templates only). **Never commit passwords/keys/backend credentials.** Operational cutover/rollback details: `docs/migration/2026-11-06-absorb-spectre-backup.md`.
 
@@ -179,15 +178,15 @@ spectre-suite/
 │   ├── dispatch/                # Registry, resolve, verify, run records/provenance
 │   ├── monitoring/              # Prometheus/Grafana assets, exporters
 │   └── ...
-├── scripts/                     # Legacy compatibility forwarders (C1 removal planned) + ML python helpers where present
-├── prometheus/                  # Monitoring config; top-level exporters are legacy forwarders
+├── scripts/                     # Legacy Phase 1 forwarders/compatibility paths (C1 in progress); canonical implementations: spectre/actions/*
+├── prometheus/                  # Monitoring config/rules/alertmanager assets; top-level exporter forwarders are transitional (canonical: spectre/monitoring/exporters/*)
 ├── grafana-dashboards/          # Dashboards/provisioning assets
 ├── config/                      # Config templates (including restic templates)
 ├── systemd/                     # Unit/timer helpers (legacy/repo paths; verify canonical usage)
 ├── docs/                        # Docs, runbooks, migration notes, superpowers specs/plans
 ├── tests/                       # Test suite (`bash tests/run_tests.sh`)
 ├── docker-compose.monitoring.yml
-├── install.sh                   # Review before use (legacy install behavior; consolidation alignment pending)
+├── install.sh                   # §8.2-aligned root installer (installs /usr/local/bin/spectre only; review before use)
 └── pyproject.toml
 ```
 
@@ -214,7 +213,7 @@ spectre run security/scan-docker-images
 sudo spectre run security/run-security-hardening
 ```
 
-Legacy `scripts/...` invocations may still work via forwarders, but are not the canonical interface.
+Legacy `scripts/...` and top-level `prometheus/*-exporter.sh` forwarders may still exist during C1; prefer `spectre run <job>` and canonical `spectre/actions/*` / `spectre/monitoring/exporters/*` / `spectre/policies/*` paths.
 
 ## Testing
 

@@ -6,14 +6,14 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ML_DIR="$PROJECT_ROOT/scripts/ml-anomaly"
+ML_DIR="$PROJECT_ROOT/spectre/actions/ml-anomaly"
 
 echo "Running ML unit tests..."
 echo "=========================================="
 
 # Interpreter selection.
 #
-# This looked for a venv at scripts/ml-anomaly/venv/bin/python, which nothing in
+# This looked for a venv at spectre/actions/ml-anomaly/venv/bin/python, which nothing in
 # this repository ever creates, so it always fell through to whatever python3 was
 # on PATH. That only works by accident: CI pip-installs into the system
 # interpreter first, so the fallback finds pandas. On this host system python3
@@ -66,7 +66,7 @@ DEPS
         ) || miss="(probe failed)"
         [ -n "$miss" ] && echo "  - $candidate missing: $miss" || echo "  - $candidate: ok"
     done
-    echo "  install with: /usr/bin/python3 -m pip install -r $PROJECT_ROOT/scripts/ml-anomaly/requirements.txt"
+    echo "  install with: /usr/bin/python3 -m pip install -r $PROJECT_ROOT/spectre/actions/ml-anomaly/requirements.txt"
     echo "  or select a prepared interpreter: ML_PYTHON=/path/to/python"
     echo "=========================================="
     exit 1
@@ -89,7 +89,7 @@ DEPS
 if [ -n "$missing_deps" ]; then
     echo "ML Unit Tests: FAILED"
     echo "  missing Python dependencies in $PY: $missing_deps"
-    echo "  install with: $PY -m pip install -r $PROJECT_ROOT/scripts/ml-anomaly/requirements.txt"
+    echo "  install with: $PY -m pip install -r $PROJECT_ROOT/spectre/actions/ml-anomaly/requirements.txt"
     echo "  or select a prepared interpreter: ML_PYTHON=/path/to/python"
     echo "=========================================="
     exit 1

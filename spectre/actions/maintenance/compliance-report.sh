@@ -258,7 +258,7 @@ check_security_tools() {
 }
 
 # Build the input document consumed by the OPA policies in
-# scripts/security/opa/policies. Values are derived from the live system
+# spectre/policies/ (canonical; legacy scripts/security/opa/policies/ fallback). Values are derived from the live system
 # where feasible; operational controls we manage are set to their intended
 # state so the policies can actually be evaluated (not just linted).
 build_opa_input() {
@@ -304,22 +304,23 @@ build_opa_input() {
         vpn_enabled="true"
     fi
 
+    _has_action() { [ -f "$PROJECT_ROOT/spectre/actions/$1" ] || [ -f "$PROJECT_ROOT/scripts/$1" ]; }
     local backup_encryption_enabled="false"
-    if [ -f "$PROJECT_ROOT/scripts/backups/backup-encryption.sh" ]; then
+    if _has_action "backups/backup-encryption.sh"; then
         backup_encryption_enabled="true"
     fi
 
     local backup_verification_enabled="false"
-    if [ -f "$PROJECT_ROOT/scripts/backups/backup-verification.sh" ]; then
+    if _has_action "backups/backup-verification.sh"; then
         backup_verification_enabled="true"
     fi
 
     local database_backups_enabled="false"
     local docker_volume_backups_enabled="false"
-    if [ -f "$PROJECT_ROOT/scripts/backups/backup-databases.sh" ]; then
+    if _has_action "backups/backup-databases.sh"; then
         database_backups_enabled="true"
     fi
-    if [ -f "$PROJECT_ROOT/scripts/backups/backup-docker-volumes.sh" ]; then
+    if _has_action "backups/backup-docker-volumes.sh"; then
         docker_volume_backups_enabled="true"
     fi
 
@@ -392,7 +393,8 @@ check_opa_policies() {
         log "INFO: opa not installed or not executable; skipping OPA policy evaluation"
         return 0
     fi
-    local policy_dir="$PROJECT_ROOT/scripts/security/opa/policies"
+    local policy_dir="$PROJECT_ROOT/spectre/policies"
+    [ -d "$policy_dir" ] || policy_dir="$PROJECT_ROOT/scripts/security/opa/policies"
     if [ ! -d "$policy_dir" ]; then
         log "INFO: no OPA policies found at $policy_dir"
         return 0

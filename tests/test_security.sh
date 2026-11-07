@@ -12,16 +12,16 @@ echo "Running security script tests..."
 test_security_scripts_exist() {
     echo "Test 1: Check if security scripts exist"
     local security_scripts=(
-        "scripts/security/run-security-hardening.sh"
-        "scripts/security/scan-dependencies.sh"
-        "scripts/security/docker-security-hardening.sh"
-        "scripts/security/install-ids-ips.sh"
-        "scripts/security/advanced-threat-detection.sh"
+        "security/run-security-hardening.sh"
+        "security/scan-dependencies.sh"
+        "security/docker-security-hardening.sh"
+        "security/install-ids-ips.sh"
+        "security/advanced-threat-detection.sh"
     )
     
     local all_exist=true
     for script in "${security_scripts[@]}"; do
-        if [ ! -f "$PROJECT_ROOT/$script" ]; then
+        if [ ! -f "$PROJECT_ROOT/spectre/actions/$script" ] && [ ! -f "$PROJECT_ROOT/scripts/$script" ]; then
             echo "❌ Missing security script: $script"
             all_exist=false
         fi
@@ -39,14 +39,15 @@ test_security_scripts_exist() {
 test_security_scripts_executable() {
     echo "Test 2: Check if security scripts are executable"
     local security_scripts=(
-        "scripts/security/run-security-hardening.sh"
-        "scripts/security/scan-dependencies.sh"
-        "scripts/security/docker-security-hardening.sh"
+        "security/run-security-hardening.sh"
+        "security/scan-dependencies.sh"
+        "security/docker-security-hardening.sh"
     )
     
     local all_executable=true
     for script in "${security_scripts[@]}"; do
-        if [ ! -x "$PROJECT_ROOT/$script" ]; then
+        local _p="$PROJECT_ROOT/spectre/actions/$script"; [ -f "$_p" ] || _p="$PROJECT_ROOT/scripts/$script"
+        if [ ! -x "$_p" ]; then
             echo "❌ Security script not executable: $script"
             all_executable=false
         fi
@@ -65,7 +66,8 @@ test_security_scripts_syntax() {
     echo "Test 3: Check if security scripts have correct syntax"
     local syntax_errors=0
     
-    for script in "$PROJECT_ROOT"/scripts/security/*.sh; do
+    local _secdir="$PROJECT_ROOT/spectre/actions/security"; [ -d "$_secdir" ] || _secdir="$PROJECT_ROOT/scripts/security"
+    for script in "$_secdir"/*.sh; do
         if [ -f "$script" ]; then
             if ! bash -n "$script"; then
                 echo "❌ Syntax error in $script"
@@ -110,7 +112,7 @@ test_security_configurations() {
 # Test 5: Check if IDS/IPS installation script exists
 test_ids_ips_script() {
     echo "Test 5: Check if IDS/IPS installation script exists"
-    if [ -f "$PROJECT_ROOT/scripts/security/install-ids-ips.sh" ]; then
+    if [ -f "$PROJECT_ROOT/spectre/actions/security/install-ids-ips.sh" ] || [ -f "$PROJECT_ROOT/scripts/security/install-ids-ips.sh" ]; then
         echo "✅ IDS/IPS installation script exists"
         return 0
     else

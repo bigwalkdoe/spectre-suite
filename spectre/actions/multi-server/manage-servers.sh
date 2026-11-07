@@ -77,19 +77,32 @@ deploy_maintenance_scripts() {
     echo "Deploying maintenance scripts to $server_name..."
     
     # Copy maintenance scripts directory
-    scp -P "$ssh_port" -r "$REPO_ROOT/scripts/" \
-        "$ssh_user@$ssh_host:/tmp/maintenance-scripts/"
+    if [ -d "$REPO_ROOT/spectre/actions" ]; then
+        scp -P "$ssh_port" -r "$REPO_ROOT/spectre/actions/" "$ssh_user@$ssh_host:/tmp/spectre-actions/"
+        scp -P "$ssh_port" -r "$REPO_ROOT/scripts/" "$ssh_user@$ssh_host:/tmp/maintenance-scripts/" 2>/dev/null || true
+    else
+        scp -P "$ssh_port" -r "$REPO_ROOT/scripts/" "$ssh_user@$ssh_host:/tmp/maintenance-scripts/"
+    fi
     
     # Install scripts on remote server
     execute_on_server "$server_name" "$ssh_user" "$ssh_host" "$ssh_port" "
         sudo mkdir -p /usr/local/bin/
-        sudo cp /tmp/maintenance-scripts/backups/*.sh /usr/local/bin/
-        sudo cp /tmp/maintenance-scripts/maintenance/*.sh /usr/local/bin/
-        sudo cp /tmp/maintenance-scripts/performance/*.sh /usr/local/bin/
-        sudo cp /tmp/maintenance-scripts/network/*.sh /usr/local/bin/
-        sudo cp /tmp/maintenance-scripts/security/*.sh /usr/local/bin/
-        sudo chmod +x /usr/local/bin/*.sh
-        sudo rm -rf /tmp/maintenance-scripts
+        if [ -d /tmp/spectre-actions ]; then
+            # Legacy remote install from canonical actions (prefer installing spectre on remote instead)
+            for d in backups maintenance performance network security; do
+                [ -d "/tmp/spectre-actions/$d" ] && sudo cp /tmp/spectre-actions/$d/*.sh /usr/local/bin/ 2>/dev/null || true
+            done
+            sudo chmod +x /usr/local/bin/*.sh 2>/dev/null || true
+            sudo rm -rf /tmp/spectre-actions /tmp/maintenance-scripts
+        else
+            sudo cp /tmp/maintenance-scripts/backups/*.sh /usr/local/bin/
+            sudo cp /tmp/maintenance-scripts/maintenance/*.sh /usr/local/bin/
+            sudo cp /tmp/maintenance-scripts/performance/*.sh /usr/local/bin/
+            sudo cp /tmp/maintenance-scripts/network/*.sh /usr/local/bin/
+            sudo cp /tmp/maintenance-scripts/security/*.sh /usr/local/bin/
+            sudo chmod +x /usr/local/bin/*.sh
+            sudo rm -rf /tmp/maintenance-scripts
+        fi
         echo 'Maintenance scripts deployed successfully'
     "
 }

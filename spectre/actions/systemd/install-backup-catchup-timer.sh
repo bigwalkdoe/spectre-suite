@@ -2,7 +2,7 @@
 # Install a per-user systemd timer that catches up backups missed during sleep.
 #
 # The timer is persistent: systemd fires it after boot or wake if the 05:00
-# check was skipped. The wrapper it runs is a no-op when backups are healthy.
+# check was skipped. The wrapper/job is a no-op when backups are healthy.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,8 @@ PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../.." && pwd)"}"
 USER_UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 SERVICE_NAME="spectre-backup-catchup.service"
 TIMER_NAME="spectre-backup-catchup.timer"
-WRAPPER="$PROJECT_ROOT/scripts/backups/run-missed-backups.sh"
+SPECTRE_BIN="${SPECTRE_BIN:-$(command -v spectre 2>/dev/null || echo /usr/local/bin/spectre)}"
+SPECTRE_JOB="backups/run-missed-backups"
 
 usage() {
     cat <<EOF
@@ -18,6 +19,9 @@ Usage: $(basename "$0") [--print|--uninstall]
 
   --print      Print the generated units without installing them.
   --uninstall  Stop, disable, and remove the installed timer and service.
+
+Environment:
+  SPECTRE_BIN  Path to the spectre CLI (default: spectre on PATH or /usr/local/bin/spectre)
 EOF
 }
 
@@ -32,7 +36,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=$PROJECT_ROOT
-ExecStart=$WRAPPER
+ExecStart=$SPECTRE_BIN run $SPECTRE_JOB
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Nice=10
 IOSchedulingClass=best-effort
@@ -99,8 +103,9 @@ if ! systemctl --user show-environment >/dev/null 2>&1; then
     echo "systemd user manager is not available; cannot install a user timer" >&2
     exit 1
 fi
-if [ ! -x "$WRAPPER" ]; then
-    echo "catch-up wrapper is missing or not executable: $WRAPPER" >&2
+if ! command -v "${SPECTRE_BIN}" >/dev/null 2>&1 && [ ! -x "${SPECTRE_BIN}" ]; then
+    echo "spectre CLI not found/executable: ${SPECTRE_BIN}" >&2
+    echo "Install spectre or set SPECTRE_BIN to its path." >&2
     exit 1
 fi
 

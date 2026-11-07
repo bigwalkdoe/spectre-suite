@@ -14,7 +14,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(dirname "$SCRIPT_DIR")"}"
+if [ -n "${SPECTRE_REPO_ROOT:-}" ]; then
+  PROJECT_ROOT="$SPECTRE_REPO_ROOT"
+elif [ -f "$SCRIPT_DIR/../../docker-compose.monitoring.yml" ]; then
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+else
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 cd "$PROJECT_ROOT"
 
 docs=$(ls README.md docs/*.md 2>/dev/null)

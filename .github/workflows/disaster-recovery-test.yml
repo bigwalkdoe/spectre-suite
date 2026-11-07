@@ -16,11 +16,11 @@ jobs:
       - name: Verify backup scripts exist
         run: |
           scripts=(
-            "scripts/backups/backup-databases.sh"
-            "scripts/backups/backup-all.sh"
-            "scripts/backups/backup-docker-volumes.sh"
-            "scripts/backups/backup-configurations.sh"
-            "scripts/backups/backup-projects.sh"
+            "spectre/actions/backups/backup-databases.sh"
+            "spectre/actions/backups/backup-all.sh"
+            "spectre/actions/backups/backup-docker-volumes.sh"
+            "spectre/actions/backups/backup-configurations.sh"
+            "spectre/actions/backups/backup-projects.sh"
           )
           for script in "${scripts[@]}"; do
             if [ -f "$script" ]; then

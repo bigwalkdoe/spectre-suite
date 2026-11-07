@@ -117,7 +117,7 @@
         - "{{ backup_dir }}/projects"
 
     - name: Deploy monitoring stack
-      command: "{{ installation_dir }}/scripts/deploy-monitoring.sh"
+      command: "{{ installation_dir }}/spectre/actions/deploy-monitoring.sh"
       args:
         chdir: "{{ installation_dir }}"
       when: monitoring_enabled
@@ -236,7 +236,7 @@
         name: "Daily backup"
         hour: "2"
         minute: "0"
-        job: "{{ installation_dir }}/scripts/backups/backup-all.sh"
+        job: "/usr/local/bin/spectre run backups/backup-all"
         user: "{{ ansible_user }}"
 
     - name: Create maintenance cron job
@@ -245,7 +245,7 @@
         weekday: "0"
         hour: "3"
         minute: "0"
-        job: "{{ installation_dir }}/scripts/maintenance/run-maintenance.sh"
+        job: "/usr/local/bin/spectre run maintenance/run-maintenance"
         user: "{{ ansible_user }}"
 
     - name: Create security scan cron job
@@ -254,7 +254,7 @@
         weekday: "6"
         hour: "4"
         minute: "0"
-        job: "{{ installation_dir }}/scripts/security/run-security-hardening.sh"
+        job: "/usr/local/bin/spectre run security/run-security-hardening"
         user: "{{ ansible_user }}"
 
     - name: Install Python dependencies
