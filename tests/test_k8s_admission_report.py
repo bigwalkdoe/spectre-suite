@@ -67,3 +67,31 @@ def test_k8s_admission_report_denies_privileged_and_fail_on_deny():
     assert any("Privileged containers are not allowed" in m for m in d["denials"])
     rc2, _ = run_report(obj, "--fail-on-deny")
     assert rc2 == 1
+
+
+def test_k8s_admission_report_batch_and_versions_index(tmp_path: Path):
+    if not _have_deps():
+        pytest.skip("opa or spectre-security k8s policy not available")
+    (tmp_path / "good.json").write_text(json.dumps(COMPLIANT))
+    (tmp_path / "bad.json").write_text(json.dumps(
+        {"request": {"object": {"spec": {"containers": [{"name": "t", "securityContext": {"privileged": True}}]}}}}
+    ))
+    p = subprocess.run(
+        [sys.executable, str(TOOL), "--include-versions-index", str(tmp_path)],
+        text=True, capture_output=True, check=False,
+    )
+    assert p.returncode == 0  # report-only
+    d = json.loads(p.stdout)
+    assert d["isolated"] is True and d["batch"] is True
+    assert d["fixtures_evaluated"] == 2 and d["fixtures_with_denials"] == 1
+    assert d["total_denials"] > 0
+    assert "NOT part of suite data.security[k].deny" in d["aggregation"]
+    # read-only versions index surfacing (if present on host)
+    if (Path("/home/deon/dev/github/spectre-security/security/opa/versions/index.json").exists()):
+        assert "policy_versions_index" in d
+    # fail-on-deny in batch
+    p2 = subprocess.run(
+        [sys.executable, str(TOOL), "--fail-on-deny", str(tmp_path)],
+        text=True, capture_output=True, check=False,
+    )
+    assert p2.returncode == 1
