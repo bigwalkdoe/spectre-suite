@@ -8,8 +8,6 @@ set -euo pipefail
 : "${HOME:=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 2>/dev/null || true)}"
 export HOME="${HOME:-/root}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUITE_ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../../../.." && pwd)}"
 SPECTRE_SECURITY_ROOT="${SPECTRE_SECURITY_ROOT:-/home/deon/dev/github/spectre-security}"
 STATE_DIR="${SECURITY_BASELINE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/spectre/security-baseline}"
 mkdir -p "$STATE_DIR"
