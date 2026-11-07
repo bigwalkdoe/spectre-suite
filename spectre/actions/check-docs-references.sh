@@ -55,4 +55,42 @@ if [ -n "$missing" ]; then
     exit 1
 fi
 
-echo "documentation references OK: every scripts/ and cloud-deployment/ path mentioned resolves"
+# P5b / spec §9: README must not regress into advertising unimplemented
+# capabilities as present (the Loki/Wazuh/ZAP/… class). Full capability↔actions
+# mapping is semantic; this enforces the motivating guardrails: explicit
+# "Not implemented" disclaimer, known unimplemented stacks named, and deferral
+# to `spectre actions list` / `spectre actions verify` as source of truth.
+if [ -f README.md ]; then
+    if ! grep -Fq 'Not implemented in this repository' README.md; then
+        echo "ERROR: README.md missing explicit \"Not implemented in this repository\" disclaimer (spec §9/P5b)." >&2
+        exit 1
+    fi
+    missing_caps=""
+    require_readme_token() {
+        local label="$1" pattern="$2"
+        if ! grep -Eqi "$pattern" README.md; then
+            missing_caps="${missing_caps}  - ${label}"$'\n'
+        fi
+    }
+    require_readme_token "Loki" '\bLoki\b'
+    require_readme_token "Promtail" '\bPromtail\b'
+    require_readme_token "Wazuh" '\bWazuh\b'
+    require_readme_token "OWASP ZAP / ZAP" 'OWASP ZAP|\bZAP\b'
+    require_readme_token "SonarQube" '\bSonarQube\b'
+    require_readme_token "PgBouncer" '\bPgBouncer\b'
+    require_readme_token "read-replica/read replica" 'read-replica|read replica'
+    require_readme_token "Vault/HashiCorp Vault" '\bVault\b'
+    require_readme_token "k6" '\bk6\b'
+    require_readme_token "Locust" '\bLocust\b'
+    if [ -n "$missing_caps" ]; then
+        echo "ERROR: README.md no longer names known-unimplemented capabilities (spec §9/P5b regression guard):" >&2
+        printf '%s' "$missing_caps" >&2
+        exit 1
+    fi
+    if ! grep -Fq 'spectre actions list' README.md || ! grep -Fq 'spectre actions verify' README.md; then
+        echo "ERROR: README.md must direct operators to \`spectre actions list\` / \`spectre actions verify\` as source of truth (spec §9/P5b)." >&2
+        exit 1
+    fi
+fi
+
+echo "documentation references OK: every scripts/ and cloud-deployment/ path mentioned resolves; README capability-disclaimer guardrails present"
