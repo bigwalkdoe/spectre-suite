@@ -52,6 +52,9 @@ Values use explicit status codes where helpful: `1=pass/clean/ok`, `0=fail/findi
 
 **Labels:** keep low cardinality. `source` indicates evidence origin (`suite`, `spectre_security`, `mixed`). Do not use hostnames, paths, image names, or finding IDs as labels.
 
+### Metrics & alert semantics: `opa_compat_report_ok` (Option A)
+`spectre_security_baseline_opa_compat_report_ok` uses **report-ran semantics, NOT “no denials”**: `1` = `SECURITY_OPA_COMPAT` Option A report produced/ran (policy denials do **not** make this 0), `0` = helper/exec issues, `-1` = off/unknown/skipped. `SecurityBaselineOPACompatReportIssues` alerts only on `== 0`. Dashboard panels/legend label it accordingly.
+
 ## 4. Wiring
 - Exporters write to Prometheus textfile directory (`prometheus/business-metrics` / `/textfile` in compose) for the existing `business-metrics`/node_exporter textfile scrape path.
 - A/D hybrid: exporter may read suite logs (`SECURITY_BASELINE_LOG_DIR`) and, if configured, `SPECTRE_SECURITY_ROOT`/spectre-security baseline logs/reports.
