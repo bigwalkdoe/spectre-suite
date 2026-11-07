@@ -24,11 +24,12 @@ TRIGGERS_DIR = Path(os.environ.get("TRIGGERS_DIR", "/triggers"))
 REPO_ROOT = Path(os.environ.get("REPO_ROOT", "/repo"))
 TOKEN = os.environ.get("DASHBOARD_ACTION_TOKEN", "")
 
-# Allowlist: action name -> repo-relative script path
+# Allowlist: action name -> repo-relative canonical action path (host handler
+# dispatches by action name via `spectre run`; script is recorded for validation).
 ALLOWLIST = {
-    "backup": "scripts/backups/run-missed-backups.sh",
-    "maintenance": "scripts/maintenance/run-maintenance.sh",
-    "security-scan": "scripts/security/scan-docker-images.sh",
+    "backup": "spectre/actions/backups/run-missed-backups.sh",
+    "maintenance": "spectre/actions/maintenance/run-maintenance.sh",
+    "security-scan": "spectre/actions/security/scan-docker-images.sh",
 }
 
 
@@ -104,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
             "action": action,
             "script": script_rel,
             "triggerId": trigger["id"],
-            "message": "Action queued. A host trigger handler must be installed to execute it (see scripts/dashboard-actions/process-triggers.sh and systemd/dashboard-actions/).",
+            "message": "Action queued. A host trigger handler must be installed to execute it (see spectre/actions/dashboard-actions/process-triggers.sh, `spectre run dashboard-actions/process-triggers`, and systemd/dashboard-actions/).",
         })
 
 
