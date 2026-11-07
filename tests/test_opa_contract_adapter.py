@@ -165,3 +165,73 @@ def test_backup_slice_last_success_age_is_evidence_only():
     assert not any("encryption" in d for d in denials)
     assert not any("retention" in d for d in denials)
     assert not any("off-site" in d for d in denials)
+
+
+# --- Option A adapter-tested slice: network domain (spectre-security overlap) ---
+# Direct map: network.vpn_enabled -> suite vpn_enabled (1/5 controls).
+# open_ports/remote_access/container_network are evidence-only in the adapter (no 1:1
+# suite network controls); suite-only segmentation/DMZ/internal/DDoS remain fail-closed.
+# No policy/gate changes; fail-closed count/baseline.json unchanged.
+
+
+def suite_network_deny(adapted: dict) -> list[str]:
+    p = subprocess.run(
+        [str(OPA), "eval", "--format", "raw", "--data", str(POLICY_DIR),
+         "--input", "/dev/stdin", "data.security.network.deny"],
+        input=json.dumps(adapted),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    out = json.loads(p.stdout)
+    return out if isinstance(out, list) else [str(out)]
+
+
+def test_network_slice_vpn_maps_and_unmapped_suite_controls_fail_closed():
+    """vpn_enabled maps directly; 4 suite-only network controls remain fail-closed."""
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter({"compliance": {}, "network": {
+        "remote_access": True, "vpn_enabled": True, "container_network": "bridge",
+        "open_ports": [22, 80, 443, 3002, 9090, 9093, 8081, 3100],
+    }, "backup": {}, "docker": []})
+    assert adapted["vpn_enabled"] is True
+    denials = suite_network_deny(adapted)
+    assert not any("VPN" in d or "vpn" in d for d in denials)
+    assert any("segmentation" in d for d in denials)
+    assert any("DMZ" in d for d in denials)
+    assert any("internal network" in d for d in denials)
+    assert any("DDoS" in d for d in denials)
+    assert len(denials) == 4
+
+
+def test_network_slice_vpn_disabled_denied_by_suite():
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    denials = suite_network_deny(run_adapter({"compliance": {}, "network": {
+        "remote_access": True, "vpn_enabled": False, "container_network": "bridge",
+        "open_ports": [22, 80, 443],
+    }, "backup": {}, "docker": []}))
+    assert any("no VPN is configured" in d for d in denials)
+
+
+def test_network_slice_evidence_fields_not_invented_as_suite_controls():
+    """remote_access/container_network/open_ports are evidence; adapter must not invent suite fields."""
+    import pytest
+    if not _opa_available():
+        pytest.skip("opa not available")
+    adapted = run_adapter({"compliance": {}, "network": {
+        "remote_access": True, "vpn_enabled": False, "container_network": "host",
+        "open_ports": [22, 10001, 10002],
+    }, "backup": {}, "docker": []})
+    for k in ("remote_access", "container_network", "open_ports",
+              "network_segmentation_enabled", "dmz_isolated",
+              "internal_no_internet", "ddos_protection_enabled"):
+        assert k not in adapted
+    assert adapted["vpn_enabled"] is False
+    denials = suite_network_deny(adapted)
+    # vpn denied (mapped) + 4 suite-only fail-closed = 5
+    assert len(denials) == 5
+    assert any("no VPN is configured" in d for d in denials)
