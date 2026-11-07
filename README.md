@@ -2,7 +2,7 @@
 
 Spectre Suite is a consolidated Linux operations suite for automated backups, restic snapshot workflows, monitoring/alerting (Prometheus + Grafana + Alertmanager), security hardening/scanning helpers, maintenance jobs, and operational reporting. It provides a unified `spectre` CLI/dispatch layer so scheduled and manual jobs run through one command surface with provenance.
 
-> **Project status (current tree):** The `spectre` CLI/dispatch layer is in place (reference-host schedulers repointed to `spectre run <job>`; dispatcher/registry verification reports 0 findings on the current inventory). Consolidation/migration (C1) is **in progress**: canonical implementations live under `spectre/actions/*` and `spectre/monitoring/exporters/*`, while repo-root `scripts/*.sh` and top-level `prometheus/*-exporter.sh` compatibility forwarders still exist in this tree. Canonical policy/config paths also live under `spectre/policies/*` and `spectre/actions/ml-anomaly/*`. Use `spectre run <job>` as the operator interface; verify actual state with `spectre actions list` / `spectre actions verify`. See `docs/migration/` and `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md`.
+> **Project status (current tree):** The `spectre` CLI/dispatch layer is in place (reference-host schedulers repointed to `spectre run <job>`; dispatcher/registry verification reports 0 findings on the current inventory). Consolidation/migration (C1) is **in progress**: canonical implementations live under `spectre/actions/*` and `spectre/monitoring/exporters/*` (C1 **Tier A** complete: top-level `prometheus/*-exporter.sh` forwarders removed; registry/jobs resolve to canonical actions/exporters). Repo-root `scripts/*.sh` compatibility forwarders still exist as transitional paths. Canonical policy/config paths also live under `spectre/policies/*` and `spectre/actions/ml-anomaly/*`. Use `spectre run <job>` as the operator interface; verify actual state with `spectre actions list` / `spectre actions verify`. See `docs/migration/` and `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md`.
 
 ## Features
 
@@ -47,7 +47,7 @@ On a workstation that sleeps, use the persistent catch-up timer (checks health f
 ## Unified Dispatch Model
 
 - **Canonical action implementations:** `spectre/actions/<group>/<job>.sh` (and related ML/restic actions)
-- **Legacy compatibility paths (C1, in progress):** repo-root `scripts/*.sh` and top-level `prometheus/*-exporter.sh` currently remain as Phase 1 compatibility forwarders that delegate to canonical implementations; treat them as transitional, not the operator interface. Canonical policy and ML action locations are `spectre/policies/*` and `spectre/actions/ml-anomaly/*` (untracked local artifacts, e.g. a local ML venv, may exist on disk but are not canonical). See `docs/migration/2026-11-06-phase4-c1-repo-inventory-plan.md`.
+- **Legacy compatibility paths (C1, in progress):** repo-root `scripts/*.sh` currently remains as Phase 1 compatibility forwarders that delegate to canonical implementations (C1 Tier A removed top-level `prometheus/*-exporter.sh` forwarders); treat legacy forwarders as transitional, not the operator interface. Canonical policy and ML action locations are `spectre/policies/*` and `spectre/actions/ml-anomaly/*` (untracked local artifacts, e.g. a local ML venv, may exist on disk but are not canonical). See `docs/migration/2026-11-06-phase4-c1-repo-inventory-plan.md`.
 - **Canonical exporter implementations:** `spectre/monitoring/exporters/*`
 - **Registry source of truth:** `spectre/dispatch/registry_data.json` / dispatch modules
 - **Verification:** `spectre actions verify` checks registry↔disk↔scheduler consistency and fails loudly on missing/unexecutable/bad syntax/unsafe scheduled-mutation cases (it never silently skips)
@@ -179,7 +179,7 @@ spectre-suite/
 │   ├── monitoring/              # Prometheus/Grafana assets, exporters
 │   └── ...
 ├── scripts/                     # Legacy Phase 1 forwarders/compatibility paths (C1 in progress); canonical implementations: spectre/actions/*
-├── prometheus/                  # Monitoring config/rules/alertmanager assets; top-level exporter forwarders are transitional (canonical: spectre/monitoring/exporters/*)
+├── prometheus/                  # Monitoring config/rules/alertmanager assets (canonical exporter impls: spectre/monitoring/exporters/*, spectre/actions/prometheus/*)
 ├── grafana-dashboards/          # Dashboards/provisioning assets
 ├── config/                      # Config templates (including restic templates)
 ├── systemd/                     # Unit/timer helpers (legacy/repo paths; verify canonical usage)
@@ -213,7 +213,7 @@ spectre run security/scan-docker-images
 sudo spectre run security/run-security-hardening
 ```
 
-Legacy `scripts/...` and top-level `prometheus/*-exporter.sh` forwarders may still exist during C1; prefer `spectre run <job>` and canonical `spectre/actions/*` / `spectre/monitoring/exporters/*` / `spectre/policies/*` paths.
+Legacy `scripts/...` forwarders may still exist during C1 (Tier A top-level `prometheus/*-exporter.sh` forwarders removed); prefer `spectre run <job>` and canonical `spectre/actions/*` / `spectre/monitoring/exporters/*` / `spectre/policies/*` paths.
 
 ## Testing
 
