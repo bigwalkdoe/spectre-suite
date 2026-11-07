@@ -520,6 +520,79 @@
         },
         "overrides": []
       }
+    },
+    {
+      "type": "stat",
+      "title": "OPA compat report (Option A, report-ran)",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 25
+      },
+      "id": 11,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_opa_compat_report_ok)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "OFF/UNKNOWN",
+                  "color": "#888888"
+                },
+                "0": {
+                  "text": "ISSUES",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "REPORT RAN",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#888888",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "description": "Report-ran semantics (NOT 'no denials'): 1=compat report produced/ran, 0=helper/exec issues, -1=off/unknown/skipped."
     }
   ],
   "refresh": "5m",
