@@ -14,7 +14,7 @@ import json
 import unittest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ML_DIR = os.path.join(REPO_ROOT, "scripts", "ml-anomaly")
+ML_DIR = os.path.join(REPO_ROOT, "spectre", "actions", "ml-anomaly")
 sys.path.insert(0, ML_DIR)
 
 import ml_fix_engine  # noqa: E402
