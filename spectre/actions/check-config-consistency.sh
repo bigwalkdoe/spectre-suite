@@ -26,7 +26,6 @@ NGINX_CONF="$PROJECT_ROOT/web-dashboard/nginx.conf"
 ALERTMANAGER="$PROJECT_ROOT/prometheus/alertmanager.yml"
 RULES="$PROJECT_ROOT/prometheus/alert_rules.yml"
 EXPORTER="$PROJECT_ROOT/spectre/monitoring/exporters/business-metrics-exporter.sh"
-EXPORTER_COMPAT="$PROJECT_ROOT/prometheus/business-metrics-exporter.sh"
 BACKUP_DB="$PROJECT_ROOT/spectre/actions/backups/backup-databases.sh"
 # Phase 1/C1 compat: accept legacy forwarder paths during migration
 BACKUP_DB_COMPAT="$PROJECT_ROOT/scripts/backups/backup-databases.sh"
@@ -332,8 +331,8 @@ stray=$(awk '
   # forever, and nothing says the two are looking in different directories. The
   # default also has to be writable by whoever runs the cron jobs -- /var/lib is
   # root-only, so a non-root exporter could never read a root-written marker.
-  if { [ -f "$EXPORTER" ] || [ -f "${EXPORTER_COMPAT:-}" ]; } && { [ -f "$BACKUP_DB" ] || [ -f "${BACKUP_DB_COMPAT:-}" ]; }; then
-      exporter_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$EXPORTER" "${EXPORTER_COMPAT:-/dev/null}" 2>/dev/null | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
+  if [ -f "$EXPORTER" ] && { [ -f "$BACKUP_DB" ] || [ -f "${BACKUP_DB_COMPAT:-}" ]; }; then
+      exporter_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$EXPORTER" 2>/dev/null | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
       backup_state=$(grep -oE 'BACKUP_STATE_DIR:-[^}]+' "$BACKUP_DB" "${BACKUP_DB_COMPAT:-/dev/null}" 2>/dev/null | head -1 | sed 's/.*BACKUP_STATE_DIR:-//')
       if [ -z "$exporter_state" ] || [ -z "$backup_state" ]; then
           echo "ERROR: could not read the BACKUP_STATE_DIR default from the exporter" >&2
