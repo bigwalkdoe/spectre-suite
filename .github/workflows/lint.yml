@@ -229,3 +229,37 @@ jobs:
             echo "::error::OPA policy violations: $denials" >&2
             exit 1
           fi
+
+  opa-isolated-k8s:
+    name: OPA Isolated Kubernetes Admission
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: v0.68.0
+
+      - name: Check isolated k8s rego
+        run: opa check spectre/policies/k8s/
+
+      - name: Test isolated k8s rego
+        run: opa test spectre/policies/k8s/
+
+      - name: Isolated slice stays outside security.* core packages
+        run: |
+          set -e
+          if grep -RIlE '^package[[:space:]]+security\.' spectre/policies/k8s --include='*.rego'; then
+            echo "::error::isolated k8s slice must not declare security.* packages" >&2
+            exit 1
+          fi
+          grep -RIE '^package[[:space:]]+kubernetes\.admission' spectre/policies/k8s --include='*.rego' >/dev/null
+          echo "OK: isolated k8s slice declares kubernetes.admission only"
+
+      - name: Run opt-in isolation check (core gates + vendored slice)
+        run: bash spectre/policies/contract/check_isolation.sh
+
+      - name: K8s admission + compat report tests (vendored policy)
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/test_k8s_admission_report.py tests/test_opa_compat_report.py tests/test_opa_versions_index_report.py tests/test_opa_path_c_contract.py tests/test_opa_contract_adapter.py -q
