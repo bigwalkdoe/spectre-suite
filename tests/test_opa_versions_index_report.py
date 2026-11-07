@@ -7,12 +7,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "spectre/actions/security/opa/versions-index-report.py"
-SEC_ROOT = Path("/home/deon/dev/github/spectre-security/security/opa/versions")
+VENDORED_VERSIONS_ROOT = ROOT / "spectre" / "policies" / "k8s" / "versions"
 
 
 def test_versions_index_report_isolated_and_lists_policies():
-    if not SEC_ROOT.exists():
-        pytest.skip("spectre-security OPA versions root not available")
+    if not VENDORED_VERSIONS_ROOT.exists():
+        pytest.skip("vendored OPA versions root not available")
     p = subprocess.run([sys.executable, str(TOOL)], text=True, capture_output=True, check=True)
     d = json.loads(p.stdout)
     assert d["domain"] == "opa.versions"
@@ -24,8 +24,8 @@ def test_versions_index_report_isolated_and_lists_policies():
 
 
 def test_versions_index_report_compact_omits_full_index_body():
-    if not SEC_ROOT.exists():
-        pytest.skip("spectre-security OPA versions root not available")
+    if not VENDORED_VERSIONS_ROOT.exists():
+        pytest.skip("vendored OPA versions root not available")
     p = subprocess.run([sys.executable, str(TOOL), "--compact"], text=True, capture_output=True, check=True)
     d = json.loads(p.stdout)
     assert d["isolated"] is True
@@ -35,8 +35,8 @@ def test_versions_index_report_compact_omits_full_index_body():
 
 
 def test_versions_index_report_policy_filter():
-    if not SEC_ROOT.exists():
-        pytest.skip("spectre-security OPA versions root not available")
+    if not VENDORED_VERSIONS_ROOT.exists():
+        pytest.skip("vendored OPA versions root not available")
     p = subprocess.run([sys.executable, str(TOOL), "--policy", "kubernetes-admission", "--compact"],
                        text=True, capture_output=True, check=True)
     d = json.loads(p.stdout)
