@@ -1,0 +1,14 @@
+{
+  "policy": "kubernetes-admission",
+  "version": "0.1.0",
+  "previous_version": "0.0.0",
+  "timestamp": "2026-10-15T03:42:54+05:00",
+  "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+  "message": "Add Kubernetes admission policies with 10 rules",
+  "bump_type": "minor",
+  "author": "Security Baseline",
+  "email": "security@example.com",
+  "approved": true,
+  "approved_by": "Security Baseline",
+  "approved_at": "2026-10-15T03:43:46+05:00"
+}
