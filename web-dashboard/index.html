@@ -128,11 +128,11 @@
                     <span class="badge badge-warning" id="alertCount">0</span>
                 </div>
                 <div class="card-body" aria-live="polite">
-                    <div class="alert-filters" id="alertFilters">
-                        <button class="btn btn-sm active" data-severity="all">All</button>
-                        <button class="btn btn-sm" data-severity="critical">Critical</button>
-                        <button class="btn btn-sm" data-severity="warning">Warning</button>
-                        <button class="btn btn-sm" data-severity="info">Info</button>
+                    <div class="alert-filters" id="alertFilters" role="group" aria-label="Filter alerts by severity">
+                        <button type="button" class="btn btn-sm active" data-severity="all" aria-pressed="true">All</button>
+                        <button type="button" class="btn btn-sm" data-severity="critical" aria-pressed="false">Critical</button>
+                        <button type="button" class="btn btn-sm" data-severity="warning" aria-pressed="false">Warning</button>
+                        <button type="button" class="btn btn-sm" data-severity="info" aria-pressed="false">Info</button>
                     </div>
                     <div class="alerts-list" id="alertsList">
                         <div class="no-alerts">No active alerts</div>
@@ -189,16 +189,16 @@
             <section class="card full-width" id="chartCard">
                 <div class="card-header">
                     <h2><i class="fas fa-chart-line" aria-hidden="true"></i> Resource Trends <a href="http://localhost:9090/graph" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus graph" aria-label="Open Prometheus graph"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
-                    <div class="chart-controls">
-                        <button class="btn btn-sm active" data-range="1h">1H</button>
-                        <button class="btn btn-sm" data-range="6h">6H</button>
-                        <button class="btn btn-sm" data-range="24h">24H</button>
-                        <button class="btn btn-sm" data-range="7d">7D</button>
+                    <div class="chart-controls" role="group" aria-label="Chart time range">
+                        <button type="button" class="btn btn-sm active" data-range="1h" aria-pressed="true">1H</button>
+                        <button type="button" class="btn btn-sm" data-range="6h" aria-pressed="false">6H</button>
+                        <button type="button" class="btn btn-sm" data-range="24h" aria-pressed="false">24H</button>
+                        <button type="button" class="btn btn-sm" data-range="7d" aria-pressed="false">7D</button>
                     </div>
                 </div>
                 <div class="card-body" aria-live="polite">
                     <div class="chart-container">
-                        <canvas id="resourceChart" role="img" aria-label="Resource usage trends chart showing CPU, memory, and disk usage over time"></canvas>
+                        <canvas id="resourceChart" role="img" aria-label="Resource usage trends chart showing CPU, memory, and disk usage (percent) and network I/O over time"></canvas>
                     </div>
                 </div>
             </section>
@@ -294,7 +294,7 @@
                 <span>|</span>
                 <span>Connected to Prometheus: <span id="prometheusStatus">Checking...</span></span>
                 <span>|</span>
-                <a href="http://localhost:3002" target="_blank">Open Grafana <i class="fas fa-external-link-alt"></i></a>
+                <a href="http://localhost:3002" target="_blank" rel="noopener noreferrer" aria-label="Open Grafana">Open Grafana <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
             </div>
         </footer>
 

@@ -124,8 +124,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.chart-controls .btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const target = e.currentTarget;
-            document.querySelectorAll('.chart-controls .btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.chart-controls .btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
             target.classList.add('active');
+            target.setAttribute('aria-pressed', 'true');
             updateChart(target.dataset.range);
         });
     });
@@ -134,8 +138,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#alertFilters .btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const target = e.currentTarget;
-            document.querySelectorAll('#alertFilters .btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#alertFilters .btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
             target.classList.add('active');
+            target.setAttribute('aria-pressed', 'true');
             activeAlertFilter = target.dataset.severity || 'all';
             renderAlerts();
         });
@@ -192,6 +200,12 @@ function applyChartTheme() {
     chart.options.scales.x.ticks.color = theme.tickColor;
     chart.options.scales.y.grid.color = theme.gridColor;
     chart.options.scales.y.ticks.color = theme.tickColor;
+    if (chart.options.scales.y.title) chart.options.scales.y.title.color = theme.tickColor;
+    if (chart.options.scales.y1) {
+        chart.options.scales.y1.grid.color = theme.gridColor;
+        chart.options.scales.y1.ticks.color = theme.tickColor;
+        if (chart.options.scales.y1.title) chart.options.scales.y1.title.color = theme.tickColor;
+    }
     chart.options.plugins.legend.labels = { color: theme.legendColor };
     chart.update('none');
 }
@@ -260,6 +274,15 @@ function formatBytes(bytes) {
     const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
     const val = bytes / Math.pow(1024, i);
     return `${val.toFixed(val >= 10 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatBytesPerSec(bytesPerSec) {
+    if (bytesPerSec === null || bytesPerSec === undefined || isNaN(bytesPerSec)) return 'No data';
+    if (bytesPerSec <= 0) return '0 B/s';
+    const units = ['B/s', 'KB/s', 'MB/s', 'GB/s', 'TB/s'];
+    const i = Math.min(Math.floor(Math.log(bytesPerSec) / Math.log(1024)), units.length - 1);
+    const val = bytesPerSec / Math.pow(1024, i);
+    return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function formatRelativeTime(epochSeconds) {
@@ -886,6 +909,7 @@ async function checkPrometheusConnection() {
 function initializeChart() {
     const ctx = document.getElementById('resourceChart').getContext('2d');
     const theme = getChartTheme();
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -897,7 +921,10 @@ function initializeChart() {
                     borderColor: '#667eea',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 },
                 {
                     label: 'Memory Usage (%)',
@@ -905,7 +932,10 @@ function initializeChart() {
                     borderColor: '#f5576c',
                     backgroundColor: 'rgba(245, 87, 108, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 },
                 {
                     label: 'Disk Usage (%)',
@@ -913,21 +943,29 @@ function initializeChart() {
                     borderColor: '#4facfe',
                     backgroundColor: 'rgba(79, 172, 254, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 },
                 {
-                    label: 'Network I/O (B/s)',
+                    label: 'Network I/O',
                     data: [],
                     borderColor: '#f59e0b',
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5,
+                    yAxisID: 'y1'
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: reduceMotion ? false : { duration: 150 },
             interaction: {
                 intersect: false,
                 mode: 'index'
@@ -938,14 +976,44 @@ function initializeChart() {
                     ticks: { maxTicksLimit: 10, color: theme.tickColor }
                 },
                 y: {
+                    type: 'linear',
+                    position: 'left',
                     min: 0,
                     max: 100,
                     grid: { color: theme.gridColor },
-                    ticks: { color: theme.tickColor }
+                    ticks: {
+                        color: theme.tickColor,
+                        callback: (v) => v + '%'
+                    },
+                    title: { display: true, text: 'Usage', color: theme.tickColor }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 0,
+                    beginAtZero: true,
+                    grid: { drawOnChartArea: false, color: theme.gridColor },
+                    ticks: {
+                        color: theme.tickColor,
+                        callback: (v) => formatBytesPerSec(v)
+                    },
+                    title: { display: true, text: 'Network', color: theme.tickColor }
                 }
             },
             plugins: {
-                legend: { position: 'bottom', labels: { color: theme.legendColor } }
+                legend: { position: 'bottom', labels: { color: theme.legendColor } },
+                tooltip: {
+                    animation: !reduceMotion,
+                    callbacks: {
+                        label: (ctx) => {
+                            const v = ctx.parsed.y;
+                            if (ctx.dataset.yAxisID === 'y1') {
+                                return ` ${ctx.dataset.label}: ${formatBytesPerSec(v)}`;
+                            }
+                            return ` ${ctx.dataset.label}: ${Number.isFinite(v) ? v.toFixed(1) : '—'}%`;
+                        }
+                    }
+                }
             }
         }
     });
@@ -994,8 +1062,10 @@ async function updateChart(range) {
             return;
         }
 
-        const firstSeries = results[0]?.data?.result?.[0]?.values;
-        if (!Array.isArray(firstSeries) || firstSeries.length === 0) {
+        const labelSeries = results
+            .map(r => r?.data?.result?.[0]?.values)
+            .find(v => Array.isArray(v) && v.length > 0);
+        if (!labelSeries) {
             chart.data.labels = [];
             chart.data.datasets.forEach(d => { d.data = []; });
             chart.update();
@@ -1003,7 +1073,7 @@ async function updateChart(range) {
             return;
         }
 
-        const timestamps = firstSeries.map(v => {
+        const timestamps = labelSeries.map(v => {
             const d = new Date(v[0] * 1000);
             // Include the date component for ranges that cross day boundaries
             // so the x-axis remains interpretable past 24h.
