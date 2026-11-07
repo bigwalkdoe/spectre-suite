@@ -599,5 +599,31 @@
     "replaces": [
       "crontab:*/5 * * * *"
     ]
+  },
+  {
+    "name": "security/baseline/run",
+    "action": "security/baseline/run.sh",
+    "group": "security",
+    "summary": "Run suite-canonical security baseline phases (additive; OPA/hardening/scan/drift/SBOM evidence with compat fallbacks)",
+    "sudo": true,
+    "mutates": true,
+    "concurrency": "forbid",
+    "replaces": [
+      "system:security-baseline.service",
+      "user:security-baseline.service"
+    ]
+  },
+  {
+    "name": "prometheus/security-baseline-metrics-exporter",
+    "action": "prometheus/security-baseline-metrics-exporter.sh",
+    "group": "monitoring",
+    "summary": "Export spectre_security_baseline_* pipeline metrics from baseline evidence (never-run/unknown/stale explicit)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*/5 * * * *",
+    "replaces": [
+      "system:security-baseline-exporter.service",
+      "user:security-baseline-exporter.service"
+    ]
   }
 ]
