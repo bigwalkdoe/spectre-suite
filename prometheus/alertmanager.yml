@@ -6,7 +6,7 @@ global:
   # buries the failures that matter.
   #
   # Alertmanager performs no ${VAR} substitution, so the webhook is read from a
-  # file written by scripts/setup-notification-channels.sh rather than
+  # file written by `spectre run setup-notification-channels` rather than
   # interpolated here. The *_file variants are only valid per-receiver, not
   # under `global`, so each slack_config names the file explicitly.
   slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
@@ -51,7 +51,7 @@ route:
 # Notification receivers
 # Alertmanager performs NO environment-variable substitution in its config file,
 # so the webhook URL is read from a file rather than interpolated here. It is
-# written by scripts/setup-notification-channels.sh -- see
+# written by `spectre run setup-notification-channels` -- see
 # prometheus/alertmanager-secrets/README.md.
 receivers:
   # Slack is the only channel. Severity is carried by the attachment colour and
