@@ -59,15 +59,29 @@ if "$OPA_CMD" version >/dev/null 2>&1; then
   else
     warn "OPA check reported issues (see $LOG_DIR/opa-check.log)"
   fi
-  log "Phase 1b: OPA policy tests (compat)"
-  if [ "${SECURITY_OPA_COMPAT:-0}" = "1" ] && helper=$(resolve_helper "test-opa-policies.sh"); then
-    if OPA_CMD="$OPA_CMD" "$helper" 2>&1 | tee "$LOG_DIR/opa-tests.log"; then
-      log "OPA compat tests: PASSED"
+  log "Phase 1b: OPA compat (Option A, report-only when SECURITY_OPA_COMPAT=1)"
+  if [ "${SECURITY_OPA_COMPAT:-0}" = "1" ]; then
+    if helper=$(resolve_helper "opa-compat-report.sh"); then
+      log "OPA compat report (Option A adapter -> canonical suite policies, report-only):"
+      if "$helper" 2>&1 | tee "$LOG_DIR/opa-compat-report.log"; then
+        log "OPA compat report: COMPLETED (see $LOG_DIR/opa-compat-report.log)"
+      else
+        warn "OPA compat report: issues (exit $?); see $LOG_DIR/opa-compat-report.log"
+      fi
     else
-      OPA_TEST_EXIT=$?; warn "OPA compat tests: FAILED (exit $OPA_TEST_EXIT)"
+      log "OPA compat report helper not found (opa-compat-report.sh); skipping"
+    fi
+    if helper=$(resolve_helper "test-opa-policies.sh"); then
+      if OPA_CMD="$OPA_CMD" "$helper" 2>&1 | tee "$LOG_DIR/opa-tests.log"; then
+        log "OPA legacy compat tests: PASSED"
+      else
+        OPA_TEST_EXIT=$?; warn "OPA legacy compat tests: FAILED (exit $OPA_TEST_EXIT)"
+      fi
+    else
+      log "OPA legacy compat tests: SKIPPED (no test-opa-policies.sh contract helper; suite-native OPA gate remains canonical)"
     fi
   else
-    log "OPA compat tests: SKIPPED (set SECURITY_OPA_COMPAT=1 and provide test-opa-policies.sh/current-infrastructure.json contract to enable; suite-native OPA gate remains canonical)"
+    log "OPA compat: SKIPPED (set SECURITY_OPA_COMPAT=1 for Option A adapter report; suite-native OPA gate remains canonical)"
   fi
 else
   warn "OPA not available; skipping OPA phases"
