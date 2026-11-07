@@ -31,6 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: No tracked legacy scripts/ tree (C1 guardrail)
+        run: |
+          if git ls-files scripts | grep -q .; then
+            echo "::error::tracked files reintroduced under scripts/ (C1 removed the legacy tree); move to spectre/actions or remove" >&2
+            git ls-files scripts >&2
+            exit 1
+          fi
+          echo "OK: no tracked files under scripts/"
+
       - name: Install shellcheck
         run: |
           sudo apt-get update -qq
