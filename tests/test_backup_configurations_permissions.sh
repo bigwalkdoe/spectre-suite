@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-if [ -f "$PROJECT_ROOT/spectre/actions/backups/backup-configurations.sh" ]; then TARGET="$PROJECT_ROOT/spectre/actions/backups/backup-configurations.sh"; else TARGET="$PROJECT_ROOT/scripts/backups/backup-configurations.sh"; fi
+TARGET="$PROJECT_ROOT/spectre/actions/backups/backup-configurations.sh"
 
 pass() { echo "✅ $1"; }
 fail() { echo "❌ $1"; exit 1; }
