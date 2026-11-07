@@ -2,6 +2,8 @@
 
 ## Common Incidents and Resolution Steps
 
+> **Modular runbooks:** see [`runbooks/`](runbooks/README.md) for focused runbooks (e.g. [security baseline OPA alert semantics](runbooks/security-baseline-opa-alerts.md): `OPACheckFailed` vs `OPATestsFailed` vs `OPACompatReportIssues` report-ran).
+
 ---
 
 ### Runbook 1: High CPU Usage
