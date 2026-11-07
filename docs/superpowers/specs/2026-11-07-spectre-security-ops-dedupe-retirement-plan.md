@@ -1,8 +1,8 @@
 # spectre-security Ops De-duplication & Retirement Plan (coordinated)
 
-**Date:** 2026-11-07  
-**Status:** draft — **coordination and explicit confirmation required** (cross-repo + host)  
-**Principle:** `spectre-suite` is canonical for execution/scheduling/provenance (`spectre run`, registry, `actions verify`, health/catch-up/restic semantics where applicable). `spectre-security` may temporarily own deep evidence generation during A/D hybrid; migrate only gaps, then retire parallels to avoid two truths.
+**Date:** 2026-11-07 (closure pass 2026-11-08)  
+**Status:** **largely executed (coordinated)** — see `2026-11-07-spectre-security-retirement-execution.md` for evidenced steps. Remaining items require explicit operator/org decisions (notably hosted infra disposition).  
+**Principle:** `spectre-suite` is canonical for execution/scheduling/provenance (`spectre run`, registry, `actions verify`, health/catch-up/restic semantics where applicable). `spectre-security` source repo is now **archived on GitHub**; suite compat paths degrade gracefully when `SPECTRE_SECURITY_ROOT` is absent. Migrate only gaps, retire parallels to avoid two truths.
 
 ## 1. Scope
 - **spectre-security repo** (`~//dev/github/spectre-security`, `git@github.com:bigwalkdoe/spectre-security.git`): overlapping scripts, baseline exporters/services/timers, OPA, CI/workflows, installers.
@@ -19,20 +19,17 @@
 | Backups/maintenance/perf/network/setup | top-level `setup-*`, `setup-backup-cron.sh`, maintenance/perf/network scripts | suite registry actions, backup health/catch-up/restic semantics | **Prefer suite semantics**; do not run spectre-security installers that (re)create `~//scripts` or legacy cron; migrate only gaps |
 | Host `/usr/local/bin` legacy refs | 14 files found referencing `~//scripts` (2026-11-07) | `spectre run` + canonical installers/wrappers | Cross-repo/host coordination (see §3) |
 
-## 3. Host findings — `/usr/local/bin` (fedora, 2026-11-07)
-**Evidence:** `rg -l ~//scripts /usr/local/bin` found 14 files (root-owned, Jul 26 2026). No active scheduler references found in `/etc/systemd/system`, readable `/etc/cron*`, or `~/.config/systemd/user` (spot check); `/var/spool/cron` unreadable. Matching names exist in `spectre-security`, but sampled hashes **differ** from current `spectre-security` files → likely installed from spectre-security/older state.
+## 3. Host findings — `/usr/local/bin` (fedora, 2026-11-07) — **resolved/archived (evidenced)**
+**Evidence (2026-11-07):** `rg -l ~//scripts /usr/local/bin` found 14 files referencing `~//scripts`. No active scheduler references found in `/etc/systemd/system`, readable `/etc/cron*`, or `~/.config/systemd/user` (spot check). Sampled hashes differed from then-current `spectre-security` files.
 
-**High-risk:** `setup-backup-cron.sh` would install legacy `~//scripts/backups/*` cron entries, regressing the current clean `spectre run` crontab — **do not execute**.  
-**Broken/legacy:** `check-performance-wrapper.sh` targets missing `~//scripts/...` (unused by active `performance-check.service`).  
-**Legacy generators:** `setup-audit-logging.sh`, `setup-database-optimization.sh`, `setup-intrusion-detection.sh`, `setup-logging.sh`, `setup-opa-policies.sh`, `setup-resource-monitoring.sh`, `setup-secrets-management.sh`, `setup-security-scanning.sh` create `~//scripts/*`/legacy cron/jobs.  
-**Runtime helpers (stale paths):** `run-trivy-scan.sh`, `run-zap-scan.sh`, `container-logrotate.sh`, `centralized-log-shipper.sh`.
+**Disposition (completed, evidenced 2026-11-07; see retirement execution Step 4):** `setup-backup-cron.sh`, `check-performance-wrapper.sh`, and all 12 remaining scripts were archived to `/usr/local/bin/.archived-spectre-security-20261107/` (0644, SHA256s recorded). Post-check: **no** `~//scripts` refs remain in `/usr/local/bin`. High-risk generators were **not executed**; archiving prevents execution from `/usr/local/bin` but does not undo prior system changes made by those scripts.
 
-**Required handling:** classify manual/external use, confirm disposition with operator + spectre-security ownership, archive/remove/replace only with explicit confirmation, then re-scan and update Phase 4 checklist §1.17/§4.34.
+**Follow-up (operator):** if any external/manual workflow depended on these paths, restore/replace deliberately from archive with confirmation.
 
-## 4. spectre-security retirement boundary (decide per capability)
-- **Absorb into suite:** baseline orchestration phases (parity proven), OPA governance (per decision), metrics/exporters, provenance/scheduling, drift/SBOM/reporting semantics.
-- **Possibly external infra (evaluate):** SonarQube/ZAP hosted services/compose — may remain operational dependencies while suite owns orchestration/evidence collection.
-- **Archive/read-only after parity:** overlapping setup scripts, duplicate exporters/timers, superseded top-level scripts. Keep git history; record retirement evidence.
+## 4. spectre-security retirement boundary (status 2026-11-08)
+- **Absorbed/isolated in suite (evidenced):** baseline orchestration phases + compat path, `spectre_security_baseline_*` observability (exporter/alerts/dashboard/tests), OPA Path C groundwork (shared core + adapters), k8s admission/versions **vendored and isolated** with separate CI in `lint.yml` (`opa-isolated-k8s`), CI/OPA core gates 38/0, `actions verify` green (see retirement execution doc).
+- **Hosted/external infra (evaluate separately — disposition tracking needed):** SonarQube/ZAP hosted services/compose may remain operational dependencies while suite owns orchestration/evidence collection. **Owner/disposition not recorded in this repo;** confirm with operator/org and document the decision.
+- **Retired/archived:** overlapping `/usr/local/bin` legacy generators/helpers archived (Step 4). GitHub `bigwalkdoe/spectre-security` **archived/read-only** (Step 5b, 2026-11-08). Local clone removed (Step 5a). Keep git history/evidence.
 
 ## 5. Migration/retirement checklist (template)
 For each capability:
@@ -43,9 +40,7 @@ For each capability:
 - [ ] Legacy script/installer retired or clearly marked non-canonical.
 - [ ] spectre-security artifact archived/read-only or removed only after coordination.
 
-## 6. Immediate coordinated actions (no destructive changes here)
-1. Confirm whether `spectre-security` is active, superseded, or in maintenance on this host and in org workflows.
-2. Freeze/guard legacy installers: ensure `setup-backup-cron.sh` and other `/usr/local/bin` generators are not used (operator awareness; consider renaming/archiving with confirmation).
-3. Migrate baseline systemd exporter/timer (spectre-security) to suite `prometheus/security-baseline-metrics-exporter` + canonical textfile wiring — host change, confirm.
-4. After OPA governance decision + parity, reconcile `security/opa` and retire duplicate CI/workflows.
-5. Update Phase 4 checklist evidence as host items are resolved.
+## 6. Coordinated actions — closure status (2026-11-08)
+1. **Done (decisions/evidence):** `spectre-security` treated as superseded for absorbed capabilities; GitHub repo archived (5b); local clone removed (5a); Path C (C now) groundwork complete with isolated k8s/versions.
+2. **Done (host, evidenced):** `/usr/local/bin` legacy generators/helpers archived to `.archived-spectre-security-20261107/`; no `~//scripts` refs remain in `/usr/local/bin`. Suite user timer `spectre-security-baseline-metrics.timer` installed/active (3a); masked legacy system HTTP exporter left unchanged.
+3. **Remaining (operator/org coordination):** disposition/ownership for SonarQube/ZAP/hosted services (evaluate separately); concrete Path C live-infra input generation parity; any further host repointing beyond 3a; update Phase 4 checklist evidence as external items are resolved. **No further destructive host or GitHub actions without explicit confirmation.**

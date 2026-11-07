@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -257,3 +258,13 @@ def test_contract_mapping_covers_core_package_input_surface():
         "security.intrusion_detection",
         "security.network",
     }, f"unexpected canonical security control packages: {sorted(security_control_pkgs)}"
+
+
+def test_opt_in_isolation_check_script_passes():
+    """Track 3 hardening: vendored k8s/versions remain isolated; core gates preserved."""
+    if not _opa_available():
+        pytest.skip("opa not available")
+    script = ROOT / "spectre/policies/contract/check_isolation.sh"
+    assert script.exists() and os.access(script, os.X_OK)
+    r = subprocess.run(["bash", str(script)], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, f"stdout:\n{r.stdout}\nstderr:\n{r.stderr}"
