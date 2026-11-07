@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="t d">
+  <title id="t">Spectre Suite monitoring preview</title>
+  <desc id="d">Illustrative monitoring dashboard preview with panels for backups, alerts, and exporters.</desc>
+  <rect width="960" height="420" fill="#0f172a"/>
+  <rect x="24" y="24" width="912" height="372" rx="14" fill="#111827" stroke="#334155"/>
+  <text x="48" y="62" font-family="ui-monospace, monospace" font-size="22" fill="#e2e8f0">Spectre Observability — illustrative preview</text>
+  <rect x="48" y="86" width="420" height="130" rx="10" fill="#020617" stroke="#334155"/>
+  <text x="68" y="116" font-family="ui-monospace, monospace" font-size="14" fill="#94a3b8">BACKUP HEALTH</text>
+  <rect x="68" y="132" width="120" height="16" rx="4" fill="#22c55e"/>
+  <rect x="198" y="132" width="90" height="16" rx="4" fill="#22c55e"/>
+  <rect x="298" y="132" width="140" height="16" rx="4" fill="#38bdf8"/>
+  <text x="68" y="178" font-family="ui-monospace, monospace" font-size="13" fill="#cbd5e1">archives verified · markers fresh · offsite degraded-safe</text>
+  <rect x="492" y="86" width="420" height="130" rx="10" fill="#020617" stroke="#334155"/>
+  <text x="512" y="116" font-family="ui-monospace, monospace" font-size="14" fill="#94a3b8">ALERTS / EXPORTERS</text>
+  <text x="512" y="148" font-family="ui-monospace, monospace" font-size="13" fill="#86efac">● Watchdog dead-man’s-switch active</text>
+  <text x="512" y="172" font-family="ui-monospace, monospace" font-size="13" fill="#86efac">● spectre_agent_up verified identity</text>
+  <text x="512" y="196" font-family="ui-monospace, monospace" font-size="13" fill="#fcd34d">● stale metrics => investigate exporter schedule</text>
+  <rect x="48" y="236" width="864" height="136" rx="10" fill="#020617" stroke="#334155"/>
+  <text x="68" y="266" font-family="ui-monospace, monospace" font-size="14" fill="#94a3b8">DISPATCH SNAPSHOT</text>
+  <text x="68" y="294" font-family="ui-monospace, monospace" font-size="13" fill="#a5f3fc">$ spectre run backups/check-backup-health</text>
+  <text x="68" y="318" font-family="ui-monospace, monospace" font-size="13" fill="#a5f3fc">$ spectre actions verify   → blocking 0 · advisory 1</text>
+  <text x="68" y="342" font-family="ui-monospace, monospace" font-size="13" fill="#94a3b8">Replace this preview with real Grafana/terminal screenshots in assets/ (redact secrets).</text>
+</svg>
