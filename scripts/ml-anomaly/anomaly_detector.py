@@ -1,1 +1,0 @@
-../../spectre/actions/ml-anomaly/anomaly_detector.py
