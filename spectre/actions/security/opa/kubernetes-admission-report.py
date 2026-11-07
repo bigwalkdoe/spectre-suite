@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Kubernetes admission policy report (Option A compat slice, ISOLATED).
 
-Evaluates AdmissionReview JSON against spectre-security's kubernetes.admission
-policy (data.kubernetes.admission.deny). This is a SEPARATE domain from the
-suite's infra baseline aggregation (data.security[k].deny) and MUST NOT be
-merged into that aggregation or CI gates without an explicit decision.
+Evaluates AdmissionReview JSON against the isolated kubernetes.admission policy
+(data.kubernetes.admission.deny). The policy is vendored under
+`spectre/policies/k8s/` so it runs without the retired spectre-security repo;
+`SPECTRE_SECURITY_ROOT` remains a fallback.
+
+This is a SEPARATE domain from the suite's infra baseline aggregation
+(data.security[k].deny) and MUST NOT be merged into that aggregation or CI gates
+without an explicit decision.
 
 Report-only by default (exit 0 when report produced). Use --fail-on-deny to
 exit 1 when denials are present.
@@ -18,6 +22,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+SUITE_ROOT = Path(__file__).resolve().parents[4]
+VENDORED_POLICY_DIR = SUITE_ROOT / "spectre" / "policies" / "k8s"
+VENDORED_POLICY = VENDORED_POLICY_DIR / "kubernetes-admission.rego"
+VENDORED_VERSIONS = VENDORED_POLICY_DIR / "versions"
+
 
 def _security_root() -> Path:
     return Path(os.environ.get("SPECTRE_SECURITY_ROOT", "/home/deon/dev/github/spectre-security"))
@@ -30,6 +39,8 @@ def find_policy(explicit: str) -> Path:
             return p
         print(f"policy not found: {p}", file=sys.stderr)
         raise SystemExit(2)
+    if VENDORED_POLICY.exists():
+        return VENDORED_POLICY
     root = _security_root()
     for cand in [
         root / "security/opa/policies/kubernetes-admission.rego",
@@ -38,7 +49,8 @@ def find_policy(explicit: str) -> Path:
         if cand.exists():
             return cand
     print(
-        f"kubernetes admission policy not found; set --policy or SPECTRE_SECURITY_ROOT (tried {root}/security/opa/policies)",
+        f"kubernetes admission policy not found; set --policy or SPECTRE_SECURITY_ROOT "
+        f"(tried {VENDORED_POLICY} and {root}/security/opa/policies)",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -58,7 +70,9 @@ def load_version_metadata(explicit: str = "") -> dict | None:
         else:
             return {"path": str(p), "error": "not found"}
     else:
-        base = _security_root() / "security/opa/versions/kubernetes-admission"
+        base = VENDORED_VERSIONS / "kubernetes-admission"
+        if not base.exists():
+            base = _security_root() / "security/opa/versions/kubernetes-admission"
     if not base.exists():
         return None
     candidates = sorted([d for d in base.iterdir() if d.is_dir()], key=lambda x: x.name)
@@ -75,8 +89,10 @@ def load_version_metadata(explicit: str = "") -> dict | None:
 
 
 def load_versions_index() -> dict | None:
-    """Read-only: surface spectre-security OPA versions index (isolated/report-only)."""
-    p = _security_root() / "security/opa/versions/index.json"
+    """Read-only: surface the OPA versions index (vendored first, isolated/report-only)."""
+    p = VENDORED_VERSIONS / "index.json"
+    if not p.exists():
+        p = _security_root() / "security/opa/versions/index.json"
     if not p.exists():
         return None
     try:
@@ -110,8 +126,8 @@ def _eval_one(policy: Path, input_path: Path) -> tuple[list, str | None]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("input", help="AdmissionReview JSON file, directory of *.json fixtures (batch, report-only summary), or - for stdin")
-    ap.add_argument("--policy", default="", help="kubernetes-admission.rego file or policy dir (default: $SPECTRE_SECURITY_ROOT/security/opa/policies)")
-    ap.add_argument("--version-metadata", default="", help="metadata.json path or versions/kubernetes-admission dir (default: auto under $SPECTRE_SECURITY_ROOT; read-only, report-only)")
+    ap.add_argument("--policy", default="", help="kubernetes-admission.rego file or policy dir (default: vendored spectre/policies/k8s, then $SPECTRE_SECURITY_ROOT/security/opa/policies)")
+    ap.add_argument("--version-metadata", default="", help="metadata.json path or versions/kubernetes-admission dir (default: vendored spectre/policies/k8s/versions, then $SPECTRE_SECURITY_ROOT; read-only, report-only)")
     ap.add_argument("--include-versions-index", action="store_true", help="include spectre-security OPA versions/index.json (read-only, isolated; not in data.security[k].deny)")
     ap.add_argument("--summary-only", action="store_true", help="batch mode: omit per-fixture denial messages (keep counts/errors)")
     ap.add_argument("--fail-on-deny", action="store_true", help="exit 1 if any denials are present (default: report-only, exit 0)")
@@ -121,6 +137,8 @@ def main() -> int:
     vindex = load_versions_index() if args.include_versions_index else None
 
     def _finalize(report: dict, had_errors: bool, had_denials: bool) -> int:
+        vendored_paths = {VENDORED_POLICY.resolve(), VENDORED_POLICY_DIR.resolve()}
+        report["policy_source"] = "vendored" if policy.resolve() in vendored_paths else "external"
         if meta is not None:
             report["policy_version_metadata"] = meta
         if vindex is not None:

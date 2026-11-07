@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "status": "draft",
+  "note": "Machine-checkable mapping for implemented adapter slices (additive). Does not change policy behavior/gates. Unmapped suite controls remain fail-closed.",
+  "core": {
+    "aggregation": "data.security[k].deny[m]",
+    "policy_dir": "spectre/policies",
+    "rego": "v1",
+    "ci_invariants": {"opa_check": true, "empty_input_min_denials": 38, "baseline_denials": 0}
+  },
+  "adapters": {
+    "nested_infra_to_suite_flat": {
+      "implemented": "spectre/actions/security/baseline/opa-contract-adapter.py",
+      "source_shape": {"docker": "array", "network": "object", "compliance": "object", "backup": "object"},
+      "mappings": [
+        {"source": "compliance.firewall_enabled", "suite_field": "firewall_enabled", "suite_packages": ["security.firewall"]},
+        {"source": "compliance.ssh_password_auth", "suite_field": "ssh_password_auth", "suite_packages": ["security.firewall"]},
+        {"source": "compliance.audit_logging_enabled", "suite_field": "audit_logging_enabled", "suite_packages": ["security.audit"]},
+        {"source": "compliance.intrusion_detection_active", "suite_field": "intrusion_detection_active", "suite_packages": ["security.intrusion_detection"], "note": "does NOT assert fail2ban_active/fail2ban_configured"},
+        {"source": "compliance.file_integrity_monitoring", "suite_field": "file_integrity_monitoring", "suite_packages": ["security.intrusion_detection"]},
+        {"source": "network.vpn_enabled", "suite_field": "vpn_enabled", "suite_packages": ["security.network"]},
+        {"source": "backup.encrypted", "suite_field": "backup_encryption_enabled", "suite_packages": ["security.backups"]},
+        {"source": "backup.retention_days", "suite_field": "backup_retention_days", "suite_packages": ["security.backups"], "note": "non-integer skipped (fail-closed)"},
+        {"source": "backup.offsite_replication", "suite_field": "backup_offsite_enabled", "suite_packages": ["security.backups"]},
+        {"source": "docker[].privileged (derived global)", "suite_field": "docker_privileged_disabled", "suite_packages": ["security.docker"], "note": "true only if no container privileged"},
+        {"source": "docker[].memory_limit (derived heuristic)", "suite_field": "docker_resource_limits", "suite_packages": ["security.docker"], "note": "asserted only if ALL containers declare memory_limit>0; else absent/fail-closed"}
+      ],
+      "evidence_only_unmapped": [
+        "compliance.security_scanning_enabled",
+        "network.open_ports", "network.remote_access", "network.container_network",
+        "backup.last_success_age",
+        "docker sensitive bind mounts (/etc,/var/run,/proc,/sys,/dev)", "docker 0.0.0.0 port exposure", "docker missing healthcheck"
+      ],
+      "suite_controls_never_invented_examples": [
+        "fail2ban_active", "fail2ban_configured", "ssh_root_login", "audit_retention_days", "sudo_logging_enabled",
+        "log_monitoring_enabled", "alert_thresholds_configured", "security_baseline_compliant", "cis_benchmarks_followed",
+        "pci_dss_compliant", "security_assessments_scheduled", "patch_management_active",
+        "network_segmentation_enabled", "dmz_isolated", "internal_no_internet", "ddos_protection_enabled",
+        "backup_verification_enabled", "database_backups_enabled", "docker_volume_backups_enabled",
+        "docker_not_root", "docker_no_new_privileges", "docker_userland_proxy_disabled"
+      ]
+    },
+    "k8s_admission": {
+      "implemented": "spectre/actions/security/opa/kubernetes-admission-report.py",
+      "source_shape": "AdmissionReview (input.request.object...)",
+      "policy": "spectre/policies/k8s/kubernetes-admission.rego",
+      "test": "spectre/policies/k8s/kubernetes-admission_test.rego",
+      "query": "data.kubernetes.admission.deny",
+      "isolated": true,
+      "aggregation": "NOT in data.security[k].deny",
+      "ci_gate": "none (separate/opt-in only by explicit decision)",
+      "versions_index": "spectre/policies/k8s/versions/index.json",
+      "versions_metadata": "spectre/policies/k8s/versions/kubernetes-admission/v0.1.0/metadata.json",
+      "versions_report": "spectre/actions/security/opa/versions-index-report.py"
+    }
+  }
+}

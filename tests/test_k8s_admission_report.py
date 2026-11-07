@@ -10,7 +10,7 @@ TOOL = ROOT / "spectre/actions/security/opa/kubernetes-admission-report.py"
 OPA = Path.home() / ".local/bin/opa"
 if not OPA.exists():
     OPA = Path("opa")
-POLICY = Path("/home/deon/dev/github/spectre-security/security/opa/policies/kubernetes-admission.rego")
+POLICY = ROOT / "spectre/policies/k8s/kubernetes-admission.rego"
 
 
 def _have_deps():
@@ -45,12 +45,13 @@ COMPLIANT = {
 
 def test_k8s_admission_report_isolated_and_compliant_passes():
     if not _have_deps():
-        pytest.skip("opa or spectre-security k8s policy not available")
+        pytest.skip("opa or vendored k8s policy not available")
     rc, d = run_report(COMPLIANT)
     assert rc == 0
     assert d["domain"] == "kubernetes.admission"
     assert d["isolated"] is True
     assert "NOT part of suite data.security[k].deny" in d["aggregation"]
+    assert d["policy_source"] == "vendored"
     assert d["denial_count"] == 0
     # read-only/report-only version metadata surfacing (isolated)
     meta = d.get("policy_version_metadata") or {}
@@ -59,7 +60,7 @@ def test_k8s_admission_report_isolated_and_compliant_passes():
 
 def test_k8s_admission_report_denies_privileged_and_fail_on_deny():
     if not _have_deps():
-        pytest.skip("opa or spectre-security k8s policy not available")
+        pytest.skip("opa or vendored k8s policy not available")
     obj = {"request": {"object": {"spec": {"containers": [{"name": "test", "securityContext": {"privileged": True}}]}}}}
     rc, d = run_report(obj)
     assert rc == 0  # report-only default
@@ -71,7 +72,7 @@ def test_k8s_admission_report_denies_privileged_and_fail_on_deny():
 
 def test_k8s_admission_report_batch_and_versions_index(tmp_path: Path):
     if not _have_deps():
-        pytest.skip("opa or spectre-security k8s policy not available")
+        pytest.skip("opa or vendored k8s policy not available")
     (tmp_path / "good.json").write_text(json.dumps(COMPLIANT))
     (tmp_path / "bad.json").write_text(json.dumps(
         {"request": {"object": {"spec": {"containers": [{"name": "t", "securityContext": {"privileged": True}}]}}}}
@@ -86,10 +87,11 @@ def test_k8s_admission_report_batch_and_versions_index(tmp_path: Path):
     assert d["fixtures_evaluated"] == 2 and d["fixtures_with_denials"] == 1
     assert d["total_denials"] > 0
     assert "NOT part of suite data.security[k].deny" in d["aggregation"]
-    # read-only versions index surfacing (if present on host)
-    if (Path("/home/deon/dev/github/spectre-security/security/opa/versions/index.json").exists()):
-        assert "policy_versions_index" in d
-        assert d["policy_versions_index_summary"]["policy_count"] >= 1
+    # read-only vendored versions index surfacing
+    assert d["policy_source"] == "vendored"
+    assert "policy_versions_index" in d
+    assert d["policy_versions_index_summary"]["policy_count"] >= 1
+    assert d["policy_versions_index"]["policies"]["kubernetes-admission"]["version"] == "0.1.0"
     # summary-only omits per-fixture denial messages
     p3 = subprocess.run(
         [sys.executable, str(TOOL), "--summary-only", str(tmp_path)],
