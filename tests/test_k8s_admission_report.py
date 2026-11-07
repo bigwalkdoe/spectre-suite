@@ -52,6 +52,9 @@ def test_k8s_admission_report_isolated_and_compliant_passes():
     assert d["isolated"] is True
     assert "NOT part of suite data.security[k].deny" in d["aggregation"]
     assert d["denial_count"] == 0
+    # read-only/report-only version metadata surfacing (isolated)
+    meta = d.get("policy_version_metadata") or {}
+    assert meta.get("policy") in (None, "kubernetes-admission") or "kubernetes-admission" in str(meta.get("_metadata_path", ""))
 
 
 def test_k8s_admission_report_denies_privileged_and_fail_on_deny():
