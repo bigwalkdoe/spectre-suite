@@ -1,0 +1,35 @@
+{
+  "contract_version": "live_infra_snapshot/v0",
+  "source": "suite-fixture/example",
+  "generated_at": "2026-11-08T00:00:00Z",
+  "compliance": {
+    "firewall_enabled": true,
+    "ssh_password_auth": false,
+    "audit_logging_enabled": true,
+    "intrusion_detection_active": true,
+    "file_integrity_monitoring": true,
+    "security_scanning_enabled": true
+  },
+  "network": {
+    "vpn_enabled": true,
+    "open_ports": [22],
+    "remote_access": true,
+    "container_network": "bridge"
+  },
+  "backup": {
+    "encrypted": true,
+    "retention_days": 30,
+    "offsite_replication": true,
+    "last_success_age": 3600
+  },
+  "docker": [
+    {
+      "name": "app",
+      "privileged": false,
+      "memory_limit": 512,
+      "healthcheck": "CMD-SHELL /bin/true",
+      "mounts": [{"source": "/srv/app", "target": "/app"}],
+      "ports": [{"host_ip": "127.0.0.1", "host_port": 8080}]
+    }
+  ]
+}
