@@ -66,6 +66,17 @@ def main() -> int:
         "adapter_notes": mapping.get("notes", []),
         "unmapped_suite_controls_note": mapping.get("unmapped_suite_controls_note", ""),
     }
+    if "docker_evidence" in mapping:
+        ev = mapping["docker_evidence"] or {}
+        summary["docker_evidence"] = {
+            "report_only": bool(ev.get("report_only", True)),
+            "container_count": ev.get("container_count", 0),
+            "privileged_count": len(ev.get("privileged_containers") or []),
+            "no_memory_limit_count": len(ev.get("no_memory_limit") or []),
+            "sensitive_bind_mount_count": len(ev.get("sensitive_bind_mounts") or []),
+            "exposed_all_interfaces_count": len(ev.get("exposed_all_interfaces") or []),
+            "missing_healthcheck_count": len(ev.get("missing_healthcheck") or []),
+        }
     print(json.dumps(summary, indent=2))
     # exit 0 = report produced (compat mode); denials are informational under Option A adapter.
     return 0
