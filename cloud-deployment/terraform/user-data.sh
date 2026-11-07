@@ -67,10 +67,16 @@ echo "Running Spectre Suite installation..."
 chmod +x install.sh
 ./install.sh
 
-# Deploy monitoring stack
+# Deploy monitoring stack (canonical action; spectre installed by install.sh)
 echo "Deploying monitoring stack..."
-chmod +x scripts/deploy-monitoring.sh
-./scripts/deploy-monitoring.sh
+if command -v spectre >/dev/null 2>&1; then
+    spectre run deploy-monitoring
+elif [ -x ./spectre/actions/deploy-monitoring.sh ]; then
+    ./spectre/actions/deploy-monitoring.sh
+else
+    echo "ERROR: deploy-monitoring action not found" >&2
+    exit 1
+fi
 
 # Configure firewall
 echo "Configuring firewall..."
@@ -191,13 +197,15 @@ apt-get install -y nginx
 systemctl enable nginx
 systemctl start nginx
 
-# Create cron jobs for cloud-specific tasks
+# Create cron jobs for cloud-specific tasks (dispatch via spectre when installed)
 echo "Setting up cloud cron jobs..."
 cat > /etc/cron.d/cloud-maintenance << EOF
-# Cloud maintenance tasks
-0 2 * * * ubuntu /opt/spectre-suite/scripts/backups/backup-all.sh
-0 3 * * 0 ubuntu /opt/spectre-suite/scripts/maintenance/run-maintenance.sh
-0 4 * * 6 ubuntu /opt/spectre-suite/scripts/security/run-security-hardening.sh
+# Cloud maintenance tasks (canonical dispatch)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 2 * * * ubuntu cd /opt/spectre-suite && /usr/local/bin/spectre run backups/backup-all
+0 3 * * 0 ubuntu cd /opt/spectre-suite && /usr/local/bin/spectre run maintenance/run-maintenance
+0 4 * * 6 ubuntu cd /opt/spectre-suite && /usr/local/bin/spectre run security/run-security-hardening
 0 5 * * * ubuntu /usr/local/bin/backup-to-s3.sh
 EOF
 
