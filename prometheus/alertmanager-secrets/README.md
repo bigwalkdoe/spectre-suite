@@ -5,7 +5,7 @@ does **not** expand `${VAR}` in its config file, so credentials cannot be
 interpolated there.
 
 Slack is the only notification channel. Populate it with
-`scripts/setup-notification-channels.sh`, which writes the value from the
+`spectre run setup-notification-channels` (or `spectre/actions/setup-notification-channels.sh`), which writes the value from the
 environment and chmods it 0600. Contents are gitignored.
 
 | File | Environment variable |
@@ -26,7 +26,7 @@ attachment `color` (`danger` / `warning` / `good`) and the title prefix instead.
 ## Verifying delivery
 
 ```sh
-./scripts/setup-notification-channels.sh --test
+spectre run setup-notification-channels -- --test
 ```
 
 `amtool check-config` is not a delivery test: `*_file` options are not
@@ -63,5 +63,5 @@ was created with while each container is assigned its own, so the mount is
 unreadable *even by root* and Alertmanager crash-loops on its own config with
 `permission denied`. Because the label lives on the inode, any rewrite of the
 file — `git checkout`, `git pull`, `sed -i` — resets it, so the failure appears
-on an ordinary pull rather than at deploy time. `scripts/check-config-consistency.sh`
+on an ordinary pull rather than at deploy time. `spectre run check-config-consistency`
 fails if any bind mount loses the label.

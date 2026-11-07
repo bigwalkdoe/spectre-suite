@@ -48,7 +48,7 @@ A custom web-based monitoring dashboard that provides real-time system metrics a
 
 1. **Deploy Monitoring Stack** (if not already deployed):
    ```bash
-   ./scripts/deploy-monitoring.sh
+   spectre run deploy-monitoring
    ```
 
 2. **Access the Dashboard**:
@@ -101,7 +101,7 @@ Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actio
 
 - The action service is **allowlisted** and **token-protected**. It queues trigger files; a host handler runs the scripts.
 - Set `DASHBOARD_ACTION_TOKEN` in `.env`.
-- Install the host handler: `./scripts/systemd/install-dashboard-actions-handler.sh` (or copy units from `systemd/dashboard-actions/` and adjust paths).
+- Install the host handler: `./spectre/actions/systemd/install-dashboard-actions-handler.sh` (or copy units from `systemd/dashboard-actions/` and adjust paths).
 - Trigger actions with the dashboard; when prompted, enter the token (stored in `sessionStorage` for the browser session).
 
 To disable actions in the UI: open the dashboard with `?actionsBase=off`.
