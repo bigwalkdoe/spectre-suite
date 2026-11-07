@@ -20,6 +20,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--versions-root", default="", help="versions directory (default: $SPECTRE_SECURITY_ROOT/security/opa/versions)")
     ap.add_argument("--index", default="", help="index.json path (default: <versions-root>/index.json)")
+    ap.add_argument("--policy", default="", help="filter to a single policy name (read-only)")
     ap.add_argument("--compact", action="store_true", help="omit full index body; keep index summary + per-policy presence")
     args = ap.parse_args()
     root = Path(args.versions_root) if args.versions_root else (_security_root() / "security/opa/versions")
@@ -34,6 +35,8 @@ def main() -> int:
     if idx_path.exists():
         try:
             idx = json.loads(idx_path.read_text(encoding="utf-8"))
+            if isinstance(idx, dict) and args.policy and isinstance(idx.get("policies"), dict):
+                idx = {**idx, "policies": {k: v for k, v in idx["policies"].items() if k == args.policy}}
             if args.compact:
                 policies = (idx.get("policies") or {}) if isinstance(idx, dict) else {}
                 report["index_summary"] = {
@@ -49,7 +52,10 @@ def main() -> int:
     else:
         report["index_error"] = "index.json not found"
     presence = {}
-    for p in sorted([x for x in root.iterdir() if x.is_dir()]):
+    policy_dirs = sorted([x for x in root.iterdir() if x.is_dir()]) if root.exists() else []
+    if args.policy:
+        policy_dirs = [p for p in policy_dirs if p.name == args.policy]
+    for p in policy_dirs:
         vdirs = sorted([d for d in p.iterdir() if d.is_dir() and d.name.startswith("v")])
         meta = None
         if vdirs:
@@ -64,6 +70,8 @@ def main() -> int:
                 meta = {"has_metadata": False}
         presence[p.name] = {"version_dirs": [d.name for d in vdirs], "latest_metadata": meta}
     report["policies"] = presence
+    if args.policy:
+        report["policy_filter"] = args.policy
     print(json.dumps(report, indent=2))
     return 0
 
