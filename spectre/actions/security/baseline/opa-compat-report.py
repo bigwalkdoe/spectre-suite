@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -27,7 +28,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("input", nargs="?", default="", help="nested current-infrastructure.json (or set SECURITY_BASELINE_FILE)")
     ap.add_argument("--policy-dir", default=str(POLICY_DIR))
+    ap.add_argument("--verbose", action="store_true", help="include report-only detail (e.g. docker_evidence per-container lists)")
     args = ap.parse_args()
+    verbose = args.verbose or os.environ.get("SECURITY_OPA_COMPAT_VERBOSE", "") == "1"
     src = args.input or str(Path.home() / ".local/state/spectre/security-baseline/current-infrastructure.json")
     if not Path(src).exists():
         # compat fallback
@@ -77,6 +80,15 @@ def main() -> int:
             "exposed_all_interfaces_count": len(ev.get("exposed_all_interfaces") or []),
             "missing_healthcheck_count": len(ev.get("missing_healthcheck") or []),
         }
+        if verbose:
+            summary["docker_evidence"].update({
+                "privileged_containers": ev.get("privileged_containers") or [],
+                "no_memory_limit": ev.get("no_memory_limit") or [],
+                "sensitive_bind_mounts": ev.get("sensitive_bind_mounts") or [],
+                "exposed_all_interfaces": ev.get("exposed_all_interfaces") or [],
+                "missing_healthcheck": ev.get("missing_healthcheck") or [],
+                "note": ev.get("note", ""),
+            })
     print(json.dumps(summary, indent=2))
     # exit 0 = report produced (compat mode); denials are informational under Option A adapter.
     return 0
