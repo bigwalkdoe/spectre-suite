@@ -548,3 +548,125 @@ groups:
         annotations:
           summary: "Restic verification is stale"
           description: "Last restic verify is {{ $value | humanizeDuration }} ago (>8d)."
+
+  # Security baseline pipeline evidence (OPA/drift/SBOM/scan phases), published by
+  # spectre/monitoring/exporters/security-baseline-metrics-exporter.sh from suite
+  # and/or spectre-security baseline logs (A/D hybrid). Distinct from
+  # security_alerts: spectre_agent_* = runtime agent findings/availability;
+  # spectre_security_baseline_* = baseline pipeline evidence. Status values: 1=ok/
+  # clean/no-drift, 0=fail/findings/drift, -1=unknown/skipped/not configured.
+  - name: security_baseline_alerts
+    interval: 60s
+    rules:
+      - alert: SecurityBaselineMetricsMissing
+        expr: absent(spectre_security_baseline_exporter_up)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline pipeline metrics are not being published"
+          description: >-
+            No spectre_security_baseline_exporter_up series is present. The
+            baseline metrics exporter may not be scheduled/scraped, or it failed
+            before writing textfile metrics. This is loss of baseline visibility,
+            not evidence that the baseline is clean.
+
+      - alert: SecurityBaselineNeverRun
+        expr: spectre_security_baseline_never_run == 1 and spectre_security_baseline_exporter_up == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline pipeline has no recorded run/evidence"
+          description: >-
+            The baseline exporter is up but found no baseline evidence
+            (never_run=1, source={{ $labels.source }}). Run the canonical
+            baseline job (e.g. spectre run security/baseline/run) or verify the
+            evidence/log paths. Absence of evidence is not a clean result.
+
+      - alert: SecurityBaselineEvidenceStale
+        expr: >-
+          spectre_security_baseline_stale == 1
+          and spectre_security_baseline_never_run == 0
+          and spectre_security_baseline_exporter_up == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline evidence is stale"
+          description: >-
+            Baseline evidence (source={{ $labels.source }}) is older than the
+            configured freshness window. Stale evidence must not be treated as a
+            current pass/fail; refresh the baseline pipeline.
+
+      - alert: SecurityBaselineDriftDetected
+        expr: spectre_security_baseline_drift_detected == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline drift detected"
+          description: >-
+            The baseline pipeline reports drift (source={{ $labels.source }},
+            drift_detected=1). Inspect drift evidence/reports and remediate or
+            update the approved baseline per policy.
+
+      - alert: SecurityBaselineOPACheckFailed
+        expr: spectre_security_baseline_opa_check_ok == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Security baseline OPA policy check failed"
+          description: >-
+            Suite/canonical OPA policy check reported issues
+            (source={{ $labels.source }}). This is distinct from agent runtime
+            findings; review baseline OPA check logs/evidence.
+
+      - alert: SecurityBaselineOPATestsFailed
+        expr: spectre_security_baseline_opa_tests_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline OPA compatibility/tests failed"
+          description: >-
+            OPA compatibility/policy tests failed (source={{ $labels.source }}).
+            Treat as evidence of policy/contract drift; review compat test logs.
+            Unknown/skipped (-1) does not trigger this alert.
+
+      - alert: SecurityBaselineHardeningFailed
+        expr: spectre_security_baseline_hardening_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline hardening phase failed"
+          description: >-
+            The baseline hardening phase reported failure
+            (source={{ $labels.source }}). Review hardening logs; unknown/
+            skipped (-1) does not trigger this alert.
+
+      - alert: SecurityBaselineGitleaksFindings
+        expr: spectre_security_baseline_gitleaks_ok == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Security baseline Gitleaks reported findings/issues"
+          description: >-
+            Gitleaks reported potential secrets/findings or failed
+            (source={{ $labels.source }}). Investigate immediately; do not treat
+            unknown/skipped (-1) as clean.
+
+      - alert: SecurityBaselineSBOMFailed
+        expr: spectre_security_baseline_sbom_ok == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline SBOM generation failed or had issues"
+          description: >-
+            SBOM generation reported issues (source={{ $labels.source }}).
+            Evidence/SBOM completeness may be degraded; unknown/skipped (-1)
+            does not trigger this alert.
