@@ -73,14 +73,49 @@ def map_nested_to_suite(src: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
 
     # Docker-derived global assertions (heuristic, explicit).
     if isinstance(docker, list) and docker:
-        any_priv = any(bool(c.get("privileged")) for c in docker if isinstance(c, dict))
+        containers = [c for c in docker if isinstance(c, dict)]
+        any_priv = any(bool(c.get("privileged")) for c in containers)
         set_if("docker_privileged_disabled", not any_priv, "derived: no container privileged=true")
-        all_mem = all(isinstance(c, dict) and int(c.get("memory_limit") or 0) > 0 for c in docker)
-        if all_mem:
+        all_mem = all(int(c.get("memory_limit") or 0) > 0 for c in containers) if containers else False
+        if containers and all_mem:
             set_if("docker_resource_limits", True, "derived heuristic: all containers have memory_limit > 0")
         else:
             report["notes"].append("docker_resource_limits not asserted (not all containers declare memory_limit > 0)")
         report["notes"].append("docker_not_root/docker_no_new_privileges/docker_userland_proxy_disabled not derived from nested container schema; remain fail-closed unless asserted")
+        report["notes"].append("docker evidence-only (not mapped to suite global controls): sensitive bind mounts, 0.0.0.0 port exposure, missing healthcheck")
+        sensitive_paths = ("/etc", "/var/run", "/proc", "/sys", "/dev")
+        sensitive_mounts = []
+        exposed_all_ifaces = []
+        missing_healthcheck = []
+        no_memory_limit = []
+        for c in containers:
+            name = str(c.get("name") or "<unnamed>")
+            if int(c.get("memory_limit") or 0) <= 0:
+                no_memory_limit.append(name)
+            hc = c.get("healthcheck")
+            if hc is None or (isinstance(hc, str) and hc.strip() == ""):
+                missing_healthcheck.append(name)
+            for m in (c.get("mounts") or []):
+                if not isinstance(m, dict):
+                    continue
+                src_m = str(m.get("source") or "")
+                if any(src_m.startswith(sp) for sp in sensitive_paths):
+                    sensitive_mounts.append({"container": name, "source": src_m})
+            for p in (c.get("ports") or []):
+                if not isinstance(p, dict):
+                    continue
+                if str(p.get("host_ip") or "") == "0.0.0.0":
+                    exposed_all_ifaces.append({"container": name, "host_port": p.get("host_port")})
+        report["docker_evidence"] = {
+            "container_count": len(containers),
+            "privileged_containers": [str(c.get("name") or "<unnamed>") for c in containers if bool(c.get("privileged"))],
+            "no_memory_limit": no_memory_limit,
+            "sensitive_bind_mounts": sensitive_mounts,
+            "exposed_all_interfaces": exposed_all_ifaces,
+            "missing_healthcheck": missing_healthcheck,
+            "report_only": True,
+            "note": "Evidence metadata for compat/reporting; not emitted in adapted policy input and not asserted as suite global controls.",
+        }
 
     report["unmapped_suite_controls_note"] = (
         "Suite controls without confident mappings remain absent from output so canonical rego stays fail-closed. "
