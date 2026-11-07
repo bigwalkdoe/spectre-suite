@@ -554,7 +554,12 @@ groups:
   # and/or spectre-security baseline logs (A/D hybrid). Distinct from
   # security_alerts: spectre_agent_* = runtime agent findings/availability;
   # spectre_security_baseline_* = baseline pipeline evidence. Status values: 1=ok/
-  # clean/no-drift, 0=fail/findings/drift, -1=unknown/skipped/not configured.
+  # clean/no-drift (or report ran for opa_compat_report_ok), 0=fail/findings/drift
+  # (or helper/exec issues for opa_compat_report_ok), -1=unknown/skipped/not configured.
+  # OPA alerts: OPACheckFailed = suite-native opa check failed (critical); OPATestsFailed
+  # = legacy compat policy tests failed (actual test failures); OPACompatReportIssues =
+  # Option A compat report helper/exec issues only (report-ran semantics: 1=report
+  # produced/ran even with denials, 0=issues, -1=off; NOT policy denials).
   - name: security_baseline_alerts
     interval: 60s
     rules:
