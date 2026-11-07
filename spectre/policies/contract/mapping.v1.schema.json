@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectre-suite.local/policies/contract/mapping.v1.schema.json",
+  "title": "Spectre OPA Path C contract mapping (v1)",
+  "type": "object",
+  "required": ["version", "status", "core", "adapters"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "status": {"type": "string", "minLength": 1},
+    "note": {"type": "string"},
+    "core": {
+      "type": "object",
+      "required": ["aggregation", "policy_dir", "rego", "ci_invariants"],
+      "additionalProperties": true,
+      "properties": {
+        "aggregation": {"type": "string", "const": "data.security[k].deny[m]"},
+        "policy_dir": {"type": "string", "minLength": 1},
+        "rego": {"type": "string"},
+        "ci_invariants": {
+          "type": "object",
+          "required": ["opa_check", "empty_input_min_denials", "baseline_denials"],
+          "additionalProperties": true,
+          "properties": {
+            "opa_check": {"type": "boolean"},
+            "empty_input_min_denials": {"type": "integer", "minimum": 0},
+            "baseline_denials": {"type": "integer", "minimum": 0},
+            "isolated_k8s_gate": {"type": "string"}
+          }
+        }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "required": ["nested_infra_to_suite_flat", "k8s_admission"],
+      "additionalProperties": true,
+      "properties": {
+        "nested_infra_to_suite_flat": {
+          "type": "object",
+          "required": ["implemented", "source_shape", "mappings"],
+          "additionalProperties": true,
+          "properties": {
+            "implemented": {"type": "string", "minLength": 1},
+            "source_shape": {"type": "object"},
+            "mappings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["suite_field", "suite_packages"],
+                "additionalProperties": true,
+                "properties": {
+                  "source": {"type": "string"},
+                  "suite_field": {"type": "string", "pattern": "^[a-zA-Z0-9_]+$"},
+                  "suite_packages": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                  "note": {"type": "string"}
+                }
+              }
+            },
+            "evidence_only_unmapped": {"type": "array", "items": {"type": "string"}},
+            "suite_controls_never_invented_examples": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "k8s_admission": {
+          "type": "object",
+          "required": ["implemented", "isolated", "aggregation", "policy", "query"],
+          "additionalProperties": true,
+          "properties": {
+            "implemented": {"type": "string"},
+            "isolated": {"type": "boolean", "const": true},
+            "aggregation": {"type": "string"},
+            "ci_gate": {"type": "string"},
+            "policy": {"type": "string"},
+            "query": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}
