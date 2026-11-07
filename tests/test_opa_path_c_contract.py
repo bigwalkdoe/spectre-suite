@@ -6,10 +6,12 @@ change policy behavior or CI gates.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -18,6 +20,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "spectre" / "policies" / "contract" / "mapping.v1.json"
 POLICY_DIR = ROOT / "spectre" / "policies"
+LINT_WORKFLOW = ROOT / ".github" / "workflows" / "lint.yml"
 
 
 def load_mapping() -> dict:
@@ -150,3 +153,94 @@ def test_k8s_vendored_policy_is_not_a_security_core_package():
     assert m is not None
     assert m.group(1) == "kubernetes.admission"
     assert not m.group(1).startswith("security.")
+
+
+def test_k8s_ci_gate_reflects_isolated_lint_job():
+    """Contract must accurately describe isolated k8s CI enforcement (track 3, additive)."""
+    m = load_mapping()
+    k8s = m["adapters"]["k8s_admission"]
+    assert "lint.yml" in k8s["ci_gate"]
+    assert "NOT core aggregation" in k8s["ci_gate"] or "data.security[k].deny" in k8s["ci_gate"]
+    assert LINT_WORKFLOW.exists()
+    wf = LINT_WORKFLOW.read_text(encoding="utf-8")
+    assert re.search(r"^\s*opa-isolated-k8s:\s*$", wf, re.MULTILINE), "lint.yml missing opa-isolated-k8s job"
+    assert "opa check spectre/policies/k8s/" in wf
+    assert "opa test spectre/policies/k8s/" in wf
+    core_inv = m["core"].get("ci_invariants", {})
+    assert "isolated_k8s_gate" in core_inv
+
+
+def _load_nested_adapter_module():
+    path = ROOT / "spectre/actions/security/baseline/opa-contract-adapter.py"
+    spec = importlib.util.spec_from_file_location("opa_contract_adapter_mod", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_nested_adapter_emitted_fields_are_mapped_and_valid_suite_inputs():
+    """Adapter may only emit confidently mappable suite fields (tracks 1/2 hardening)."""
+    mod = _load_nested_adapter_module()
+    mapping = load_mapping()["adapters"]["nested_infra_to_suite_flat"]
+    mapped_fields = {e["suite_field"] for e in mapping["mappings"]}
+    suite_fields = policy_input_fields()
+    # Representative nested input exercising all implemented mapping slices.
+    sample = {
+        "compliance": {
+            "firewall_enabled": True,
+            "ssh_password_auth": False,
+            "audit_logging_enabled": True,
+            "intrusion_detection_active": True,
+            "file_integrity_monitoring": True,
+            "security_scanning_enabled": True,
+        },
+        "network": {"vpn_enabled": True, "open_ports": [22], "remote_access": True},
+        "backup": {"encrypted": True, "retention_days": 30, "offsite_replication": True, "last_success_age": 1},
+        "docker": [
+            {
+                "name": "app",
+                "privileged": False,
+                "memory_limit": 512,
+                "healthcheck": "CMD true",
+                "mounts": [],
+                "ports": [{"host_ip": "127.0.0.1", "host_port": 80}],
+            }
+        ],
+    }
+    adapted, report = mod.map_nested_to_suite(sample)
+    for field in adapted:
+        assert field in mapped_fields, f"adapter emitted {field!r} but it is not in contract mapping"
+        assert field in suite_fields, f"adapter emitted {field!r} but it is not consumed by suite policies"
+    assert isinstance(report.get("mapped"), list)
+    # Report must not claim mappings for fields absent from adapted output.
+    for entry in report["mapped"]:
+        assert entry["suite_field"] in adapted
+    # Docker evidence is report-only metadata, never policy input.
+    if "docker_evidence" in report:
+        assert report["docker_evidence"].get("report_only") is True
+        for k in ("sensitive_bind_mounts", "exposed_all_interfaces", "missing_healthcheck", "no_memory_limit"):
+            assert k not in adapted
+
+
+def test_contract_mapping_covers_core_package_input_surface():
+    """Every canonical suite security.* control package remains represented by the core contract."""
+    m = load_mapping()
+    assert m["core"]["aggregation"] == "data.security[k].deny[m]"
+    packages = policy_packages()
+    # Exclude *_test rego packages; the aggregation contract targets canonical control packages.
+    security_control_pkgs = {
+        k for k in packages
+        if k.startswith("security.") and not k.endswith("_test") and not k.startswith("security.test")
+    }
+    assert security_control_pkgs == {
+        "security.audit",
+        "security.backups",
+        "security.compliance",
+        "security.docker",
+        "security.encryption",
+        "security.firewall",
+        "security.intrusion_detection",
+        "security.network",
+    }, f"unexpected canonical security control packages: {sorted(security_control_pkgs)}"
