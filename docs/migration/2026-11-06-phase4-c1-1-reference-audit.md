@@ -1,9 +1,10 @@
 # Phase 4 / C1.1 — Reference Audit (NO DELETIONS)
 
-**Status:** Audit complete (repo-side). **No `git rm`, no file deletions, no host changes performed.**  
+**Status (original):** Audit complete (repo-side, 2026-11-06). **No `git rm`, no file deletions, no host changes performed.**  
+**Status (2026-11-07):** **C1 resolved on `main`.** High-priority rewires and C1 deletions completed in confirmed batches; tracked `scripts/` tree removed (`git ls-files scripts` = 0), OPA canonicalized to real `spectre/policies/`. CI green on `4c211c9`. See “Resolution / C1 completion addendum”.  
 **Date:** 2026-11-06  
 **Branch/context:** `main` @ `6248692` (post-merge of consolidation Phase 1 shims/Phase 2-3 repointing).  
-**Preconditions checked:** `spectre actions verify` (host inventory) → **0 findings**. Schedulers on the reference host dispatch via `/usr/local/bin/spectre run <job>` (per prior runbook).  
+**Preconditions checked (original):** `spectre actions verify` (host inventory) → **0 findings**. Schedulers on the reference host dispatch via `/usr/local/bin/spectre run <job>` (per prior runbook).  
 **Parent plan:** `docs/migration/2026-11-06-phase4-c1-repo-inventory-plan.md`
 
 ## Scope
@@ -66,3 +67,19 @@ These will break functionality, CI, or tests if `scripts/` or top-level `prometh
 - [x] Hits classified into must-rewire / should-update / historical.
 - [x] No deletions, no host/scheduler changes made.
 - [x] `spectre actions verify` remained **0 findings** (checked before audit).
+
+## Resolution / C1 completion addendum (2026-11-07)
+
+**Outcome:** C1 executed (after B1/B2 and C1.1 audit basis) via confirmed, evidence-backed B3 preps and deletion batches. Tracked legacy `scripts/` is removed (`git ls-files scripts` = 0). CI all green on `4c211c9`.
+
+**A-items (resolution summary, point-in-time audit preserved above):**
+- Dashboard trigger executor: canonical `spectre/actions/dashboard-actions/process-triggers.sh` dispatches allowlisted actions via `spectre run` (not `scripts/...` exec); backend allowlist/docs rewired.
+- User-timer installers: restic backup/verify installers generate `spectre run backups/restic/{backup,verify}`; backup catch-up/restic timer tests/harness rewired to canonical paths/layouts.
+- CI/tests/harness: active workflow/test references to `scripts/` rewired as needed; `tests/test_ml.py` fixed to `spectre/actions/ml-anomaly` (`4c211c9`).
+- Exporters/Tier A: top-level `prometheus/*-exporter.sh` forwarders removed earlier; registry/config-consistency/tests/exporter comments handled in rewires.
+- OPA: CI/workflows already targeted `spectre/policies/`; `spectre/policies` became a real directory with identical rego/baseline (Step A, `010ea7b`), active refs rewired, `scripts/security/opa/*` removed after confirmation (Step B, `0dfe7a1`).
+- Repo systemd templates/examples/messages: rewired where they were active blockers (e.g. dashboard-actions, custom-backup example, alertmanager/notification docs).
+
+**B/C-items:** operator docs/messages updated where they blocked safe deletion; historical migration/superpowers docs intentionally retain old paths as records.
+
+**Key commits:** `54c9d6c`, `bd9eb08`–`13f0935`, `010ea7b`, `0dfe7a1`, `4c211c9`. **Follow-up:** optional CI guardrail for tracked `scripts/` reintroduction; consult `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md` for Phase 4 work beyond C1.
