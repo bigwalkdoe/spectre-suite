@@ -423,6 +423,11 @@
           "expr": "max by (source) (spectre_security_baseline_trivy_image_ok)",
           "legendFormat": "trivy_image_ok {{source}}",
           "refId": "J"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_opa_compat_report_ok)",
+          "legendFormat": "opa_compat_report_ok {{source}} (1 report ran, 0 issues, -1 off)",
+          "refId": "K"
         }
       ],
       "options": {
@@ -501,6 +506,11 @@
           "expr": "spectre_security_baseline_sbom_ok",
           "legendFormat": "sbom {{source}}",
           "refId": "E"
+        },
+        {
+          "expr": "spectre_security_baseline_opa_compat_report_ok",
+          "legendFormat": "opa_compat {{source}} (1 ran/0 issues/-1 off)",
+          "refId": "F"
         }
       ],
       "fieldConfig": {
