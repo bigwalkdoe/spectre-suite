@@ -90,7 +90,8 @@ deploy_maintenance_scripts() {
         if [ -d /tmp/spectre-actions ]; then
             # Legacy remote install from canonical actions (prefer installing spectre on remote instead)
             for d in backups maintenance performance network security; do
-                [ -d "/tmp/spectre-actions/$d" ] && sudo cp /tmp/spectre-actions/$d/*.sh /usr/local/bin/ 2>/dev/null || true
+                # shellcheck disable=SC2154  # \$d is the remote loop var (local SSH payload is double-quoted)
+                [ -d /tmp/spectre-actions/\$d ] && sudo cp /tmp/spectre-actions/\$d/*.sh /usr/local/bin/ 2>/dev/null || true
             done
             sudo chmod +x /usr/local/bin/*.sh 2>/dev/null || true
             sudo rm -rf /tmp/spectre-actions /tmp/maintenance-scripts
