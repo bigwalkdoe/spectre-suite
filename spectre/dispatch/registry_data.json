@@ -692,5 +692,13 @@
     "summary": "Option A compat: adapt nested infra JSON and report mapped fields + suite OPA denials (no gate changes)",
     "mutates": false,
     "concurrency": "allow"
+  },
+  {
+    "name": "security/opa/kubernetes-admission-report",
+    "action": "security/opa/kubernetes-admission-report.sh",
+    "group": "security",
+    "summary": "ISOLATED report: evaluate AdmissionReview against kubernetes.admission policy (not in data.security[k].deny aggregation; no CI gate change)",
+    "mutates": false,
+    "concurrency": "allow"
   }
 ]
