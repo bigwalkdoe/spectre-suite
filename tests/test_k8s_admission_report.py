@@ -89,6 +89,16 @@ def test_k8s_admission_report_batch_and_versions_index(tmp_path: Path):
     # read-only versions index surfacing (if present on host)
     if (Path("~//dev/github/spectre-security/security/opa/versions/index.json").exists()):
         assert "policy_versions_index" in d
+    # summary-only omits per-fixture denial messages
+    p3 = subprocess.run(
+        [sys.executable, str(TOOL), "--summary-only", str(tmp_path)],
+        text=True, capture_output=True, check=False,
+    )
+    assert p3.returncode == 0
+    d3 = json.loads(p3.stdout)
+    assert d3["fixtures_with_denials"] == 1 and d3["total_denials"] > 0
+    bad = next(r for r in d3["results"] if r["input"].endswith("bad.json"))
+    assert "denials" not in bad and bad["denial_count"] > 0
     # fail-on-deny in batch
     p2 = subprocess.run(
         [sys.executable, str(TOOL), "--fail-on-deny", str(tmp_path)],
