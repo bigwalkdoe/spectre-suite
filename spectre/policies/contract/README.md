@@ -39,10 +39,15 @@ index/metadata) and are intentionally **not** part of `data.security[k].deny`;
 a separate gate requires an explicit, reviewed decision. The report tool defaults
 to the vendored slice (`SPECTRE_SECURITY_ROOT` remains a fallback).
 
-## Run
+Run:
 
 ```bash
 python3 -m pytest tests/test_opa_path_c_contract.py -q
 opa test spectre/policies/
 ./spectre/policies/contract/check_isolation.sh
 ```
+
+The isolated k8s/versions domain has a dedicated CI gate:
+`.github/workflows/opa-isolated-k8s.yml` (isolated `opa check`/`opa test` +
+isolation guard + opt-in check + report tests). It does not run the core OPA
+aggregation gate.
