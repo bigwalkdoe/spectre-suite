@@ -24,13 +24,13 @@ pass() { echo "✅ $1"; PASSED=$((PASSED + 1)); }
 fail() { echo "❌ $1"; FAILED=$((FAILED + 1)); }
 
 # Build a throwaway tree with the layout the gate expects. It derives the project
-# root from its own location, so copying the script into $TMP/scripts/ is enough
+# root from its own location, so copying the script into a sandbox subdir is enough
 # to redirect every path it reads.
 stage() {
     local dest
     dest="$(mktemp -d)"
-    mkdir -p "$dest/scripts" "$dest/prometheus" "$dest/web-dashboard"
-    cp "$PROJECT_ROOT/spectre/actions/check-config-consistency.sh" "$dest/scripts/"
+    mkdir -p "$dest/gate" "$dest/prometheus" "$dest/web-dashboard"
+    cp "$PROJECT_ROOT/spectre/actions/check-config-consistency.sh" "$dest/gate/"
     cp "$PROJECT_ROOT/prometheus/prometheus.yml" "$dest/prometheus/"
     cp "$PROJECT_ROOT/prometheus/alert_rules.yml" "$dest/prometheus/"
     cp "$PROJECT_ROOT/prometheus/alertmanager.yml" "$dest/prometheus/"
@@ -41,7 +41,7 @@ stage() {
 
 # Run the gate in a staged tree. Echoes combined output; returns its exit status.
 gate() {
-    "$1/scripts/check-config-consistency.sh" 2>&1
+    "$1/gate/check-config-consistency.sh" 2>&1
 }
 
 # expect_pass <label> <tree>

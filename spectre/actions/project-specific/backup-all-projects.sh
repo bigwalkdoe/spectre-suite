@@ -14,7 +14,10 @@ echo "==========================================" >> "$BACKUP_LOG"
 
 _run_action() { # $1 rel
   local a="$REPO_ROOT/spectre/actions/$1"
-  [ -f "$a" ] || a="$REPO_ROOT/scripts/$1"
+  if [ ! -f "$a" ]; then
+    echo "ERROR: missing canonical action: $a" >> "$BACKUP_LOG"
+    return 1
+  fi
   "$a"
 }
 # Run Guardrail-AI backup
