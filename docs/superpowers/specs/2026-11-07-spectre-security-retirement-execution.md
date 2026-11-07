@@ -45,13 +45,10 @@
   - `setup-security-scanning.sh` `5129ee4c...8147`
 - **Verification:** spot-check removed; `rg -l /home/deon/scripts /usr/local/bin` → **no refs remain**. Archive contains 14 files total (all non-executable). Note: archiving prevents execution from `/usr/local/bin` but does not undo any prior system changes made by these scripts.
 
-## Step 5 — Archive spectre-security read-only (coordinated) — **NOT executed**
-**Preconditions (all required):** steps 1–4 completed/confirmed; retirement checklist satisfied per capability; no required consumers of the repo path remain (or dependency explicitly versioned/accepted); host schedulers/units repointed; GitHub/org workflow coordination complete.
-**Actions (when confirmed):**
-- Ensure local clone has no needed uncommitted state (spectre-security currently has untracked `AGENTS.md` — review separately).
-- Tag/release a final retirement marker in spectre-security; update README to “archived/read-only, superseded by spectre-suite” with pointers.
-- Archive GitHub repo (`bigwalkdoe/spectre-security`) after coordination; retain git history.
-- Keep/adjust local clone only if compat tools still intentionally depend on it; otherwise remove local path after dependency removal is complete and verified.
-- Update Phase 4/ops checklist evidence and suite docs.
+## Step 5 — Archive spectre-security read-only (coordinated) — **partially executed (confirmed)**
+- **5b (GitHub `bigwalkdoe/spectre-security`):** **Not now** (confirmed) — no GitHub archival performed.
+- **5c (retirement marker):** README notice added and committed **locally** in spectre-security (`06f5a86`), **not pushed** (confirmed). Local clone removal means that unpushed commit and untracked `AGENTS.md` are **lost**.
+- **5a (local clone `/home/deon/dev/github/spectre-security`):** **Partial removal** — `rm -rf` removed most files but **88 root-owned items remain** (maintenance compliance reports, `security/reports/*` trivy/zap outputs, `security/sonarqube/docker-compose.yml`, `security/zap/docker-compose.yml`) due to permission denied; `sudo` required to complete. **Run to finish (confirmed):** `sudo rm -rf /home/deon/dev/github/spectre-security`
+- **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path no longer a full clone; this is expected.
 
-**I did not archive/delete the spectre-security repo (local or GitHub).**
+**GitHub repo remains not archived (per 5b).**
