@@ -700,5 +700,13 @@
     "summary": "ISOLATED report: evaluate AdmissionReview against kubernetes.admission policy (not in data.security[k].deny aggregation; no CI gate change)",
     "mutates": false,
     "concurrency": "allow"
+  },
+  {
+    "name": "security/opa/versions-index-report",
+    "action": "security/opa/versions-index-report.sh",
+    "group": "security",
+    "summary": "ISOLATED read-only report: list spectre-security OPA versions/index.json and per-policy metadata presence (not in data.security[k].deny aggregation; no CI gate change)",
+    "mutates": false,
+    "concurrency": "allow"
   }
 ]
