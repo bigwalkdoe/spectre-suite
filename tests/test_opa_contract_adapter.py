@@ -505,3 +505,12 @@ def test_explicit_unambiguous_unmapped_controls_never_invented():
         "security_scanning_enabled", "last_success_age", "open_ports", "remote_access", "container_network",
     ):
         assert k not in adapted, f"{k} must not be invented (fail-closed)"
+
+
+def test_backup_retention_days_non_integer_not_mapped_fail_closed():
+    """Locks existing adapter behavior (no new mapping): non-integer retention is skipped, not invented."""
+    adapted, report = run_adapter_with_report({"compliance": {}, "network": {}, "backup": {
+        "encrypted": True, "retention_days": "not-a-number", "offsite_replication": True,
+    }, "docker": []})
+    assert "backup_retention_days" not in adapted  # skipped -> fail-closed in suite policy
+    assert any("retention_days" in n for n in report.get("notes", []))
