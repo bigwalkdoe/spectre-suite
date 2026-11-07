@@ -329,8 +329,8 @@ async function fetchAllMetrics() {
             queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
             queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
             queryPrometheus('100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'),
-            queryPrometheus('rate(node_network_receive_bytes_total[5m])'),
-            queryPrometheus('rate(node_network_transmit_bytes_total[5m])'),
+            queryPrometheus('sum(rate(node_network_receive_bytes_total{device!~"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|cali.*"}[5m]))'),
+            queryPrometheus('sum(rate(node_network_transmit_bytes_total{device!~"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|cali.*"}[5m]))'),
             queryPrometheus('node_load1'),
             queryPrometheus('node_boot_time_seconds'),
             queryPrometheus('node_procs_running'),
@@ -964,7 +964,7 @@ async function updateChart(range) {
         '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))',
         '100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))',
         '100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))',
-        'rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m])'
+        'sum(rate(node_network_receive_bytes_total{device!~"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|cali.*"}[5m])) + sum(rate(node_network_transmit_bytes_total{device!~"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|cali.*"}[5m]))'
     ];
 
     // Bump the in-flight token; any in-progress fetch is now stale.
