@@ -56,7 +56,7 @@ The ML anomaly detection system uses multiple algorithms to detect anomalies in 
 ### Automated Setup
 
 ```bash
-cd scripts/ml-anomaly
+cd spectre/actions/ml-anomaly
 ./setup_ml_anomaly.sh
 ```
 
@@ -64,7 +64,7 @@ cd scripts/ml-anomaly
 
 ```bash
 # Install Python dependencies
-pip install -r scripts/ml-anomaly/requirements.txt
+pip install -r spectre/actions/ml-anomaly/requirements.txt
 
 # Create directories
 sudo mkdir -p /var/log/ml-anomaly
@@ -82,26 +82,26 @@ sudo mkdir -p /var/lib/ml-anomaly
 
 ```bash
 # Train with 100 samples (default)
-python3 scripts/ml-anomaly/anomaly_detector.py --mode train
+python3 spectre/actions/ml-anomaly/anomaly_detector.py --mode train
 
 # Train with custom number of samples
-python3 scripts/ml-anomaly/anomaly_detector.py --mode train --training-samples 200
+python3 spectre/actions/ml-anomaly/anomaly_detector.py --mode train --training-samples 200
 
 # Train specific detector
-python3 scripts/ml-anomaly/anomaly_detector.py --mode train --detector isolation_forest
+python3 spectre/actions/ml-anomaly/anomaly_detector.py --mode train --detector isolation_forest
 ```
 
 ### Anomaly Detection
 
 ```bash
 # Single detection check
-python3 scripts/ml-anomaly/anomaly_detector.py --mode detect
+python3 spectre/actions/ml-anomaly/anomaly_detector.py --mode detect
 
 # Use specific detector
-python3 scripts/ml-anomaly/anomaly_detector.py --mode detect --detector statistical
+python3 spectre/actions/ml-anomaly/anomaly_detector.py --mode detect --detector statistical
 
 # Continuous monitoring
-python3 scripts/ml-anomaly/anomaly_detector.py --mode continuous
+python3 spectre/actions/ml-anomaly/anomaly_detector.py --mode continuous
 ```
 
 ### Systemd Services
@@ -130,7 +130,7 @@ curl http://localhost:8090/metrics
 
 ### Model Parameters
 
-Edit `scripts/ml-anomaly/anomaly_detector.py` to adjust parameters:
+Edit `spectre/actions/ml-anomaly/anomaly_detector.py` to adjust parameters:
 
 #### Isolation Forest
 ```python
@@ -376,14 +376,14 @@ Anything not explicitly allowed is dropped and flagged `needs human review`.
 
 ```bash
 # Install ML stack + pull a free local model
-bash scripts/ml-anomaly/setup_ml_anomaly.sh
+bash spectre/actions/ml-anomaly/setup_ml_anomaly.sh
 
 # Run the full pipeline once (detect -> diagnose -> report)
 sudo systemctl start ml-anomaly-fix
 
 # Or interactively
-ML_FIX_MODE=dry-run  bash scripts/ml-anomaly/run_ml_pipeline.sh
-ML_FIX_MODE=apply    bash scripts/ml-anomaly/run_ml_pipeline.sh
+ML_FIX_MODE=dry-run  bash spectre/actions/ml-anomaly/run_ml_pipeline.sh
+ML_FIX_MODE=apply    bash spectre/actions/ml-anomaly/run_ml_pipeline.sh
 ```
 
 ### Configuration (environment variables)

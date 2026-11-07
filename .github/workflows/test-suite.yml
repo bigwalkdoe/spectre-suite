@@ -21,11 +21,11 @@ jobs:
       # These were pinned to exact versions (numpy==1.26.0, pandas==2.0.3).
       # pandas 2.0.3 predates Python 3.12 wheels, so the install falls back to a
       # source build and fails on any interpreter newer than 3.11. The unpinned
-      # floor in scripts/ml-anomaly/requirements.txt is what the code actually
+      # floor in spectre/actions/ml-anomaly/requirements.txt is what the code actually
       # needs, and the full suite passes against current releases.
       - name: Install Python dependencies
         run: |
-          pip install -r scripts/ml-anomaly/requirements.txt || \
+          pip install -r spectre/actions/ml-anomaly/requirements.txt || \
             pip install "numpy>=1.21.0" "pandas>=1.3.0" "scikit-learn>=1.0.0" "scipy>=1.7.0" requests prometheus-client pytest
       - name: Verify Python dependencies
         run: python -c "import numpy as np; import pandas; import sklearn; print('Numpy:', np.__version__, '| Pandas:', pandas.__version__, '| sklearn:', sklearn.__version__)"

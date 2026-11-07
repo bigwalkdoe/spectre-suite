@@ -15,7 +15,7 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-EXPORTER="$PROJECT_ROOT/prometheus/security-metrics-exporter.sh"
+EXPORTER="$PROJECT_ROOT/spectre/monitoring/exporters/security-metrics-exporter.sh"
 
 echo "Running security metrics exporter tests..."
 

@@ -4,8 +4,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-# shellcheck source=../scripts/backups/restic/common.sh
-. "$PROJECT_ROOT/scripts/backups/restic/common.sh"
+# shellcheck source=../spectre/actions/backups/restic/common.sh
+if [ -f "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh" ]; then
+  . "$PROJECT_ROOT/spectre/actions/backups/restic/common.sh"
+else
+  . "$PROJECT_ROOT/scripts/backups/restic/common.sh"
+fi
 
 pass() { echo "✅ $1"; }
 fail() { echo "❌ $1"; exit 1; }
@@ -126,16 +130,16 @@ export RESTIC_REPOSITORY="$tmp/repo"
 export RESTIC_CONFIG="$tmp/noconfig"  # avoid sourcing real env
 
 # prune must be tag-scoped
-bash "$PROJECT_ROOT/scripts/backups/restic/prune.sh" --dry-run --repo local >/dev/null 2>&1 || true
+bash "$PROJECT_ROOT/spectre/actions/backups/restic/prune.sh" --dry-run --repo local >/dev/null 2>&1 || true
 grep -q -- '--tag spectre-suite' "$RESTIC_ARGS_LOG" || fail "prune/forget must pass --tag spectre-suite: $(cat "$RESTIC_ARGS_LOG" 2>/dev/null)"
 pass "prune wrapper is tag-scoped"
 
 # restore flag parsing
 : > "$RESTIC_ARGS_LOG"
-bash "$PROJECT_ROOT/scripts/backups/restic/restore.sh" --list --local >/dev/null 2>&1 || true
+bash "$PROJECT_ROOT/spectre/actions/backups/restic/restore.sh" --list --local >/dev/null 2>&1 || true
 grep -q snapshots "$RESTIC_ARGS_LOG" || fail "restore --list should invoke snapshots: $(cat "$RESTIC_ARGS_LOG" 2>/dev/null)"
 : > "$RESTIC_ARGS_LOG"
-bash "$PROJECT_ROOT/scripts/backups/restic/restore.sh" --snapshot abc --dry-run --target "$tmp/rt" --local >/dev/null 2>&1 || true
+bash "$PROJECT_ROOT/spectre/actions/backups/restic/restore.sh" --snapshot abc --dry-run --target "$tmp/rt" --local >/dev/null 2>&1 || true
 logged=$(cat "$RESTIC_ARGS_LOG" 2>/dev/null)
 [[ "$logged" == *restore* ]] || fail "restore should invoke restore: $logged"
 [[ "$logged" == *abc* ]] || fail "restore should pass snapshot id: $logged"
@@ -143,7 +147,7 @@ pass "restore wrapper parses --list/--snapshot/--dry-run/--target/--local"
 
 # verify records marker
 export MARKER_DIR="$tmp/markers"; mkdir -p "$MARKER_DIR"
-bash "$PROJECT_ROOT/scripts/backups/restic/verify.sh" --local >/dev/null 2>&1 || true
+bash "$PROJECT_ROOT/spectre/actions/backups/restic/verify.sh" --local >/dev/null 2>&1 || true
 [ -f "$MARKER_DIR/last-verify" ] || fail "verify must write last-verify marker"
 v=$(read_marker_epoch "$MARKER_DIR/last-verify")
 [ "$v" -gt 0 ] 2>/dev/null || [ "$v" -eq 0 ] 2>/dev/null || fail "last-verify marker malformed"

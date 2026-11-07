@@ -105,7 +105,7 @@ outside=$(printf '%s\n' "$scheduled" \
 # So: fail on the fork root, and on any basename this repo also provides.
 # Everything else is reported and allowed.
 FORK_ROOTS="/home/deon/scripts/"
-repo_scripts=$(cd "$PROJECT_ROOT" && find scripts prometheus -name '*.sh' -printf '%f\n' 2>/dev/null | sort -u)
+repo_scripts=$(cd "$PROJECT_ROOT" && find scripts prometheus spectre/actions spectre/monitoring/exporters -name '*.sh' -printf '%f\n' 2>/dev/null | sort -u)
 
 offenders=""
 foreign=""
@@ -196,14 +196,16 @@ fi
 # above all passed while disk-space-check and security-scan failed every run.
 # This delegates to the label script's own --check, which reports the exact
 # paths and stays quiet where SELinux is not enforcing.
-if [ -x "$PROJECT_ROOT/scripts/systemd/label-exec-context.sh" ]; then
-    if "$PROJECT_ROOT/scripts/systemd/label-exec-context.sh" --check >/tmp/spectre-label-check.$$ 2>&1; then
+_label_check="$PROJECT_ROOT/spectre/actions/systemd/label-exec-context.sh"
+[ -x "$_label_check" ] || _label_check="$PROJECT_ROOT/scripts/systemd/label-exec-context.sh"
+if [ -x "$_label_check" ]; then
+    if "$_label_check" --check >/tmp/spectre-label-check.$$ 2>&1; then
         pass "repository scripts carry an exec label a system unit can use"
     else
         fail "scheduled repository scripts are not executable by system units:"
         rg -A1 'NOT EXECUTABLE' /tmp/spectre-label-check.$$ 2>/dev/null | rg -o '/home/[^ ]+\.sh' | head -5 | sed 's/^/     /' \
             || head -5 /tmp/spectre-label-check.$$ | sed 's/^/     /'
-        echo "     Fix: sudo $PROJECT_ROOT/scripts/systemd/label-exec-context.sh"
+        echo "     Fix: sudo $_label_check"
     fi
     rm -f /tmp/spectre-label-check.$$
 fi

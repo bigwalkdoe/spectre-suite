@@ -91,7 +91,7 @@ jobs:
       - name: Run anomaly detection (detect mode)
         run: |
           export ML_DATA_DIR="$PWD" ML_LOG_DIR="$PWD/ml-log"
-          python3 scripts/ml-anomaly/anomaly_detector.py \
+          python3 spectre/actions/ml-anomaly/anomaly_detector.py \
             --mode detect --training-samples 20 --output "$PWD/ml-log/latest_detection.json"
           echo "--- report ---"
           python3 -c "import json; d=json.load(open('$PWD/ml-log/latest_detection.json')); print('is_anomaly:', d['is_anomaly']); print('votes:', d['anomaly_votes'], '/', d['total_detectors'])"
@@ -170,7 +170,7 @@ jobs:
                    "high_mem_processes": 14 if i==19 else int(random.uniform(0,3))}
               with open(f"{d}/metrics_{i:03d}.json","w") as f: json.dump(m,f)
           PY
-          python3 scripts/ml-anomaly/anomaly_detector.py \
+          python3 spectre/actions/ml-anomaly/anomaly_detector.py \
             --mode detect --training-samples 20 --output "$PWD/ml-log/latest_detection.json"
-          python3 scripts/ml-anomaly/ml_fix_engine.py \
+          python3 spectre/actions/ml-anomaly/ml_fix_engine.py \
             --anomaly-report "$PWD/ml-log/latest_detection.json" --mode dry-run

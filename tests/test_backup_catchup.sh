@@ -13,7 +13,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Consolidation: scripts/backups/run-missed-backups.sh is a forwarder; the sandbox
 # needs the real control flow with sibling stubs.
 WRAPPER="$PROJECT_ROOT/spectre/actions/backups/run-missed-backups.sh"
-INSTALLER="$PROJECT_ROOT/scripts/systemd/install-backup-catchup-timer.sh"
+INSTALLER="$PROJECT_ROOT/spectre/actions/systemd/install-backup-catchup-timer.sh"
 
 PASSED=0
 FAILED=0
@@ -63,7 +63,7 @@ EOF
 
 # --- installer output --------------------------------------------------------
 if [ ! -x "$INSTALLER" ]; then
-    fail "missing or non-executable installer: scripts/systemd/install-backup-catchup-timer.sh"
+    fail "missing or non-executable installer: spectre/actions/systemd/install-backup-catchup-timer.sh"
 else
     installer_output=$("$INSTALLER" --print 2>&1)
     installer_status=$?
@@ -73,8 +73,8 @@ else
         fail "installer timer does not run at 05:00"
     elif ! printf '%s\n' "$installer_output" | grep -q '^Persistent=true$'; then
         fail "installer timer is not persistent"
-    elif ! printf '%s\n' "$installer_output" | grep -Fq "ExecStart=$PROJECT_ROOT/scripts/backups/run-missed-backups.sh"; then
-        fail "installer service does not run this repository's catch-up wrapper"
+    elif ! printf '%s\n' "$installer_output" | grep -Eq "ExecStart=.*spectre run backups/run-missed-backups|ExecStart=.*run-missed-backups"; then
+        fail "installer service does not dispatch backups/run-missed-backups"
     else
         pass "installer emits a persistent 05:00 timer for the catch-up wrapper"
     fi
@@ -82,7 +82,7 @@ fi
 
 # --- wrapper decisions -------------------------------------------------------
 if [ ! -x "$WRAPPER" ]; then
-    fail "missing or non-executable wrapper: scripts/backups/run-missed-backups.sh"
+    fail "missing or non-executable wrapper: spectre/actions/backups/run-missed-backups.sh"
 else
     # Healthy backups: the wrapper must be a no-op.
     sandbox="$TMP_ROOT/healthy"
