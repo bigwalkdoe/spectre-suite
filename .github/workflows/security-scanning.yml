@@ -74,14 +74,14 @@ jobs:
       # own hardcoded `= true` constant, so `data.security` reported full
       # compliance for any input at all -- the check could not fail. The policies
       # now derive every control from input, and CI evaluates them against a
-      # committed, reviewable baseline (scripts/security/opa/baseline.json).
+      # committed, reviewable baseline (spectre/policies/baseline.json).
       # Flipping any control there fails the job until the config is fixed.
       - name: Evaluate policies against declared baseline
         run: |
           set -euo pipefail
           denials=$(opa eval --format raw \
-            --data scripts/security/opa/policies \
-            --input scripts/security/opa/baseline.json \
+            --data spectre/policies \
+            --input spectre/policies/baseline.json \
             '[m | data.security[k].deny[m]]' | tail -1)
           echo "Policy denials: $denials"
           if [ "$denials" != "[]" ]; then
@@ -96,7 +96,7 @@ jobs:
         if: always()
         with:
           name: opa-policy-results
-          path: scripts/security/opa/baseline.json
+          path: spectre/policies/baseline.json
 
   load-test:
     name: Load Test
@@ -126,7 +126,7 @@ jobs:
             echo "SPECTRE_LOAD_TEST_URL repository variable is not set; refusing to report a pass." >&2
             exit 1
           fi
-          k6 run scripts/performance/load-testing/k6-script.js \
+          k6 run spectre/actions/performance/load-testing/k6-script.js \
             -e BASE_URL="$SPECTRE_LOAD_TEST_URL" \
             -e VUS="${VUS:-10}" -e DURATION="${DURATION:-30s}"
 

@@ -52,10 +52,10 @@ cd spectre-suite/cloud-deployment/ansible
 ansible-playbook -i inventory/production.yml playbook.yml
 
 # 3. Restore data from off-site backup
-scripts/backups/restore-from-remote.sh
+spectre/actions/backups/restore-from-remote.sh
 
 # 4. Verify services
-scripts/maintenance/system-health-check.sh
+spectre/actions/maintenance/system-health-check.sh
 ```
 
 ### 3. Docker Daemon Failure
@@ -73,7 +73,7 @@ sudo cp /tmp/etc/docker/daemon.json /etc/docker/daemon.json
 docker-compose -f spectre-suite/docker-compose.monitoring.yml up -d
 
 # 4. Restore volumes from backup
-scripts/backups/restore-docker-volumes.sh
+spectre/actions/backups/restore-docker-volumes.sh
 ```
 
 ### 4. Security Breach
@@ -87,7 +87,7 @@ sudo fail2ban-client set sshd banip <attacker_ip>
 # Container scanning is a CI job, not a local script. Scan an image directly:
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   aquasec/trivy image --severity HIGH,CRITICAL <image>
-scripts/security/scan-docker-images.sh
+spectre/actions/security/scan-docker-images.sh
 
 # 3. Review logs
 sudo journalctl -u docker --since "24 hours ago" | grep -i error
@@ -95,13 +95,13 @@ tail -100 /var/log/auth.log | grep -i "failed\|error\|unauthorized"
 
 # 4. Rotate credentials
 # There is no secrets-injection script. Rotate by editing .env (database and
-# Redis credentials) and re-running scripts/setup-notification-channels.sh for
+# Redis credentials) and re-running spectre/actions/setup-notification-channels.sh for
 # the Alertmanager receivers, then restart the stack.
 sudo systemctl restart all services
 
 # 5. Generate incident report
 # No report generator is provided. The inputs are: the scan output above, the
-# journal/auth log greps, and scripts/maintenance/audit-trail.sh.
+# journal/auth log greps, and spectre/actions/maintenance/audit-trail.sh.
 ```
 
 ### 5. Disk Space Exhaustion
@@ -112,8 +112,8 @@ du -sh /* 2>/dev/null | sort -rh | head -10
 du -sh /var/log/* 2>/dev/null | sort -rh | head -10
 
 # 2. Clean up immediately
-scripts/maintenance/cleanup-system.sh
-scripts/maintenance/cleanup-logs.sh
+spectre/actions/maintenance/cleanup-unused-resources.sh
+spectre/actions/maintenance/cleanup-logs.sh
 
 # 3. Remove old Docker data
 docker system prune -af --volumes 2>/dev/null || true
@@ -166,16 +166,16 @@ scp -r user@backup-server:/backups/configurations/latest/ /tmp/config-restore/
 sudo cp -r /tmp/config-restore/* /
 
 # Step 3: Restore databases
-scripts/backups/restore-databases.sh
+spectre/actions/backups/restore-databases.sh
 
 # Step 4: Restore Docker volumes
-scripts/backups/restore-docker-volumes.sh
+spectre/actions/backups/restore-docker-volumes.sh
 
 # Step 5: Start services
 docker-compose -f docker-compose.monitoring.yml up -d
 
 # Step 6: Verify
-scripts/maintenance/system-health-check.sh
+spectre/actions/maintenance/system-health-check.sh
 ```
 
 ### Backup Verification Procedure
@@ -213,7 +213,7 @@ notification itself is broken.
 
 Credentials are **not** edited into `prometheus/alertmanager.yml`; Alertmanager
 does no `${VAR}` substitution. They are written as one-value files to
-`prometheus/alertmanager-secrets/` by `scripts/setup-notification-channels.sh`
+`prometheus/alertmanager-secrets/` by `spectre/actions/setup-notification-channels.sh`
 (directory bind-mounted read-only, gitignored, files mode 0600).
 
 - **Slack**: `SLACK_WEBHOOK_URL` -> `alertmanager-secrets/slack_webhook_url`.

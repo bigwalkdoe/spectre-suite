@@ -50,20 +50,30 @@ run_test_suite() {
 check_script_syntax() {
     echo "Checking script syntax..."
     echo "------------------------------------------"
-    
+
     local syntax_errors=0
     local script_count=0
-    
-    for script in "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/*/*.sh; do
-        if [ -f "$script" ]; then
-            ((script_count+=1))
-            if ! bash -n "$script"; then
-                echo -e "${RED}❌ Syntax error in $script${NC}"
-                ((syntax_errors+=1))
-            fi
+    local -A seen=()
+
+    # Canonical implementations first; include legacy forwarders during C1 transition.
+    for script in \
+        "$PROJECT_ROOT"/spectre/actions/*.sh \
+        "$PROJECT_ROOT"/spectre/actions/**/*.sh \
+        "$PROJECT_ROOT"/spectre/actions/*/*.sh \
+        "$PROJECT_ROOT"/spectre/monitoring/exporters/*.sh \
+        "$PROJECT_ROOT"/scripts/*.sh \
+        "$PROJECT_ROOT"/scripts/**/*.sh \
+        "$PROJECT_ROOT"/scripts/*/*.sh; do
+        [ -f "$script" ] || continue
+        [ -n "${seen[$script]:-}" ] && continue
+        seen[$script]=1
+        ((script_count+=1))
+        if ! bash -n "$script"; then
+            echo -e "${RED}❌ Syntax error in $script${NC}"
+            ((syntax_errors+=1))
         fi
     done
-    
+
     if [ $syntax_errors -eq 0 ]; then
         echo -e "${GREEN}✅ All $script_count scripts have correct syntax${NC}"
         ((PASSED_TESTS+=1))
@@ -71,7 +81,7 @@ check_script_syntax() {
         echo -e "${RED}❌ Found syntax errors in $syntax_errors scripts${NC}"
         ((FAILED_TESTS+=1))
     fi
-    
+
     ((TOTAL_TESTS+=1))
     echo ""
 }
@@ -80,23 +90,33 @@ check_script_syntax() {
 check_required_files() {
     echo "Checking required files..."
     echo "------------------------------------------"
-    
+
     local required_files=(
         "README.md"
         "install.sh"
-        "scripts/detect-distribution.sh"
-        "scripts/deploy-monitoring.sh"
     )
-    
+    # Accept canonical or legacy-forwarder locations during C1 transition.
+    local required_either=(
+        "spectre/actions/detect-distribution.sh|scripts/detect-distribution.sh"
+        "spectre/actions/deploy-monitoring.sh|scripts/deploy-monitoring.sh"
+    )
+
     local missing_files=0
-    
+
     for file in "${required_files[@]}"; do
         if [ ! -f "$PROJECT_ROOT/$file" ]; then
             echo -e "${RED}❌ Missing required file: $file${NC}"
             ((missing_files+=1))
         fi
     done
-    
+    for pair in "${required_either[@]}"; do
+        local a="${pair%%|*}" b="${pair#*|}"
+        if [ ! -f "$PROJECT_ROOT/$a" ] && [ ! -f "$PROJECT_ROOT/$b" ]; then
+            echo -e "${RED}❌ Missing required file: $a (or $b)${NC}"
+            ((missing_files+=1))
+        fi
+    done
+
     if [ $missing_files -eq 0 ]; then
         echo -e "${GREEN}✅ All required files present${NC}"
         ((PASSED_TESTS+=1))
@@ -104,7 +124,7 @@ check_required_files() {
         echo -e "${RED}❌ Missing $missing_files required files${NC}"
         ((FAILED_TESTS+=1))
     fi
-    
+
     ((TOTAL_TESTS+=1))
     echo ""
 }
@@ -113,15 +133,16 @@ check_required_files() {
 check_directory_structure() {
     echo "Checking directory structure..."
     echo "------------------------------------------"
-    
+
     local required_dirs=(
-        "scripts"
-        "scripts/backups"
-        "scripts/security"
-        "scripts/maintenance"
-        "scripts/network"
-        "scripts/performance"
-        "scripts/ml-anomaly"
+        "spectre/actions"
+        "spectre/monitoring/exporters"
+        "spectre/actions/backups"
+        "spectre/actions/security"
+        "spectre/actions/maintenance"
+        "spectre/actions/network"
+        "spectre/actions/performance"
+        "spectre/actions/ml-anomaly"
         "prometheus"
         "grafana-dashboards"
         "grafana-provisioning"
@@ -132,16 +153,21 @@ check_directory_structure() {
         "tests"
         "web-dashboard"
     )
-    
+    # Legacy dirs optional during C1 (forwarders may be removed in batches)
+    local optional_dirs=("scripts" "scripts/backups" "scripts/security" "scripts/maintenance" "scripts/network" "scripts/performance" "scripts/ml-anomaly")
+
     local missing_dirs=0
-    
+
     for dir in "${required_dirs[@]}"; do
         if [ ! -d "$PROJECT_ROOT/$dir" ]; then
             echo -e "${RED}❌ Missing required directory: $dir${NC}"
             ((missing_dirs+=1))
         fi
     done
-    
+    for dir in "${optional_dirs[@]}"; do
+        [ -d "$PROJECT_ROOT/$dir" ] || echo -e "${YELLOW}  (optional/legacy dir absent: $dir)${NC}"
+    done
+
     if [ $missing_dirs -eq 0 ]; then
         echo -e "${GREEN}✅ All required directories present${NC}"
         ((PASSED_TESTS+=1))
@@ -149,7 +175,7 @@ check_directory_structure() {
         echo -e "${RED}❌ Missing $missing_dirs required directories${NC}"
         ((FAILED_TESTS+=1))
     fi
-    
+
     ((TOTAL_TESTS+=1))
     echo ""
 }
@@ -158,24 +184,30 @@ check_directory_structure() {
 check_executable_permissions() {
     echo "Checking executable permissions..."
     echo "------------------------------------------"
-    
+
     local permission_errors=0
-    
-    # prometheus/*.sh is included deliberately. The glob used to cover only
-    # scripts/**, which is why business-metrics-exporter.sh shipped without its
-    # executable bit: the cron entry that runs it every 5 minutes failed with
-    # "Permission denied", so it never wrote a .prom file, and the metrics it
-    # produces silently did not exist. Nothing caught it because nothing looked.
-    for script in "$PROJECT_ROOT"/scripts/**/*.sh "$PROJECT_ROOT"/scripts/*/*.sh \
-                  "$PROJECT_ROOT"/prometheus/*.sh; do
-        if [ -f "$script" ]; then
-            if [ ! -x "$script" ]; then
-                echo -e "${YELLOW}⚠️  Script not executable: $script${NC}"
-                ((permission_errors+=1))
-            fi
+    local -A seen=()
+
+    # Canonical actions/exporters plus legacy forwarders and any remaining
+    # prometheus/*.sh helpers during C1 transition.
+    for script in \
+        "$PROJECT_ROOT"/spectre/actions/*.sh \
+        "$PROJECT_ROOT"/spectre/actions/**/*.sh \
+        "$PROJECT_ROOT"/spectre/actions/*/*.sh \
+        "$PROJECT_ROOT"/spectre/monitoring/exporters/*.sh \
+        "$PROJECT_ROOT"/scripts/*.sh \
+        "$PROJECT_ROOT"/scripts/**/*.sh \
+        "$PROJECT_ROOT"/scripts/*/*.sh \
+        "$PROJECT_ROOT"/prometheus/*.sh; do
+        [ -f "$script" ] || continue
+        [ -n "${seen[$script]:-}" ] && continue
+        seen[$script]=1
+        if [ ! -x "$script" ]; then
+            echo -e "${YELLOW}⚠️  Script not executable: $script${NC}"
+            ((permission_errors+=1))
         fi
     done
-    
+
     if [ $permission_errors -eq 0 ]; then
         echo -e "${GREEN}✅ All scripts have executable permissions${NC}"
         ((PASSED_TESTS+=1))
@@ -183,7 +215,7 @@ check_executable_permissions() {
         echo -e "${YELLOW}⚠️  $permission_errors scripts lack executable permissions${NC}"
         ((FAILED_TESTS+=1))
     fi
-    
+
     ((TOTAL_TESTS+=1))
     echo ""
 }

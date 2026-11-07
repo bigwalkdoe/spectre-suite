@@ -130,33 +130,33 @@ systemctl --user list-timers | grep spectre-restic
 ls -la "${XDG_STATE_HOME:-$HOME/.local/state}/spectre-suite/backups"   # last-success, last-offsite-success, last-verify, last-health
 journalctl --user -u spectre-restic-backup.service --since "1 day ago"
 journalctl --user -u spectre-restic-verify.service --since "1 week ago"
-RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env" scripts/backups/restic/backup.sh   # manual run (foreground)
+RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env" spectre/actions/backups/restic/backup.sh   # manual run (foreground)
 ```
 
 **Resolution (artifact backups):**
 ```bash
-scripts/backups/backup-databases.sh
-scripts/backups/run-missed-backups.sh   # catch-up; acts only when health says stale
+spectre/actions/backups/backup-databases.sh
+spectre/actions/backups/run-missed-backups.sh   # catch-up; acts only when health says stale
 df -h /backups
 docker ps
 docker exec postgres pg_isready
-scripts/backups/backup-all.sh
+spectre/actions/backups/backup-all.sh
 ```
 
 **Restore an artifact backup** (suite tar/db dump archives under `/backups/*`; independent of restic snapshots):
 ```bash
-scripts/backups/restore-databases.sh
-scripts/backups/restore-docker-volumes.sh
-scripts/backups/restore-from-remote.sh   # off-site artifact copy
+spectre/actions/backups/restore-databases.sh
+spectre/actions/backups/restore-docker-volumes.sh
+spectre/actions/backups/restore-from-remote.sh   # off-site artifact copy
 ```
 
 **Restore from a restic snapshot** (adopted engine; local-first, tag-scoped `spectre-suite,workstation`):
 ```bash
 export RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env"
-scripts/backups/restic/restore.sh --list
-scripts/backups/restic/restore.sh --snapshot <id> --dry-run
-scripts/backups/restic/restore.sh --snapshot <id> --target /tmp/restore-test [paths...]
-scripts/backups/restic/restore.sh --latest --target /tmp/restore-test --dry-run   # optional
+spectre/actions/backups/restic/restore.sh --list
+spectre/actions/backups/restic/restore.sh --snapshot <id> --dry-run
+spectre/actions/backups/restic/restore.sh --snapshot <id> --target /tmp/restore-test [paths...]
+spectre/actions/backups/restic/restore.sh --latest --target /tmp/restore-test --dry-run   # optional
 # Use --local to read RESTIC_REPOSITORY_LOCAL (/backups/spectre-backup). Verify restored files before replacing originals.
 ```
 
@@ -217,7 +217,7 @@ docker pull <image>:pinned-tag
 docker compose build --no-cache <service>
 
 # Re-run the scan
-scripts/security/scan-docker-images.sh
+spectre/actions/security/scan-docker-images.sh
 
 # Record a false positive. Trivy reads .trivyignore from the working directory,
 # so create it where you run the scan:
@@ -237,7 +237,7 @@ explicit version, so there is no `:latest` to pull for the monitoring stack.
 
 **Check:**
 ```bash
-scripts/network/monitor-network.sh
+spectre/actions/network/monitor-network.sh
 ping -c 3 8.8.8.8
 curl -sf http://localhost:9090/-/healthy
 docker network ls
@@ -335,7 +335,7 @@ docker-compose -f docker-compose.monitoring.yml up -d prometheus
 # Config references must resolve to services that exist. The integrity-check
 # script this runbook used to call is not in this repository, so the primary
 # diagnostic for this runbook failed on invocation.
-scripts/check-config-consistency.sh
+spectre/actions/check-config-consistency.sh
 
 # Confirm nothing drifted from version control.
 git status --short

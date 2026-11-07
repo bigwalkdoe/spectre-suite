@@ -17,7 +17,7 @@ The advanced security framework provides:
 
 #### Installation
 ```bash
-./scripts/security/install-ids-ips.sh
+./spectre/actions/security/install-ids-ips.sh
 ```
 
 #### Features
@@ -78,7 +78,7 @@ sudo aide --update
 
 #### Script
 ```bash
-./scripts/security/advanced-threat-detection.sh
+./spectre/actions/security/advanced-threat-detection.sh
 ```
 
 #### Features
@@ -92,16 +92,16 @@ sudo aide --update
 #### Modes
 ```bash
 # Establish baselines
-./scripts/security/advanced-threat-detection.sh baseline
+./spectre/actions/security/advanced-threat-detection.sh baseline
 
 # Run threat detection scan
-./scripts/security/advanced-threat-detection.sh monitor
+./spectre/actions/security/advanced-threat-detection.sh monitor
 
 # Generate report
-./scripts/security/advanced-threat-detection.sh report
+./spectre/actions/security/advanced-threat-detection.sh report
 
 # Continuous monitoring
-./scripts/security/advanced-threat-detection.sh continuous
+./spectre/actions/security/advanced-threat-detection.sh continuous
 ```
 
 #### Detection Capabilities
@@ -114,7 +114,7 @@ sudo aide --update
 
 #### Installation
 ```bash
-./scripts/security/security-integration.sh
+./spectre/actions/security/security-integration.sh
 ```
 
 #### Components
@@ -181,7 +181,7 @@ Add custom threat intelligence:
 sudo nano /etc/suricata/rules/custom.rules
 
 # Add custom threat IPs to threat detection
-# Edit scripts/security/advanced-threat-detection.sh
+# Edit spectre/actions/security/advanced-threat-detection.sh
 ```
 
 ## Security Best Practices
@@ -233,7 +233,7 @@ Complete audit trail includes:
 Generate security reports:
 ```bash
 # Threat detection report
-./scripts/security/advanced-threat-detection.sh report
+./spectre/actions/security/advanced-threat-detection.sh report
 
 # Security monitoring summary
 sudo journalctl -u security-monitor.service
@@ -270,7 +270,7 @@ sudo journalctl -u suricata
 # Set appropriate runmode and worker threads
 
 # Adjust threat detection intervals
-# Edit scripts/security/advanced-threat-detection.sh
+# Edit spectre/actions/security/advanced-threat-detection.sh
 # Modify sleep intervals and scan frequencies
 ```
 

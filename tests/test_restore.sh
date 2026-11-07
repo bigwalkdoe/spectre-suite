@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-RESTORE_SCRIPT="$PROJECT_ROOT/scripts/backups/restore-databases.sh"
+if [ -f "$PROJECT_ROOT/spectre/actions/backups/restore-databases.sh" ]; then RESTORE_SCRIPT="$PROJECT_ROOT/spectre/actions/backups/restore-databases.sh"; else RESTORE_SCRIPT="$PROJECT_ROOT/scripts/backups/restore-databases.sh"; fi
 
 echo "Running restore drill..."
 echo "------------------------------------------"

@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-EXPORTER="$PROJECT_ROOT/prometheus/business-metrics-exporter.sh"
+EXPORTER="$PROJECT_ROOT/spectre/monitoring/exporters/business-metrics-exporter.sh"
 
 pass() { echo "✅ $1"; }
 fail() { echo "❌ $1"; exit 1; }
