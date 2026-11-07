@@ -6,23 +6,23 @@
 **Spec ref:** `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md` §8.4 Phase 4 — *“Remove shims; delete `/home/deon/scripts`; archive the agent repo read-only — done when no path outside the repo is referenced.”*
 
 ## Preconditions
-- [ ] On the target host, confirm `spectre` CLI/dispatch is installed and working: `spectre actions list`, `spectre actions verify` (expect 0 legacy-path findings where applicable).
-- [ ] Confirm schedulers (cron, system/user timers) invoke `spectre run <job>` or approved canonical entrypoints — no repo `scripts/` paths, no `/home/deon/scripts`.
-- [ ] Have rollback/host access appropriate for scheduler and filesystem changes.
+- [x] On the target host, confirm `spectre` CLI/dispatch is installed and working: `spectre actions list`, `spectre actions verify` (expect 0 legacy-path findings where applicable). **Fedora 2026-11-07:** 67 jobs, `actions verify` no findings.
+- [x] Confirm schedulers (cron, system/user timers) invoke `spectre run <job>` or approved canonical entrypoints — no repo `scripts/` paths, no `/home/deon/scripts`. **Fedora 2026-11-07 (active schedulers checked):** crontab uses `/usr/local/bin/spectre run ...`; `performance-check.service`/`security-scan.service` use `spectre run`; no legacy scheduler refs found in `/etc/systemd/system`, `~/.config/systemd/user`, readable cron dirs. Caveat: stale `/usr/local/bin` artifacts contain legacy refs (see §1.17) but no active references found.
+- [ ] Have rollback/host access appropriate for scheduler and filesystem changes. (Operational — not verified in-session.)
 
 ## Checklist
 
 ### 1) In-repo shims / legacy `scripts/` (repo-side, C1)
 - [x] Tracked legacy `scripts/` tree removed from repo (`git ls-files scripts` = 0); active refs rewired; CI guardrail blocks tracked reintroduction.
-- [ ] Verify no deployed/installed artifacts on the host still reference repo `scripts/` paths (generated units, copied scripts under `/usr/local/bin` or elsewhere, local wrappers). Use `rg` on host config locations as appropriate; `spectre actions verify`/dispatcher checks where available.
+- [ ] Verify no deployed/installed artifacts on the host still reference repo `scripts/` paths (generated units, copied scripts under `/usr/local/bin` or elsewhere, local wrappers). Use `rg` on host config locations as appropriate; `spectre actions verify`/dispatcher checks where available. **Fedora 2026-11-07: NOT fully satisfied (cross-repo ownership caveat).** Active schedulers/units checked use `spectre run` (crontab, `performance-check.service`, `security-scan.service`), but `rg` found `/usr/local/bin` artifacts with `/home/deon/scripts/...` references (e.g. `check-performance-wrapper.sh` → missing target; `setup-*`/`run-*`/`container-logrotate.sh`/`centralized-log-shipper.sh`). **Ownership:** matching filenames exist in separate repo `/home/deon/dev/github/spectre-security` (e.g. `security/run-trivy-scan.sh`, `security/setup-security-scanning.sh`, `performance/check-performance-wrapper.sh`, `setup-backup-cron.sh`), but sampled `/usr/local/bin` hashes **differ** from current `spectre-security` copies — likely installed from `spectre-security`/older state, **not** from `spectre-suite`. No active scheduler refs found in `/etc/systemd/system`, readable `/etc/cron*`, or `~/.config/systemd/user`; `/var/spool/cron` unreadable. **Handle as `spectre-security`/host coordination, not blind spectre-suite Phase 4 deletion.** Requires explicit confirmation; coordinate whether `spectre-security` is superseded/should stop installing legacy `/home/deon/scripts` paths.
 
 ### 2) Delete `/home/deon/scripts` (host)
-- [ ] Confirm `/home/deon/scripts` is absent **or** contains no live, scheduler-referenced, or PATH-installed operational scripts. (Reference host noted absent in earlier migration context; do not assume.)
+- [x] Confirm `/home/deon/scripts` is absent **or** contains no live, scheduler-referenced, or PATH-installed operational scripts. (Reference host noted absent in earlier migration context; do not assume.) **Fedora 2026-11-07:** `test ! -e /home/deon/scripts` → absent.
   ```bash
   test ! -e /home/deon/scripts && echo "absent" || find /home/deon/scripts -maxdepth 3 | head
   ```
-- [ ] If present and unused after verification, remove/archive per ops policy (confirm no `ConditionPathExists`, no cron/systemd/user-timer, no `/usr/local/*` wrapper depends on it). **Destructive host action — explicit confirmation required.**
-- [ ] Re-run scheduler/dispatch verification after removal.
+- [x] If present and unused after verification, remove/archive per ops policy (confirm no `ConditionPathExists`, no cron/systemd/user-timer, no `/usr/local/*` wrapper depends on it). **N/A — `/home/deon/scripts` absent on this host (2026-11-07).** Note: legacy `/usr/local/bin` files still *contain* `/home/deon/scripts` references (see §1.17); they do not make `/home/deon/scripts` present, but they are stale/risky artifacts.
+- [x] Re-run scheduler/dispatch verification after removal. **N/A — nothing removed (absent).** `actions verify` re-run 2026-11-07: no findings.
 
 ### 3) Archive the agent repo read-only (external/ops)
 - [x] Identify the agent repo location(s) used historically; confirm suite/dispatch no longer depends on writable agent-repo paths for scheduled work. **Host `fedora` (2026-11-07):** searched `/home/deon` depth 3 outside `spectre-suite` — no separate `spectre-agent` repo found; operator confirmed **none on this host**. Suite/dispatch runs from this merged repo; no external writable agent repo identified for scheduled work.
@@ -30,9 +30,9 @@
 - [x] Confirm no schedulers or installed units reference the archived repo. **N/A (none on this host, confirmed 2026-11-07).**
 
 ### 4) “No path outside the repo is referenced” (definition of done)
-- [ ] `spectre actions verify` reports no legacy-path findings (where host inventory is available).
-- [ ] Manual spot-check: crontab, `systemctl list-timers --all`, `systemctl --user list-timers --all`, and any `/etc/systemd/system` or user unit files for jobs — no references to removed `scripts/` paths or `/home/deon/scripts`.
-- [ ] Prometheus/exporter/timer installs regenerated from canonical installers if previously installed from legacy paths.
+- [x] `spectre actions verify` reports no legacy-path findings (where host inventory is available). **Fedora 2026-11-07:** 67 jobs, 0 blocking, 0 legacy-path, 0 unregistered — **no findings**.
+- [ ] Manual spot-check: crontab, `systemctl list-timers --all`, `systemctl --user list-timers --all`, and any `/etc/systemd/system` or user unit files for jobs — no references to removed `scripts/` paths or `/home/deon/scripts`. **Partially satisfied (2026-11-07):** `crontab -l` uses `spectre run` only; system/user timers reviewed (spectre/perf/sec timers present, no legacy refs observed). `rg` over `/etc/systemd/system` and `~/.config/systemd/user` found no `/home/deon/scripts`/repo-`scripts/` legacy scheduler refs (permission denied on `/etc/systemd/system/alloy.service.d/env.conf`; `/var/spool/cron` unreadable). **However**, stale `/usr/local/bin` artifacts contain legacy refs (see §1.17) — until inspected/cleaned per ops decision, do not claim full Phase 4 DoD.
+- [ ] Prometheus/exporter/timer installs regenerated from canonical installers if previously installed from legacy paths. **Not verified (2026-11-07).** Check exporter/timer/service install provenance; regenerate from canonical installers if any legacy-installed. **Requires explicit confirmation before host changes.**
 
 ## Evidence to record
 - Hostname, date, operator
