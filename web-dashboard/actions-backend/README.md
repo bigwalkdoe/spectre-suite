@@ -4,10 +4,10 @@ Minimal, **allowlisted**, token-protected trigger service for the web dashboard 
 
 ## Security model
 
-- **Allowlist only**: maps action names to fixed repo-relative scripts. No user-supplied arguments are passed to the shell.
-  - `backup` → `scripts/backups/run-missed-backups.sh`
-  - `maintenance` → `scripts/maintenance/run-maintenance.sh`
-  - `security-scan` → `scripts/security/scan-docker-images.sh`
+- **Allowlist only**: maps action names to fixed repo-relative canonical action scripts. No user-supplied arguments are passed to the shell.
+  - `backup` → `spectre/actions/backups/run-missed-backups.sh` (`spectre run backups/run-missed-backups`)
+  - `maintenance` → `spectre/actions/maintenance/run-maintenance.sh` (`spectre run maintenance/run-maintenance`)
+  - `security-scan` → `spectre/actions/security/scan-docker-images.sh` (`spectre run security/scan-docker-images`)
 - **Token required**: when `DASHBOARD_ACTION_TOKEN` is set, requests must include `X-Dashboard-Action-Token`. If unset, the service rejects all action requests (`503`).
 - **No in-container execution**: the container **queues trigger files** to `/triggers` and returns `202 Accepted`. A **host handler** runs the allowlisted scripts. This avoids granting the container docker/host/root privileges.
 
@@ -17,7 +17,7 @@ Minimal, **allowlisted**, token-protected trigger service for the web dashboard 
 - `docker-compose.monitoring.yml` service `dashboard-actions` — builds the backend, mounts `./dashboard-actions/triggers` and the repo read-only.
 - `web-dashboard/nginx.conf` — proxies `/actions/` → `dashboard-actions:8090`.
 - `web-dashboard/dashboard.js` — posts to `/actions/<name>` (configurable via `?actionsBase=`; `actionsBase=off` disables), prompts/stores token in `sessionStorage` on `401`.
-- Host handler: `scripts/dashboard-actions/process-triggers.sh` consumes queued triggers.
+- Host handler: `spectre/actions/dashboard-actions/process-triggers.sh` (or `spectre run dashboard-actions/process-triggers`) consumes queued triggers.
 - Systemd templates: `systemd/dashboard-actions/spectre-dashboard-actions.{path,service}` (user units, adjust repo path if needed).
 
 ## Setup
