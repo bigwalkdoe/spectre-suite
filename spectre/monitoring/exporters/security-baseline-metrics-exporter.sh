@@ -79,6 +79,21 @@ opa_tests=$(phase_status "$LOGD/opa-tests.log" "ALL (OPA )?TESTS PASSED|ALL PASS
 if [ -f "$BLOG" ] && grep -q "OPA .*tests: PASSED\|OPA policy tests: ALL PASSED" "$BLOG" 2>/dev/null; then opa_tests=1; fi
 if [ -f "$BLOG" ] && grep -q "OPA .*tests: FAILED\|OPA policy tests FAILED" "$BLOG" 2>/dev/null; then opa_tests=0; fi
 
+# Option A compat report (SECURITY_OPA_COMPAT): report-ran semantics, NOT "no denials".
+# 1=report produced/ran when enabled, 0=helper/exec issues, -1=off/unknown/skipped.
+opa_compat_report=-1
+if [ -f "$BLOG" ]; then
+  if grep -q "OPA compat report: COMPLETED" "$BLOG" 2>/dev/null; then opa_compat_report=1; fi
+  if grep -q "OPA compat report: issues" "$BLOG" 2>/dev/null; then opa_compat_report=0; fi
+  if grep -Eq 'opa_compat=0,on' "$BLOG" 2>/dev/null && [ "$opa_compat_report" = "-1" ]; then opa_compat_report=1; fi
+  if grep -Eq 'opa_compat=[1-9][0-9]*,on' "$BLOG" 2>/dev/null; then opa_compat_report=0; fi
+  if grep -q "OPA compat: SKIPPED" "$BLOG" 2>/dev/null && [ "$opa_compat_report" = "-1" ]; then opa_compat_report=-1; fi
+fi
+if [ "$opa_compat_report" = "-1" ] && [ -f "$LOGD/opa-compat-report.log" ]; then
+  # report log exists but baseline markers absent/ambiguous -> unknown (do not guess)
+  opa_compat_report=-1
+fi
+
 hardening=$(phase_status "$LOGD/hardening.log" "COMPLETED|completed successfully|Hardening: COMPLETED" "FAILED|failed|Hardening: FAILED")
 if [ -f "$BLOG" ] && grep -q "Hardening: COMPLETED" "$BLOG" 2>/dev/null; then hardening=1; fi
 if [ -f "$BLOG" ] && grep -q "Hardening: FAILED" "$BLOG" 2>/dev/null; then hardening=0; fi
@@ -145,8 +160,10 @@ emit "spectre_security_baseline_stale{source=\"$source_kind\"} $stale"
 
 gauge_help spectre_security_baseline_opa_check_ok "1 pass, 0 fail/issues, -1 unknown/skipped (suite-native OPA check)"
 emit "spectre_security_baseline_opa_check_ok{source=\"$source_kind\"} $opa_check"
-gauge_help spectre_security_baseline_opa_tests_ok "1 pass, 0 fail, -1 unknown/skipped (compat policy tests)"
+gauge_help spectre_security_baseline_opa_tests_ok "1 pass, 0 fail, -1 unknown/skipped (legacy compat policy tests)"
 emit "spectre_security_baseline_opa_tests_ok{source=\"$source_kind\"} $opa_tests"
+gauge_help spectre_security_baseline_opa_compat_report_ok "1 Option A compat report produced/ran when enabled (report-only; denials do not make this 0), 0 helper/exec issues, -1 off/unknown/skipped"
+emit "spectre_security_baseline_opa_compat_report_ok{source=\"$source_kind\"} $opa_compat_report"
 gauge_help spectre_security_baseline_hardening_ok "1 ok, 0 fail, -1 unknown/skipped"
 emit "spectre_security_baseline_hardening_ok{source=\"$source_kind\"} $hardening"
 gauge_help spectre_security_baseline_drift_detected "1 drift detected, 0 no drift (positive evidence), -1 unknown/skipped"
