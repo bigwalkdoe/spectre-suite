@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectre-suite.local/policies/contract/live_infra_snapshot.v0.schema.json",
+  "title": "Spectre live infra snapshot (v0, nested adapter-compatible)",
+  "description": "Versioned envelope for the existing nested spectre-security-shaped infra snapshot consumed by opa-contract-adapter.py. Backward-compatible: adapter reads docker/network/compliance/backup and ignores unknown metadata. Unmapped suite controls remain absent/fail-closed.",
+  "type": "object",
+  "required": ["docker", "network", "compliance", "backup"],
+  "additionalProperties": true,
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "description": "Snapshot contract identifier/version",
+      "examples": ["live_infra_snapshot/v0"]
+    },
+    "source": {
+      "type": "string",
+      "description": "Producer/provenance identifier (e.g., suite drift-detection, compat import)"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "RFC3339/ISO8601 timestamp when produced, if known"
+    },
+    "docker": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "network": {"type": "object", "additionalProperties": true},
+    "compliance": {"type": "object", "additionalProperties": true},
+    "backup": {"type": "object", "additionalProperties": true}
+  }
+}
