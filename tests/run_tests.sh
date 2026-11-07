@@ -55,15 +55,13 @@ check_script_syntax() {
     local script_count=0
     local -A seen=()
 
-    # Canonical implementations first; include legacy forwarders during C1 transition.
+    # Canonical implementations (C1: scripts/ forwarders removed progressively).
     for script in \
         "$PROJECT_ROOT"/spectre/actions/*.sh \
         "$PROJECT_ROOT"/spectre/actions/**/*.sh \
         "$PROJECT_ROOT"/spectre/actions/*/*.sh \
         "$PROJECT_ROOT"/spectre/monitoring/exporters/*.sh \
-        "$PROJECT_ROOT"/scripts/*.sh \
-        "$PROJECT_ROOT"/scripts/**/*.sh \
-        "$PROJECT_ROOT"/scripts/*/*.sh; do
+        "$PROJECT_ROOT"/*.sh; do
         [ -f "$script" ] || continue
         [ -n "${seen[$script]:-}" ] && continue
         seen[$script]=1
@@ -95,24 +93,16 @@ check_required_files() {
         "README.md"
         "install.sh"
     )
-    # Accept canonical or legacy-forwarder locations during C1 transition.
-    local required_either=(
-        "spectre/actions/detect-distribution.sh|scripts/detect-distribution.sh"
-        "spectre/actions/deploy-monitoring.sh|scripts/deploy-monitoring.sh"
+    local required_canonical=(
+        "spectre/actions/detect-distribution.sh"
+        "spectre/actions/deploy-monitoring.sh"
     )
 
     local missing_files=0
 
-    for file in "${required_files[@]}"; do
+    for file in "${required_files[@]}" "${required_canonical[@]}"; do
         if [ ! -f "$PROJECT_ROOT/$file" ]; then
             echo -e "${RED}❌ Missing required file: $file${NC}"
-            ((missing_files+=1))
-        fi
-    done
-    for pair in "${required_either[@]}"; do
-        local a="${pair%%|*}" b="${pair#*|}"
-        if [ ! -f "$PROJECT_ROOT/$a" ] && [ ! -f "$PROJECT_ROOT/$b" ]; then
-            echo -e "${RED}❌ Missing required file: $a (or $b)${NC}"
             ((missing_files+=1))
         fi
     done
@@ -153,9 +143,6 @@ check_directory_structure() {
         "tests"
         "web-dashboard"
     )
-    # Legacy dirs optional during C1 (forwarders may be removed in batches)
-    local optional_dirs=("scripts" "scripts/backups" "scripts/security" "scripts/maintenance" "scripts/network" "scripts/performance" "scripts/ml-anomaly")
-
     local missing_dirs=0
 
     for dir in "${required_dirs[@]}"; do
@@ -163,9 +150,6 @@ check_directory_structure() {
             echo -e "${RED}❌ Missing required directory: $dir${NC}"
             ((missing_dirs+=1))
         fi
-    done
-    for dir in "${optional_dirs[@]}"; do
-        [ -d "$PROJECT_ROOT/$dir" ] || echo -e "${YELLOW}  (optional/legacy dir absent: $dir)${NC}"
     done
 
     if [ $missing_dirs -eq 0 ]; then
@@ -188,16 +172,13 @@ check_executable_permissions() {
     local permission_errors=0
     local -A seen=()
 
-    # Canonical actions/exporters plus legacy forwarders and any remaining
-    # prometheus/*.sh helpers during C1 transition.
+    # Canonical actions/exporters and repo helpers (C1: scripts/ forwarders removed progressively).
     for script in \
         "$PROJECT_ROOT"/spectre/actions/*.sh \
         "$PROJECT_ROOT"/spectre/actions/**/*.sh \
         "$PROJECT_ROOT"/spectre/actions/*/*.sh \
         "$PROJECT_ROOT"/spectre/monitoring/exporters/*.sh \
-        "$PROJECT_ROOT"/scripts/*.sh \
-        "$PROJECT_ROOT"/scripts/**/*.sh \
-        "$PROJECT_ROOT"/scripts/*/*.sh \
+        "$PROJECT_ROOT"/*.sh \
         "$PROJECT_ROOT"/prometheus/*.sh; do
         [ -f "$script" ] || continue
         [ -n "${seen[$script]:-}" ] && continue
