@@ -20,6 +20,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--versions-root", default="", help="versions directory (default: $SPECTRE_SECURITY_ROOT/security/opa/versions)")
     ap.add_argument("--index", default="", help="index.json path (default: <versions-root>/index.json)")
+    ap.add_argument("--compact", action="store_true", help="omit full index body; keep index summary + per-policy presence")
     args = ap.parse_args()
     root = Path(args.versions_root) if args.versions_root else (_security_root() / "security/opa/versions")
     idx_path = Path(args.index) if args.index else (root / "index.json")
@@ -32,7 +33,17 @@ def main() -> int:
     }
     if idx_path.exists():
         try:
-            report["index"] = json.loads(idx_path.read_text(encoding="utf-8"))
+            idx = json.loads(idx_path.read_text(encoding="utf-8"))
+            if args.compact:
+                policies = (idx.get("policies") or {}) if isinstance(idx, dict) else {}
+                report["index_summary"] = {
+                    "present": True,
+                    "policy_count": len(policies) if isinstance(policies, dict) else None,
+                    "policies": sorted(policies.keys()) if isinstance(policies, dict) else [],
+                    "current_version": idx.get("current_version") if isinstance(idx, dict) else None,
+                }
+            else:
+                report["index"] = idx
         except Exception as e:
             report["index_error"] = f"unreadable: {e}"
     else:
