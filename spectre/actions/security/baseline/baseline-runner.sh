@@ -40,6 +40,7 @@ log "Starting Spectre security baseline (suite-canonical, additive)."
 log "SUITE_ROOT=$SUITE_ROOT POLICY_DIR=$POLICY_DIR LOG_DIR=$LOG_DIR"
 
 OPA_TEST_EXIT=0
+OPA_COMPAT_EXIT=0
 HARDENING_EXIT=0
 TRIVY_FS_EXIT=0
 WAZUH_EXIT=0
@@ -66,7 +67,7 @@ if "$OPA_CMD" version >/dev/null 2>&1; then
       if "$helper" 2>&1 | tee "$LOG_DIR/opa-compat-report.log"; then
         log "OPA compat report: COMPLETED (see $LOG_DIR/opa-compat-report.log)"
       else
-        warn "OPA compat report: issues (exit $?); see $LOG_DIR/opa-compat-report.log"
+        OPA_COMPAT_EXIT=$?; warn "OPA compat report: issues (exit $OPA_COMPAT_EXIT); see $LOG_DIR/opa-compat-report.log"
       fi
     else
       log "OPA compat report helper not found (opa-compat-report.sh); skipping"
@@ -182,7 +183,7 @@ if [ "${DRIFT_EXIT}" -ne 0 ] || [ "${OPA_TEST_EXIT}" -ne 0 ] || [ "${GITLEAKS_EX
   ALERT_LEVEL="warning"
   ALERT_MSG="Spectre suite security baseline completed with warnings/failures"
 fi
-DETAILS="hardening=$HARDENING_EXIT opa_tests=$OPA_TEST_EXIT trivy_fs=$TRIVY_FS_EXIT wazuh=$WAZUH_EXIT aide=$AIDE_EXIT gitleaks=$GITLEAKS_EXIT image=$IMAGE_SCAN_EXIT sbom=$SBOM_EXIT drift=$DRIFT_EXIT run_id=$RUN_ID log_dir=$LOG_DIR"
+DETAILS="hardening=$HARDENING_EXIT opa_tests=$OPA_TEST_EXIT opa_compat=${OPA_COMPAT_EXIT}$( [ \"${SECURITY_OPA_COMPAT:-0}\" = \"1\" ] && printf ',on' || printf ',off' ) trivy_fs=$TRIVY_FS_EXIT wazuh=$WAZUH_EXIT aide=$AIDE_EXIT gitleaks=$GITLEAKS_EXIT image=$IMAGE_SCAN_EXIT sbom=$SBOM_EXIT drift=$DRIFT_EXIT run_id=$RUN_ID log_dir=$LOG_DIR"
 if helper=$(resolve_helper "alerting.sh"); then
   "$helper" "$ALERT_LEVEL" "$ALERT_MSG" "$DETAILS" 2>&1 | tee -a "$LOG_DIR/alerting.log" || warn "alerting helper failed"
 else
