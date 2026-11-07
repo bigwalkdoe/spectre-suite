@@ -48,7 +48,7 @@
 ## Step 5 — Archive spectre-security read-only (coordinated) — **partially executed (confirmed)**
 - **5b (GitHub `bigwalkdoe/spectre-security`):** **Not now** (confirmed) — no GitHub archival performed.
 - **5c (retirement marker):** README notice added and committed **locally** in spectre-security (`06f5a86`), **not pushed** (confirmed). Local clone removal means that unpushed commit and untracked `AGENTS.md` are **lost**.
-- **5a (local clone `~//dev/github/spectre-security`):** **Partial removal** — `rm -rf` removed most files but **88 root-owned items remain** (maintenance compliance reports, `security/reports/*` trivy/zap outputs, `security/sonarqube/docker-compose.yml`, `security/zap/docker-compose.yml`) due to permission denied; `sudo` required to complete. **Run to finish (confirmed):** `sudo rm -rf ~//dev/github/spectre-security`
-- **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path no longer a full clone; this is expected.
+- **5a (local clone `~//dev/github/spectre-security`):** **Complete (evidenced 2026-11-07).** Initial `rm -rf` left 88 root-owned items (permission denied); `sudo rm -rf ~//dev/github/spectre-security` completed removal — path no longer exists. Unpushed local README marker commit (`06f5a86`) and untracked `AGENTS.md` lost with clone removal.
+- **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path absent; expected.
 
 **GitHub repo remains not archived (per 5b).**
