@@ -10,8 +10,7 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-# Consolidation: scripts/backups/run-missed-backups.sh is a forwarder; the sandbox
-# needs the real control flow with sibling stubs.
+# The sandbox exercises the canonical action's real control flow with sibling stubs.
 WRAPPER="$PROJECT_ROOT/spectre/actions/backups/run-missed-backups.sh"
 INSTALLER="$PROJECT_ROOT/spectre/actions/systemd/install-backup-catchup-timer.sh"
 
@@ -28,9 +27,9 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 # control flow without touching the real backup directory or Docker.
 make_sandbox() {
     local root="$1"
-    mkdir -p "$root/scripts/backups" "$root/bin" "$root/run" "$root/home" "$root/state"
-    cp "$WRAPPER" "$root/scripts/backups/run-missed-backups.sh"
-    chmod +x "$root/scripts/backups/run-missed-backups.sh"
+    mkdir -p "$root/spectre/actions/backups" "$root/bin" "$root/run" "$root/home" "$root/state"
+    cp "$WRAPPER" "$root/spectre/actions/backups/run-missed-backups.sh"
+    chmod +x "$root/spectre/actions/backups/run-missed-backups.sh"
 
     cat > "$root/bin/docker" <<'EOF'
 #!/bin/bash
@@ -38,7 +37,7 @@ exit 0
 EOF
     chmod +x "$root/bin/docker"
 
-    cat > "$root/scripts/backups/check-backup-health.sh" <<'EOF'
+    cat > "$root/spectre/actions/backups/check-backup-health.sh" <<'EOF'
 #!/bin/bash
 echo health >> "${TEST_HEALTH_LOG:?}"
 mode="${TEST_HEALTH_MODE:-healthy}"
@@ -50,15 +49,15 @@ if [ "$mode" = "becomes-healthy" ] && [ -f "${TEST_BACKUP_MARKER:?}" ]; then
 fi
 exit 1
 EOF
-    chmod +x "$root/scripts/backups/check-backup-health.sh"
+    chmod +x "$root/spectre/actions/backups/check-backup-health.sh"
 
-    cat > "$root/scripts/backups/backup-all.sh" <<'EOF'
+    cat > "$root/spectre/actions/backups/backup-all.sh" <<'EOF'
 #!/bin/bash
 echo backup >> "${TEST_BACKUP_LOG:?}"
 touch "${TEST_BACKUP_MARKER:?}"
 exit "${TEST_BACKUP_EXIT:-0}"
 EOF
-    chmod +x "$root/scripts/backups/backup-all.sh"
+    chmod +x "$root/spectre/actions/backups/backup-all.sh"
 }
 
 # --- installer output --------------------------------------------------------
@@ -94,7 +93,7 @@ else
     TEST_BACKUP_MARKER="$TMP_ROOT/healthy.marker" \
     HOME="$sandbox/home" XDG_RUNTIME_DIR="$sandbox/run" XDG_STATE_HOME="$sandbox/state" \
     PATH="$sandbox/bin:$PATH" \
-        "$sandbox/scripts/backups/run-missed-backups.sh" >"$out" 2>&1
+        "$sandbox/spectre/actions/backups/run-missed-backups.sh" >"$out" 2>&1
     healthy_status=$?
     if [ "$healthy_status" -ne 0 ]; then
         fail "healthy path exited $healthy_status"
@@ -116,7 +115,7 @@ else
     TEST_BACKUP_MARKER="$TMP_ROOT/stale.marker" \
     HOME="$sandbox/home" XDG_RUNTIME_DIR="$sandbox/run" XDG_STATE_HOME="$sandbox/state" \
     PATH="$sandbox/bin:$PATH" \
-        "$sandbox/scripts/backups/run-missed-backups.sh" >"$out" 2>&1
+        "$sandbox/spectre/actions/backups/run-missed-backups.sh" >"$out" 2>&1
     stale_status=$?
     health_calls=$(wc -l < "$TMP_ROOT/stale.health" 2>/dev/null || echo 0)
     if [ "$stale_status" -ne 0 ]; then
@@ -139,7 +138,7 @@ else
     TEST_BACKUP_MARKER="$TMP_ROOT/failing.marker" \
     HOME="$sandbox/home" XDG_RUNTIME_DIR="$sandbox/run" XDG_STATE_HOME="$sandbox/state" \
     PATH="$sandbox/bin:$PATH" \
-        "$sandbox/scripts/backups/run-missed-backups.sh" >"$out" 2>&1
+        "$sandbox/spectre/actions/backups/run-missed-backups.sh" >"$out" 2>&1
     failing_status=$?
     if [ "$failing_status" -eq 0 ]; then
         fail "a backup that leaves health failing still exits success"
@@ -161,7 +160,7 @@ else
     TEST_BACKUP_EXIT=1 \
     HOME="$sandbox/home" XDG_RUNTIME_DIR="$sandbox/run" XDG_STATE_HOME="$sandbox/state" \
     PATH="$sandbox/bin:$PATH" \
-        "$sandbox/scripts/backups/run-missed-backups.sh" >"$out" 2>&1
+        "$sandbox/spectre/actions/backups/run-missed-backups.sh" >"$out" 2>&1
     backup_fails_status=$?
     if [ "$backup_fails_status" -eq 0 ]; then
         fail "catch-up exited success when backup-all.sh failed"
@@ -193,7 +192,7 @@ else
     TEST_BACKUP_MARKER="$TMP_ROOT/locked.marker" \
     HOME="$sandbox/home" XDG_RUNTIME_DIR="$sandbox/run" XDG_STATE_HOME="$sandbox/state" \
     PATH="$sandbox/bin:$PATH" \
-        "$sandbox/scripts/backups/run-missed-backups.sh" >"$out" 2>&1
+        "$sandbox/spectre/actions/backups/run-missed-backups.sh" >"$out" 2>&1
     locked_status=$?
     wait "$lock_pid" 2>/dev/null || true
     if [ "$locked_status" -ne 0 ]; then

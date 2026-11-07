@@ -15,7 +15,7 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-if [ -f "$PROJECT_ROOT/spectre/actions/backups/check-backup-health.sh" ]; then CHECKER="$PROJECT_ROOT/spectre/actions/backups/check-backup-health.sh"; else CHECKER="$PROJECT_ROOT/scripts/backups/check-backup-health.sh"; fi
+CHECKER="$PROJECT_ROOT/spectre/actions/backups/check-backup-health.sh"
 
 echo "Running backup health check tests..."
 
