@@ -20,7 +20,7 @@ This document outlines the security practices, vulnerability disclosure process,
   (`.github/workflows/lint.yml`) along with `terraform validate`, `promtool`,
   `amtool`, `docker compose config` and the OPA policy baseline
 - Alert policies are Rego `deny` rules derived from input, gated in CI against
-  `scripts/security/opa/baseline.json`. All 38 controls must also deny on empty
+  `spectre/policies/baseline.json`. All 38 controls must also deny on empty
   input, so a policy cannot silently fail open.
 
 ### Deployment Security
