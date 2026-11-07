@@ -33,12 +33,17 @@ def main() -> int:
     verbose = args.verbose or os.environ.get("SECURITY_OPA_COMPAT_VERBOSE", "") == "1"
     src = args.input or str(Path.home() / ".local/state/spectre/security-baseline/current-infrastructure.json")
     if not Path(src).exists():
-        # compat fallback
-        cand = Path("/home/deon/dev/github/spectre-security/security/test-data/current-infrastructure.json")
+        # compat fallback (spectre-security repo is archived; SPECTRE_SECURITY_ROOT may be set explicitly)
+        sec_root = Path(os.environ.get("SPECTRE_SECURITY_ROOT", "/home/deon/dev/github/spectre-security"))
+        cand = sec_root / "security/test-data/current-infrastructure.json"
         if cand.exists():
             src = str(cand)
         else:
-            print(f"input not found: {src}", file=sys.stderr)
+            print(
+                f"input not found: {src} (compat fallback also missing: {cand}; "
+                "provide an explicit input path or set SECURITY_BASELINE_FILE/SPECTRE_SECURITY_ROOT as appropriate)",
+                file=sys.stderr,
+            )
             return 2
     with tempfile.TemporaryDirectory() as td:
         adapted = Path(td) / "adapted.json"
