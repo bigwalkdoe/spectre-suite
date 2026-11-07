@@ -625,5 +625,72 @@
       "system:security-baseline-exporter.service",
       "user:security-baseline-exporter.service"
     ]
+  },
+  {
+    "name": "security/baseline/drift-detection",
+    "action": "security/baseline/drift-detection.sh",
+    "group": "security",
+    "summary": "Detect security baseline drift against approved compatible baseline (writes JSON/log evidence)",
+    "sudo": true,
+    "mutates": true,
+    "concurrency": "forbid"
+  },
+  {
+    "name": "security/baseline/generate-sbom",
+    "action": "security/baseline/generate-sbom.sh",
+    "group": "security",
+    "summary": "Generate CycloneDX/SPDX SBOM and dependency evidence via Trivy (additive)",
+    "mutates": true,
+    "concurrency": "forbid"
+  },
+  {
+    "name": "security/baseline/update-baseline",
+    "action": "security/baseline/update-baseline.sh",
+    "group": "security",
+    "summary": "Capture Docker/network state into spectre-security-compatible baseline JSON (mutating)",
+    "mutates": true,
+    "concurrency": "forbid"
+  },
+  {
+    "name": "security/baseline/trivy-image-scan",
+    "action": "security/baseline/trivy-image-scan.sh",
+    "group": "security",
+    "summary": "Scan a container image with Trivy (vuln/misconfig/secret/SARIF); requires IMAGE_NAME",
+    "mutates": true,
+    "concurrency": "allow"
+  },
+  {
+    "name": "security/baseline/check-wazuh-status",
+    "action": "security/baseline/check-wazuh-status.sh",
+    "group": "security",
+    "summary": "Report Wazuh agent status (read-only helper)",
+    "sudo": true,
+    "mutates": false,
+    "concurrency": "allow"
+  },
+  {
+    "name": "security/baseline/check-file-integrity",
+    "action": "security/baseline/check-file-integrity.sh",
+    "group": "security",
+    "summary": "Run AIDE/file integrity check with suite-managed state (may require privileges)",
+    "sudo": true,
+    "mutates": true,
+    "concurrency": "forbid"
+  },
+  {
+    "name": "security/baseline/alerting",
+    "action": "security/baseline/alerting.sh",
+    "group": "security",
+    "summary": "Send security baseline alert via configured webhook/Slack/email (external side effects)",
+    "mutates": false,
+    "concurrency": "allow"
+  },
+  {
+    "name": "security/baseline/opa-compat-report",
+    "action": "security/baseline/opa-compat-report.sh",
+    "group": "security",
+    "summary": "Option A compat: adapt nested infra JSON and report mapped fields + suite OPA denials (no gate changes)",
+    "mutates": false,
+    "concurrency": "allow"
   }
 ]
