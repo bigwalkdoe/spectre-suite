@@ -1,0 +1,551 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "mode": "markdown",
+        "content": "**Security baseline pipeline evidence** (`spectre_security_baseline_*`) \u2014 distinct from **Spectre agent runtime** (`spectre_agent_*` / `security_*` findings). States: `1` ok/clean/no-drift, `0` fail/findings/drift, `-1` unknown/skipped/not configured. **Never-run, unknown, and stale evidence must not be read as clean.** Source: suite baseline runner and/or spectre-security evidence (A/D hybrid)."
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Exporter up",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_exporter_up)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN/none",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Never run",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 3
+      },
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_never_run)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "has evidence",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "NEVER RUN",
+                  "color": "orange"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Stale evidence",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 3
+      },
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_stale)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "fresh/NA",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "STALE",
+                  "color": "orange"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Drift detected",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 3
+      },
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_drift_detected)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "unknown/skip",
+                  "color": "blue"
+                },
+                "0": {
+                  "text": "no drift",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "DRIFT",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Evidence age",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 3
+      },
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_evidence_age_seconds)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 172800
+              },
+              {
+                "color": "red",
+                "value": 604800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Last run (unix)",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 3
+      },
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max(spectre_security_baseline_last_run_timestamp_seconds)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Baseline phase/evidence status (1 ok, 0 fail/findings, -1 unknown/skip)",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "max by (source) (spectre_security_baseline_opa_check_ok)",
+          "legendFormat": "opa_check_ok {{source}}",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_opa_tests_ok)",
+          "legendFormat": "opa_tests_ok {{source}}",
+          "refId": "B"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_hardening_ok)",
+          "legendFormat": "hardening_ok {{source}}",
+          "refId": "C"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_drift_detected)",
+          "legendFormat": "drift_detected {{source}}",
+          "refId": "D"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_sbom_ok)",
+          "legendFormat": "sbom_ok {{source}}",
+          "refId": "E"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_trivy_fs_ok)",
+          "legendFormat": "trivy_fs_ok {{source}}",
+          "refId": "F"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_gitleaks_ok)",
+          "legendFormat": "gitleaks_ok {{source}}",
+          "refId": "G"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_aide_ok)",
+          "legendFormat": "aide_ok {{source}}",
+          "refId": "H"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_wazuh_ok)",
+          "legendFormat": "wazuh_ok {{source}}",
+          "refId": "I"
+        },
+        {
+          "expr": "max by (source) (spectre_security_baseline_trivy_image_ok)",
+          "legendFormat": "trivy_image_ok {{source}}",
+          "refId": "J"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Evidence age / staleness over time",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "spectre_security_baseline_evidence_age_seconds",
+          "legendFormat": "age {{source}}",
+          "refId": "A"
+        },
+        {
+          "expr": "spectre_security_baseline_stale * 3600",
+          "legendFormat": "stale flag*3600 {{source}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Phase status over time (-1 unknown/skip, 0 fail, 1 ok; drift: 1 detected)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "spectre_security_baseline_opa_check_ok",
+          "legendFormat": "opa_check {{source}}",
+          "refId": "A"
+        },
+        {
+          "expr": "spectre_security_baseline_drift_detected",
+          "legendFormat": "drift {{source}}",
+          "refId": "B"
+        },
+        {
+          "expr": "spectre_security_baseline_gitleaks_ok",
+          "legendFormat": "gitleaks {{source}}",
+          "refId": "C"
+        },
+        {
+          "expr": "spectre_security_baseline_hardening_ok",
+          "legendFormat": "hardening {{source}}",
+          "refId": "D"
+        },
+        {
+          "expr": "spectre_security_baseline_sbom_ok",
+          "legendFormat": "sbom {{source}}",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": -1,
+          "max": 1
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": [
+    "spectre",
+    "security",
+    "baseline",
+    "pipeline"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Security Baseline Pipeline (spectre_security_baseline_*)",
+  "uid": "spectre-security-baseline-pipeline",
+  "version": 1
+}
