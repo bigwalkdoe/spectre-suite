@@ -112,7 +112,7 @@ test_security_configurations() {
 # Test 5: Check if IDS/IPS installation script exists
 test_ids_ips_script() {
     echo "Test 5: Check if IDS/IPS installation script exists"
-    if [ -f "$PROJECT_ROOT/spectre/actions/security/install-ids-ips.sh" ] || [ -f "$PROJECT_ROOT/scripts/security/install-ids-ips.sh" ]; then
+    if [ -f "$PROJECT_ROOT/spectre/actions/security/install-ids-ips.sh" ]; then
         echo "✅ IDS/IPS installation script exists"
         return 0
     else
