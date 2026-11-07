@@ -475,3 +475,33 @@ def test_compliance_slice_unmapped_security_scanning_not_invented():
     assert "security_scanning_enabled" not in adapted
     # no suite field invented; mapping report doesn't claim a suite field for it
     assert all(m["suite_field"] != "security_scanning_enabled" for m in report.get("mapped", []))
+
+
+def test_explicit_unambiguous_unmapped_controls_never_invented():
+    """Cross-check: adapter must not invent suite controls with no confident mapping (fail-closed)."""
+    adapted = run_adapter({
+        "compliance": {
+            "firewall_enabled": True, "ssh_password_auth": False, "audit_logging_enabled": True,
+            "intrusion_detection_active": True, "file_integrity_monitoring": True,
+            "security_scanning_enabled": True,
+        },
+        "network": {"vpn_enabled": True, "open_ports": [22, 10001], "remote_access": True, "container_network": "host"},
+        "backup": {"encrypted": True, "retention_days": 30, "offsite_replication": True, "last_success_age": 1},
+        "docker": [{"name": "a", "privileged": False, "memory_limit": 1024, "healthcheck": "", "mounts": [{"source": "/etc/x"}], "ports": [{"host_ip": "0.0.0.0", "host_port": 80}]}],
+    })
+    for k in (
+        # not derived from intrusion_detection_active alone
+        "fail2ban_active", "fail2ban_configured",
+        # suite-only firewall/audit/ids controls with no legacy source
+        "ssh_root_login", "audit_retention_days", "sudo_logging_enabled",
+        "log_monitoring_enabled", "alert_thresholds_configured",
+        # suite compliance package controls (not 1:1)
+        "security_baseline_compliant", "cis_benchmarks_followed", "pci_dss_compliant",
+        "security_assessments_scheduled", "patch_management_active",
+        # unmapped network/backup/docker evidence or suite-only
+        "network_segmentation_enabled", "dmz_isolated", "internal_no_internet", "ddos_protection_enabled",
+        "backup_verification_enabled", "database_backups_enabled", "docker_volume_backups_enabled",
+        "docker_not_root", "docker_no_new_privileges", "docker_userland_proxy_disabled",
+        "security_scanning_enabled", "last_success_age", "open_ports", "remote_access", "container_network",
+    ):
+        assert k not in adapted, f"{k} must not be invented (fail-closed)"
