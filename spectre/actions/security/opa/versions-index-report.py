@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Read-only OPA versions index report (ISOLATED).
 
-Reports the full spectre-security OPA versions/index.json and per-policy metadata
-presence. Not part of suite data.security[k].deny aggregation; no CI gate change.
+Reports the OPA versions/index.json and per-policy metadata presence. Prefers
+the vendored isolated slice (`spectre/policies/k8s/versions`), with
+`SPECTRE_SECURITY_ROOT` as a fallback. Not part of suite
+data.security[k].deny aggregation; no CI gate change.
 """
 from __future__ import annotations
 
@@ -11,24 +13,34 @@ import json
 import os
 from pathlib import Path
 
+SUITE_ROOT = Path(__file__).resolve().parents[4]
+VENDORED_VERSIONS = SUITE_ROOT / "spectre" / "policies" / "k8s" / "versions"
+
 
 def _security_root() -> Path:
     return Path(os.environ.get("SPECTRE_SECURITY_ROOT", "~//dev/github/spectre-security"))
 
 
+def _default_versions_root() -> Path:
+    if VENDORED_VERSIONS.exists():
+        return VENDORED_VERSIONS
+    return _security_root() / "security/opa/versions"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--versions-root", default="", help="versions directory (default: $SPECTRE_SECURITY_ROOT/security/opa/versions)")
+    ap.add_argument("--versions-root", default="", help="versions directory (default: vendored spectre/policies/k8s/versions, then $SPECTRE_SECURITY_ROOT/security/opa/versions)")
     ap.add_argument("--index", default="", help="index.json path (default: <versions-root>/index.json)")
     ap.add_argument("--policy", default="", help="filter to a single policy name (read-only)")
     ap.add_argument("--compact", action="store_true", help="omit full index body; keep index summary + per-policy presence")
     args = ap.parse_args()
-    root = Path(args.versions_root) if args.versions_root else (_security_root() / "security/opa/versions")
+    root = Path(args.versions_root) if args.versions_root else _default_versions_root()
     idx_path = Path(args.index) if args.index else (root / "index.json")
     report = {
         "domain": "opa.versions",
         "isolated": True,
         "aggregation": "NOT part of suite data.security[k].deny aggregation; no CI gate change",
+        "source": "vendored" if root.resolve() == VENDORED_VERSIONS.resolve() else "external",
         "versions_root": str(root),
         "index_path": str(idx_path),
     }

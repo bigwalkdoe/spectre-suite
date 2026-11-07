@@ -1,7 +1,7 @@
 # OPA Governance Unification Plan (spectre-security → spectre-suite)
 
 **Date:** 2026-11-07  
-**Status:** draft — **decision required** (highest drift risk)  
+**Status:** **Path C selected** (shared core + explicit adapters; k8s/versions isolated). Groundwork implemented additively; core gates green.  
 **Context:** Absorption program (suite-as-canonical). Keep suite CI/dispatch/provenance; preserve evidence quality and CI gates.
 
 ## 1. Current contracts (observed)
@@ -56,9 +56,9 @@
 ## 5. Immediate next tasks (additive)
 - [x] Produce control-mapping matrix (MD) for suite `security.*` vs spectre-security packages/tests — `docs/superpowers/specs/2026-11-07-opa-control-mapping-matrix.md` (2026-11-07).
 - [x] Implement a **nested→suite input adapter** for `current-infrastructure.json`-style data — `spectre/actions/security/baseline/opa-contract-adapter.py` (+ `tests/test_opa_contract_adapter.py`). Adapts to suite canonical flat fields; unmapped controls remain absent (fail-closed). Verified: adapted security-repo example yields 27 denials vs 38 on empty input (11 mappable controls asserted); `actions verify`/OPA gates unaffected.
-- [~] Decide k8s admission/versions location and CI treatment (separate from `data.security[k].deny` aggregation unless explicitly integrated). **Progress:** Option A adapter/report slice added for `kubernetes.admission` AdmissionReview input (`opa-contract-adapter.py --k8s-admission`, `kubernetes-admission-report.py`); **isolated** from suite `data.security[k].deny` aggregation and CI gates.
-- [~] Port overlapping policies/tests in slices (docker/compliance/backup/network), keeping CI fail-closed count/baseline green per reviewed change. **Progress:** adapter-tested slices added (backup, network, docker evidence+report metadata, security-compliance overlap/fail-closed boundaries); **no rego/gate changes**, CI green (empty-input fail-closed count 38, `baseline.json` 0 denials).
-- [x] Add compat runner that evaluates adapted nested data against suite policies (and reports mapped/unmapped) for `SECURITY_OPA_COMPAT`. Implemented: `spectre/actions/security/baseline/opa-compat-report.{sh,py}` (registered `security/baseline/opa-compat-report`), opt-in `SECURITY_OPA_COMPAT=1` path in `security/baseline/run` (report-only, non-gating), report-only `docker_evidence` summary/`--verbose` detail.
+- [x] Decide k8s admission/versions location and CI treatment (separate from `data.security[k].deny` aggregation unless explicitly integrated). **Decision:** isolated under `spectre/policies/k8s/` (policy + tests + versions index/metadata vendored from the retired spectre-security slice); report defaults to vendored with `SPECTRE_SECURITY_ROOT` fallback. `kubernetes.admission` is **not** aggregated, no CI gate change; opt-in check `spectre/policies/contract/check_isolation.sh`. Report slice: `spectre/actions/security/opa/kubernetes-admission-report.py` (+ `--include-versions-index`), `versions-index-report.py`; `kubernetes-admission_test.rego` ported to rego v1 (16 tests).
+- [~] Port overlapping policies/tests in slices (docker/compliance/backup/network), keeping CI fail-closed count/baseline green per reviewed change. **Progress:** adapter-tested slices added (backup, network, docker evidence+report metadata, security-compliance overlap/fail-closed boundaries); suite-canonical `*_test.rego` added for **all 8** `security.*` packages (`opa test spectre/policies/` PASS 48/48, 2026-11-07); **no rego/gate changes**, CI green (empty-input fail-closed count 38, `baseline.json` 0 denials).
+- [x] Add compat runner that evaluates adapted nested data against suite policies (and reports mapped/unmapped) for `SECURITY_OPA_COMPAT`. Implemented: `spectre/actions/security/baseline/opa-compat-report.{sh,py}` (registered `security/baseline/opa-compat-report`), opt-in `SECURITY_OPA_COMPAT=1` path in `security/baseline/run` (report-only, non-gating), report-only `docker_evidence` summary/`--verbose` detail; now validated by `tests/test_opa_compat_report.py` (report-only behavior).
 
 ### `SECURITY_OPA_COMPAT` usage / interpretation (Option A)
 - **Purpose:** compare/observe legacy spectre-security nested infrastructure evidence (`docker[]`, `network{}`, `compliance{}`, `backup{}`) against **canonical** `spectre/policies` using `opa-contract-adapter.py`. Adapter output contains only confidently mappable suite flat fields; unmapped suite controls remain **absent/fail-closed**.
@@ -67,5 +67,7 @@
 - **Verbose:** `--verbose` or `SECURITY_OPA_COMPAT_VERBOSE=1` adds report-only detail (e.g. `docker_evidence` per-container lists: privileged, no-memory-limit, sensitive bind mounts, 0.0.0.0 exposure, missing healthcheck). Evidence is **not** emitted in adapted policy input and **not** asserted as suite global controls.
 - **Interpretation:** `mapped_*` = fields adapted into suite contract; `denial_count/denials` = canonical suite policy denials for the adapted input (expected to include fail-closed denials for unmapped suite controls). `docker_evidence` is evidence/report metadata only. A “legacy compliant” case may still deny suite controls that have no legacy mapping — that is correct under Option A.
 
-## 6. Decision needed
-Please choose **A**, **B**, or **C** (or constraints). Default recommendation: **A now, evolve to C** (shared core + adapters) once the control-mapping matrix and adapter tests are green. I will not change OPA packages/gates in a breaking way without this decision and passing CI checks.
+## 6. Decision (recorded)
+**Path C selected:** shared Spectre security core + explicit adapters. Suite `data.security[k].deny` aggregation and CI gates remain canonical; k8s admission/versions stay isolated (report-only) until a separate explicit gate is approved. See `docs/superpowers/specs/2026-11-07-opa-path-c-core-contract.md`.
+
+Groundwork status (additive): machine-checkable contract mapping (`spectre/policies/contract/mapping.v1.json`) + validation (`tests/test_opa_path_c_contract.py`), `*_test.rego` for all 8 `security.*` packages plus isolated vendored `kubernetes.admission` slice (`opa test spectre/policies/` **64/64** total, core gates green), nested→flat adapter + `SECURITY_OPA_COMPAT` compat report, and opt-in isolation check (`spectre/policies/contract/check_isolation.sh`). No breaking package/gate changes made without passing CI checks.

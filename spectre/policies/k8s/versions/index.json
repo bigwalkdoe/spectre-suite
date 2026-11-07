@@ -1,0 +1,97 @@
+{
+  "policies": {
+    "kubernetes-admission": {
+      "version": "0.1.0",
+      "updated_at": "2026-10-15T03:42:54+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Add Kubernetes admission policies with 10 rules",
+      "bump_type": "minor",
+      "approved": true,
+      "approved_by": "Security Baseline",
+      "approved_at": "2026-10-15T03:43:46+05:00"
+    },
+    "backup-policy": {
+      "version": "0.0.1",
+      "updated_at": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Backup policy with encryption, retention, off-site replication",
+      "bump_type": "patch",
+      "approved": true,
+      "approved_by": "Security Baseline",
+      "approved_at": "2026-10-15T03:44:00+05:00"
+    },
+    "docker-security": {
+      "version": "0.0.1",
+      "updated_at": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Docker security with privileged, mounts, limits, ports, healthchecks",
+      "bump_type": "patch",
+      "approved": true,
+      "approved_by": "Security Baseline",
+      "approved_at": "2026-10-15T03:44:00+05:00"
+    },
+    "network-security": {
+      "version": "0.0.1",
+      "updated_at": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Network security with VPN, host networking, allowed ports",
+      "bump_type": "patch",
+      "approved": true,
+      "approved_by": "Security Baseline",
+      "approved_at": "2026-10-15T03:44:00+05:00"
+    },
+    "security-compliance": {
+      "version": "0.0.1",
+      "updated_at": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Compliance with firewall, SSH, audit, IDS, AIDE, scanning",
+      "bump_type": "patch",
+      "approved": true,
+      "approved_by": "Security Baseline",
+      "approved_at": "2026-10-15T03:44:00+05:00"
+    }
+  },
+  "current_version": "0.0.1",
+  "history": [
+    {
+      "policy": "kubernetes-admission",
+      "version": "0.1.0",
+      "timestamp": "2026-10-15T03:42:54+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Add Kubernetes admission policies with 10 rules",
+      "bump_type": "minor"
+    },
+    {
+      "policy": "backup-policy",
+      "version": "0.0.1",
+      "timestamp": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Backup policy with encryption, retention, off-site replication",
+      "bump_type": "patch"
+    },
+    {
+      "policy": "docker-security",
+      "version": "0.0.1",
+      "timestamp": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Docker security with privileged, mounts, limits, ports, healthchecks",
+      "bump_type": "patch"
+    },
+    {
+      "policy": "network-security",
+      "version": "0.0.1",
+      "timestamp": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Network security with VPN, host networking, allowed ports",
+      "bump_type": "patch"
+    },
+    {
+      "policy": "security-compliance",
+      "version": "0.0.1",
+      "timestamp": "2026-10-15T03:43:52+05:00",
+      "commit": "f160f6dea9a2d29e020bb9b6ecb40dce3f76cdbd",
+      "message": "Compliance with firewall, SSH, audit, IDS, AIDE, scanning",
+      "bump_type": "patch"
+    }
+  ]
+}
