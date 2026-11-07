@@ -258,7 +258,7 @@ check_security_tools() {
 }
 
 # Build the input document consumed by the OPA policies in
-# spectre/policies/ (canonical; legacy scripts/security/opa/policies/ fallback). Values are derived from the live system
+# spectre/policies/ (canonical). Values are derived from the live system
 # where feasible; operational controls we manage are set to their intended
 # state so the policies can actually be evaluated (not just linted).
 build_opa_input() {
