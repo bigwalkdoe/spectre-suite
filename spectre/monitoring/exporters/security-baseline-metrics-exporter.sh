@@ -84,20 +84,34 @@ if [ -f "$BLOG" ] && grep -q "Hardening: COMPLETED" "$BLOG" 2>/dev/null; then ha
 if [ -f "$BLOG" ] && grep -q "Hardening: FAILED" "$BLOG" 2>/dev/null; then hardening=0; fi
 
 # Drift: 0 = no drift (positive evidence), 1 = drift detected, -1 = unknown/skipped.
+# Prefer structured JSON report when present; fall back to log parsing.
 drift=-1
-drift_files=()
-for _df in "$LOGD/drift.log" "$LOGD/drift-detection.log" "$BLOG"; do [ -f "$_df" ] && drift_files+=("$_df"); done
-if [ ${#drift_files[@]} -gt 0 ] && grep -Eq "Phase 9: drift|[Dd]rift detect|NO DRIFT|WARNING: Drift detected" "${drift_files[@]}" 2>/dev/null; then
-  if grep -Eq "NO DRIFT|No drift detected|Drift detection: NO DRIFT" "${drift_files[@]}" 2>/dev/null; then
-    drift=0
-  elif grep -Eh "WARNING: Drift detected|[Dd]rift detected" "${drift_files[@]}" 2>/dev/null | grep -Ev "NO DRIFT|No drift detected" | grep -q .; then
-    drift=1
+for _dr in "$LOGD/drift-report-latest.json" "$LOGD/reports/drift-report-latest.json" "$SUITE_LOG_DIR/drift-report-latest.json" "$SEC_LOG_DIR/drift-report-latest.json"; do
+  [ -f "$_dr" ] || continue
+  _dv=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); v=d.get('drift_detected'); print('1' if v is True else ('0' if v is False else '-1'))" "$_dr" 2>/dev/null || echo -1)
+  if [ "$_dv" = "0" ] || [ "$_dv" = "1" ]; then drift="$_dv"; break; fi
+done
+if [ "$drift" = "-1" ]; then
+  drift_files=()
+  for _df in "$LOGD/drift.log" "$LOGD/drift-detection.log" "$BLOG"; do [ -f "$_df" ] && drift_files+=("$_df"); done
+  if [ ${#drift_files[@]} -gt 0 ] && grep -Eq "Phase 9: drift|[Dd]rift detect|NO DRIFT|WARNING: Drift detected" "${drift_files[@]}" 2>/dev/null; then
+    if grep -Eq "NO DRIFT|No drift detected|Drift detection: NO DRIFT" "${drift_files[@]}" 2>/dev/null; then
+      drift=0
+    elif grep -Eh "WARNING: Drift detected|[Dd]rift detected" "${drift_files[@]}" 2>/dev/null | grep -Ev "NO DRIFT|No drift detected" | grep -q .; then
+      drift=1
+    fi
   fi
 fi
 
 sbom=$(phase_status "$LOGD/sbom.log" "SBOM generation: COMPLETED|COMPLETED" "WARNING: SBOM generation|FAILED")
 if [ -f "$BLOG" ] && grep -q "SBOM.*COMPLETED\|Phase 8: SBOM" "$BLOG" 2>/dev/null && ! grep -q "SBOM.*issues\|SBOM generation had issues" "$BLOG" 2>/dev/null; then [ "$sbom" = -1 ] && sbom=1; fi
 if [ -f "$BLOG" ] && grep -q "SBOM generation had issues\|SBOM.*FAILED" "$BLOG" 2>/dev/null; then sbom=0; fi
+# Structured/report presence: upgrade unknown to ok only when generation log indicates success.
+for _sb in "$LOGD/reports/sbom-latest" "$LOGD/sbom-latest" "$SUITE_LOG_DIR/reports/sbom-latest" "$SEC_LOG_DIR/sbom-latest"; do
+  [ -e "$_sb" ] || continue
+  if [ "$sbom" = "-1" ] && grep -Eq "SBOM.*(COMPLETED|SUCCESS)|Source CycloneDX: SUCCESS" "$LOGD/sbom-generation.log" "$BLOG" 2>/dev/null; then sbom=1; fi
+  break
+done
 
 trivy_fs=$(phase_status "$LOGD/trivy-fs.log" "" "CRITICAL|HIGH|exit [1-9]|Trivy FS: issues")
 if [ -f "$BLOG" ] && grep -q "Trivy FS: COMPLETED" "$BLOG" 2>/dev/null; then trivy_fs=1; fi
