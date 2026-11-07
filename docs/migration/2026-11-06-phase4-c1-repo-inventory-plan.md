@@ -1,8 +1,8 @@
 # Phase 4 / C1 — Repo Inventory Plan (NO DELETIONS)
 
-**Status:** Draft inventory/plan only. **No `git rm`, no file deletions, no host changes.**  
-**Date:** 2026-11-06  
-**Branch/context:** `feat/consolidation-phase1-shims` @ post-Phase 2/3 (host schedulers repointed; `spectre actions verify` → 0 findings).  
+**Status (original):** Draft inventory/plan only (2026-11-06). **No `git rm`, no file deletions, no host changes.**  
+**Status (2026-11-07):** **C1 complete on `main`.** Tracked legacy `scripts/` tree removed via confirmed, batched B1/B2 rewires + B3 preps/deletions; OPA canonicalized to real `spectre/policies/`. CI green on `4c211c9` (Authorship, Lint & Config Validation incl. OPA, Spectre Suite CI/CD, Automated Security Scanning incl. OPA, CodeQL, ML Anomaly Detection Test, Full Test Suite). `git ls-files scripts` = **0**.  
+**Branch/context (original):** `feat/consolidation-phase1-shims` @ post-Phase 2/3 (host schedulers repointed; `spectre actions verify` → 0 findings).  
 **Spec refs:** `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md` §8.4 Phase 4 (“Remove shims…”), §8.3 (forwarders).
 
 ## Goal
@@ -78,3 +78,13 @@ Search for references to legacy repo paths (exclude generated/vendor/cache as ap
 
 ## Recommendation
 Proceed with **C1.1 reference audit only** as the next confirmed step (no deletions), then propose Tier A as a small, reviewable PR/commit. Keep `scripts/` removal batched and gated on green tests + verify after each batch.
+
+## C1 completion (2026-11-07)
+
+**Outcome:** Complete. Reference audit performed in practice through evidence-backed B3-prep/batch proposals; active runtime/CI/test/example/exporter/installer refs rewired to canonical `spectre/actions/*`, `spectre/monitoring/exporters/*`, `spectre/policies/*`, and/or `spectre run` dispatch. Tracked legacy `scripts/` removed in confirmed batches (1–10a+10b) plus OPA Steps A–B. Top-level `prometheus/*-exporter.sh` Tier A forwarders had been removed earlier (`951e5e3`).
+
+**Key commits:** `54c9d6c` (B2), `bd9eb08`–`13f0935` (B3 preps/batches 1–10a+10b, including OPA-adjacent work), `010ea7b` (OPA Step A: real `spectre/policies/`), `0dfe7a1` (OPA Step B: removed `scripts/security/opa/*`), `4c211c9` (fix: `tests/test_ml.py` → `spectre/actions/ml-anomaly`).
+
+**Verification:** CI all green on `4c211c9`; `git ls-files scripts` = 0. `opa check spectre/policies/` passed locally during Step A.
+
+**Notes:** Untracked local leftovers may remain on disk (e.g. `scripts/ml-anomaly/venv/`); not tracked/deleted. Historical `docs/migration/*` and `docs/superpowers/*` records retain old path mentions as context. Optional follow-up: CI guardrail preventing reintroduction of tracked `scripts/` paths. Revisit `docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md` for any Phase 4 work beyond C1.
