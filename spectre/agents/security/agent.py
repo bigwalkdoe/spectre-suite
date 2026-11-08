@@ -232,12 +232,26 @@ class SecurityAgent(BaseAgent):
         }
 
         found_incidents = []
-        # Walk directories (ignore hidden files, virtual environments, .git, etc.)
-        ignore_dirs = {".git", ".venv", ".mypy_cache", ".pytest_cache", "__pycache__", "node_modules"}
+        # Walk directories. Ignore VCS/build/tool caches and third-party package
+        # trees: scanning installed libraries (site-packages/dist-packages, .pyenv,
+        # .cache/uv archives, language package caches) produces false "exposed
+        # secret" hits against upstream test/example code, not this host's secrets.
+        ignore_dirs = {
+            ".git", ".hg", ".svn",
+            ".venv", "venv", ".mypy_cache", ".pytest_cache", "__pycache__",
+            "node_modules", ".cache", ".pyenv", ".cargo", ".rustup", ".npm", ".nvm",
+            "site-packages", "dist-packages",
+        }
+        ignore_path_parts = {Path.home() / ".local" / "lib", Path.home() / ".cache", Path.home() / "go" / "pkg" / "mod"}
+
+        def _ignored(p: Path) -> bool:
+            if any(part in ignore_dirs for part in p.parts):
+                return True
+            return any(str(p).startswith(str(base)) for base in ignore_path_parts)
 
         try:
             for path in scan_dir.rglob("*"):
-                if any(part in ignore_dirs for part in path.parts):
+                if _ignored(path):
                     continue
                 if path.is_file() and self._is_scannable(path):
                     try:
