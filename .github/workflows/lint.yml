@@ -85,6 +85,19 @@ jobs:
       - name: terraform validate
         run: terraform -chdir=cloud-deployment/terraform validate
 
+  gitleaks:
+    name: Secrets Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks (history, redacted)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   monitoring-config:
     name: Monitoring Config
     runs-on: ubuntu-latest
