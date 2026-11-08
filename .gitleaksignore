@@ -1,0 +1,8 @@
+# Intentional synthetic secrets in test fixtures (not production credentials).
+# Reviewed 2026-11-08: these values exist only to verify secret-scanning behavior.
+2e2bd1fcc053094d784424c773e9a4379e946541:tests/agent/test_agents.py:generic-api-key:558
+2e2bd1fcc053094d784424c773e9a4379e946541:tests/agent/test_agents.py:generic-api-key:559
+
+# NOTE: Historical finding 4857fa59:scripts/setup-grafana-dashboards.sh:curl-auth-user:16
+# is intentionally NOT ignored (hardcoded credential in git history; file removed from tree).
+# Rotate if ever used on a real deployment; accept/ignore only with explicit review.
