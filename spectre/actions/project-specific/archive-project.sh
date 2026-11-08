@@ -6,8 +6,8 @@ set -e
 
 PROJECT_PATH="$1"
 ARCHIVE_YEAR="${2:-$(date +%Y)}"
-ARCHIVE_DIR="$HOME/dev/archives/$ARCHIVE_YEAR"
-LOG_FILE="$HOME/scripts/logs/archive-projects.log"
+ARCHIVE_DIR="${ARCHIVE_DIR:-$HOME/dev/archives/$ARCHIVE_YEAR}"
+LOG_FILE="${LOG_FILE:-${XDG_STATE_HOME:-$HOME/.local/state}/spectre-suite/archive-projects.log}"
 
 # Create log directory if it doesn't exist
 mkdir -p "$(dirname "$LOG_FILE")"
