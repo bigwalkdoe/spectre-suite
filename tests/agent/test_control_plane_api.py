@@ -86,6 +86,7 @@ async def test_actions_lists_registry(client: httpx.AsyncClient) -> None:
             assert key in item
 
 
-async def test_run_unknown_action_404(client: httpx.AsyncClient) -> None:
-    resp = await client.post("/api/control-plane/actions/__no_such_job__/run")
-    assert resp.status_code == 404
+async def test_action_run_not_exposed(client: httpx.AsyncClient) -> None:
+    """Control plane is observability-only; executions must happen in terminal."""
+    resp = await client.post("/api/control-plane/actions/__any_job__/run")
+    assert resp.status_code in {404, 405}
