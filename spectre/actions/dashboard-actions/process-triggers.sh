@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${SPECTRE_REPO_ROOT:-"${REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"}"
+REPO_ROOT="${SPECTRE_REPO_ROOT:-"${REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"}"
 TRIGGERS_DIR="${TRIGGERS_DIR:-$REPO_ROOT/dashboard-actions/triggers}"
 PROCESSED_DIR="$TRIGGERS_DIR/processed"
 FAILED_DIR="$TRIGGERS_DIR/failed"
