@@ -5,8 +5,8 @@ set -euo pipefail
 # Backs up system and application configurations
 
 BACKUP_DIR="${BACKUP_DIR:-/backups/configurations}"
-# Directory containing project configs to back up. Override per environment.
-PROJECTS_DIR="${PROJECTS_DIR:-$PROJECTS_ROOT}"
+# Directory containing project configs to back up. Optional; override per environment.
+PROJECTS_DIR="${PROJECTS_DIR:-${PROJECTS_ROOT:-}}"
 DATE="${DATE:-$(date +%Y%m%d_%H%M%S)}"
 RETENTION_DAYS=30
 # Test/backup seams: SUDO_CMD empty runs without sudo; source overrides for root-owned files.
@@ -45,13 +45,33 @@ $SUDO_CMD install -m 0640 -o "$(id -u)" -g "$(id -g)" "$FAIL2BAN_JAIL_SRC" "$BAC
 echo "Backing up DNF configuration..."
 $SUDO_CMD install -m 0640 -o "$(id -u)" -g "$(id -g)" "$DNF_AUTOMATIC_SRC" "$BACKUP_DIR/dnf-automatic_$DATE" 2>/dev/null || true
 
-# Project configurations
+# Project configurations (optional, host-specific)
 # NOTE: Only non-secret configs are included. .env files (which may contain
 # credentials) are deliberately excluded to avoid leaking secrets into backups.
 echo "Backing up project configurations..."
-if [[ -d "$PROJECTS_DIR/Guardrail-AI" ]]; then
-    tar czf "$BACKUP_DIR/projects_config_$DATE.tar.gz" \
-        -C "$PROJECTS_DIR" Guardrail-AI/dk-compose.yml 2>/dev/null || true
+if [[ -n "$PROJECTS_DIR" && -d "$PROJECTS_DIR" ]]; then
+    # BACKUP_PROJECT_CONFIGS: space-separated "project/relative/path" entries under PROJECTS_DIR.
+    # Default preserves legacy behavior only when the specific file exists.
+    if [[ -n "${BACKUP_PROJECT_CONFIGS:-}" ]]; then
+        # shellcheck disable=SC2206
+        config_items=($BACKUP_PROJECT_CONFIGS)
+        existing=()
+        for item in "${config_items[@]}"; do
+            [[ -e "$PROJECTS_DIR/$item" ]] && existing+=("$item")
+        done
+        if ((${#existing[@]} > 0)); then
+            tar czf "$BACKUP_DIR/projects_config_$DATE.tar.gz" -C "$PROJECTS_DIR" "${existing[@]}" 2>/dev/null || true
+        else
+            echo "  no configured project config paths found under $PROJECTS_DIR; skipping"
+        fi
+    elif [[ -d "$PROJECTS_DIR/Guardrail-AI" && -f "$PROJECTS_DIR/Guardrail-AI/dk-compose.yml" ]]; then
+        tar czf "$BACKUP_DIR/projects_config_$DATE.tar.gz" \
+            -C "$PROJECTS_DIR" Guardrail-AI/dk-compose.yml 2>/dev/null || true
+    else
+        echo "  project config backup not configured (set PROJECTS_DIR/BACKUP_PROJECT_CONFIGS); skipping"
+    fi
+else
+    echo "  project config backup not configured (set PROJECTS_DIR or PROJECTS_ROOT); skipping"
 fi
 
 # Cleanup old backups
