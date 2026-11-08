@@ -482,6 +482,24 @@ async def dashboard(_: bool = Depends(verify_api_key)) -> str:
     return DASHBOARD_HTML
 
 
+@app.get("/control-plane", response_class=HTMLResponse)
+async def control_plane_dashboard(_: bool = Depends(verify_api_key)) -> str:
+    """Serve the enterprise control-plane dashboard."""
+    from spectre.api.control_plane_ui import CONTROL_PLANE_HTML
+
+    return CONTROL_PLANE_HTML
+
+
+# Register control-plane aggregation/action endpoints.
+try:
+    from spectre.api.control_plane import register as _register_control_plane
+
+    _register_control_plane(app, verify_api_key)
+except Exception:
+    # Keep core API functional if control-plane module has optional dependency issues.
+    pass
+
+
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
