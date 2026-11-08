@@ -156,7 +156,7 @@ main.content { display: grid; gap: 16px; }
 
 /* Toasts */
 #toast-container { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 8px; z-index: 100; max-width: min(360px, calc(100vw - 36px)); }
-.toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--card-bg); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 13px; }
+.toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--card-bg); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 13px; transition: opacity .3s, transform .3s; }
 .toast--success i { color: var(--ok); } .toast--error i { color: var(--crit); }
 .toast--warning i { color: var(--warn); } .toast--info i { color: var(--accent); }
 
@@ -176,7 +176,7 @@ main.content { display: grid; gap: 16px; }
 .action-btn:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stat-card .card-updated { margin-top: 8px; }
 #systemStatus.offline .status-dot { animation: none; opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .status-dot, .card--loading::after { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .status-dot, .card--loading::after { animation: none !important; } .toast, .alert-item, .container-item, .btn { transition: none !important; } }
 
 /* Mobile sidebar toggle (isolated, preserves desktop layout) */
 .sidebar-toggle { display: none; }
