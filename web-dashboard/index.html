@@ -38,8 +38,8 @@
                 <div class="sidebar-foot-row"><span class="status-indicator online" id="systemStatus"><span class="status-dot"></span><span id="systemStatusText">All Systems Operational</span></span></div>
                 <div class="sidebar-foot-row muted">Prometheus: <span id="prometheusStatus">Checking...</span></div>
                 <div class="sidebar-foot-links">
-                    <a href="http://localhost:3002" target="_blank" rel="noopener noreferrer" aria-label="Open Grafana">Grafana <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
-                    <a href="http://localhost:9090/graph" target="_blank" rel="noopener noreferrer" aria-label="Open Prometheus">Prometheus <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
+                    <a href="#" data-ext="grafana" data-ext-path="/" target="_blank" rel="noopener noreferrer" aria-label="Open Grafana">Grafana <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
+                    <a href="#" data-ext="prometheus" data-ext-path="/graph" target="_blank" rel="noopener noreferrer" aria-label="Open Prometheus">Prometheus <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
                 </div>
             </div>
         </aside>
@@ -134,7 +134,7 @@
 
                     <section class="card" id="alertsCard">
                         <div class="card-header">
-                            <h2><i class="fas fa-bell" aria-hidden="true"></i> Active Alerts <a href="http://localhost:9093" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Alertmanager" aria-label="Open Alertmanager"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
+                            <h2><i class="fas fa-bell" aria-hidden="true"></i> Active Alerts <a href="#" data-ext="alertmanager" data-ext-path="/" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Alertmanager" aria-label="Open Alertmanager"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <span class="badge badge-warning" id="alertCount">0</span>
                         </div>
                         <div class="card-body" aria-live="polite">
@@ -168,7 +168,7 @@
 
                     <section class="card" id="containersCard">
                         <div class="card-header">
-                            <h2><i class="fas fa-cubes" aria-hidden="true"></i> Container Status <a href="http://localhost:9090/targets" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus targets" aria-label="Open Prometheus targets"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
+                            <h2><i class="fas fa-cubes" aria-hidden="true"></i> Container Status <a href="#" data-ext="prometheus" data-ext-path="/targets" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus targets" aria-label="Open Prometheus targets"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <span class="badge" id="containerStatus">Running</span>
                         </div>
                         <div class="card-body" aria-live="polite">
@@ -178,7 +178,7 @@
 
                     <section class="card full-width" id="chartCard">
                         <div class="card-header">
-                            <h2><i class="fas fa-chart-line" aria-hidden="true"></i> Resource Trends <a href="http://localhost:9090/graph" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus graph" aria-label="Open Prometheus graph"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
+                            <h2><i class="fas fa-chart-line" aria-hidden="true"></i> Resource Trends <a href="#" data-ext="prometheus" data-ext-path="/graph" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus graph" aria-label="Open Prometheus graph"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <div class="chart-controls" role="group" aria-label="Chart time range">
                                 <button type="button" class="btn btn-sm active" data-range="1h" aria-pressed="true">1H</button>
                                 <button type="button" class="btn btn-sm" data-range="6h" aria-pressed="false">6H</button>
@@ -245,7 +245,7 @@
                     <span class="sep">·</span>
                     <span>GitGuardian-inspired enterprise view</span>
                     <span class="sep">·</span>
-                    <span>Prometheus-connected static dashboard (localhost:8081)</span>
+                    <span id="dashboardLocation">Prometheus-connected static dashboard</span>
                 </div>
             </footer>
         </div>

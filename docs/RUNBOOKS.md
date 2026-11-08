@@ -305,7 +305,7 @@ sudo sed -i '/ignoreip/s/$/ <trusted_ip>/' /etc/fail2ban/jail.local
 ```bash
 docker logs prometheus | tail -50
 docker exec prometheus tsdb list
-curl -s http://localhost:9090/api/v1/label/__name__/values | head
+curl -s http://localhost:9090/prometheus/api/v1/label/__name__/values | head
 ```
 
 **Resolution:**

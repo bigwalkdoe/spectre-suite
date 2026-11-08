@@ -150,7 +150,7 @@ docker restart "$ALERTMANAGER_CONTAINER" >/dev/null
 ready=0
 for _ in $(seq 1 "$READY_TIMEOUT"); do
     if docker exec "$ALERTMANAGER_CONTAINER" \
-        wget -qO- http://localhost:9093/-/ready >/dev/null 2>&1; then
+        wget -qO- http://localhost:9093/alertmanager/-/ready >/dev/null 2>&1; then
         ready=1
         break
     fi
@@ -171,7 +171,7 @@ if [ -n "$after_config" ] && [ "$after_config" != "$before_config" ]; then
     note "configuration file changed on disk and was re-read"
 fi
 loaded=$(docker exec "$ALERTMANAGER_CONTAINER" \
-    wget -qO- http://localhost:9093/api/v2/status 2>/dev/null || true)
+    wget -qO- http://localhost:9093/alertmanager/api/v2/status 2>/dev/null || true)
 if printf '%s' "$loaded" | grep -q '"cluster"'; then
     note "config loaded and cluster is ready"
 else
@@ -220,13 +220,13 @@ if [ "$RUN_TEST" -eq 1 ]; then
     # cleanup step silently did nothing and left the alert active.
     docker exec "$ALERTMANAGER_CONTAINER" wget -qO- --header='Content-Type: application/json' \
         --post-data="[{\"labels\":{\"alertname\":\"$TEST_ALERTNAME\",\"severity\":\"critical\",\"instance\":\"$instance\"},\"annotations\":{\"description\":\"Synthetic alert from setup-notification-channels.sh --test. Self-resolving.\"},\"startsAt\":\"$(date -u -d '60 seconds ago' +%Y-%m-%dT%H:%M:%SZ)\",\"endsAt\":\"$(date -u -d '3 minutes' +%Y-%m-%dT%H:%M:%SZ)\"}]" \
-        http://localhost:9093/api/v2/alerts >/dev/null 2>&1 || true
+        http://localhost:9093/alertmanager/api/v2/alerts >/dev/null 2>&1 || true
 
     # The POST response body is empty on success, so confirm arrival by reading
     # the alert back rather than trusting the exit status.
     sleep 2
     if docker exec "$ALERTMANAGER_CONTAINER" wget -qO- \
-        http://localhost:9093/api/v2/alerts 2>/dev/null | grep -q "$instance"; then
+        http://localhost:9093/alertmanager/api/v2/alerts 2>/dev/null | grep -q "$instance"; then
         note "test alert accepted (instance=$instance)"
     else
         err "test alert was not accepted by Alertmanager; delivery is untested"

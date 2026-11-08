@@ -33,7 +33,12 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-      # Lets `curl -X POST http://localhost:9090/-/reload` apply a config edit
+      # Serves UI/API under /prometheus/ so the web-dashboard nginx can proxy it
+      # same-origin (web-dashboard/nginx.conf: /prometheus/ -> prometheus:9090).
+      # Direct host access is also under this prefix (e.g. http://127.0.0.1:9090/prometheus/graph).
+      - '--web.route-prefix=/prometheus/'
+      - '--web.external-url=/prometheus/'
+      # Lets `curl -X POST http://localhost:9090/prometheus/-/reload` apply a config edit
       # without a restart. Paired with the directory mount above, an edit now
       # reaches the container as soon as it is saved. This matters more than the
       # convenience suggests: a `docker restart` resets the `for` timer on every
@@ -60,7 +65,11 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3002}
+      # Served under /grafana/ so the web-dashboard nginx can proxy it same-origin.
+      # Default root targets the dashboard proxy (http://localhost:8081/grafana/);
+      # override GRAFANA_ROOT_URL for a different origin or direct-port access.
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:8081/grafana/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_INSTALL_PLUGINS=
     volumes:
       - grafana-data:/var/lib/grafana
@@ -104,7 +113,9 @@ services:
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
+      # Route prefix + external URL align with web-dashboard nginx /alertmanager/ proxy.
+      - '--web.route-prefix=/alertmanager/'
+      - '--web.external-url=http://localhost:9093/alertmanager/'
     restart: unless-stopped
     networks:
       - monitoring

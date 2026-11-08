@@ -11,6 +11,47 @@ const PROMETHEUS_URL = new URLSearchParams(location.search).get('prometheus') ||
 // Override with ?actionsBase=https://... or set to "off" to disable.
 const ACTIONS_BASE_PARAM = new URLSearchParams(location.search).get('actionsBase');
 const ACTIONS_BASE = ACTIONS_BASE_PARAM === 'off' ? '' : (ACTIONS_BASE_PARAM || '/actions');
+
+// External backend UIs. Default to same-origin nginx proxy paths so dashboard
+// links/endpoints reach their backends via the dashboard origin
+// (web-dashboard/nginx.conf: /grafana/, /prometheus/, /alertmanager/).
+// Backends serve under matching route prefixes (docker-compose.monitoring.yml).
+// Overrides: full base URL via ?grafanaUrl=|?prometheusUrl=|?alertmanagerUrl=;
+// or direct host:port (with subpath) via ?grafanaPort=|?prometheusPort=|?alertmanagerPort=.
+const _qs = new URLSearchParams(location.search);
+const _host = location.hostname || 'localhost';
+const _proto = location.protocol === 'https:' ? 'https:' : 'http:';
+function _backendUrl(urlKey, portKey, defaultPort, proxyBase) {
+    const full = _qs.get(urlKey);
+    if (full) return full.replace(/\/$/, '');
+    if (_qs.get(portKey)) {
+        // Explicit direct-port override; backends serve under their subpath prefix.
+        return `${_proto}//${_host}:${_qs.get(portKey)}${proxyBase}`;
+    }
+    return proxyBase; // same-origin proxied (default)
+}
+const EXTERNAL_BACKENDS = {
+    grafana: _backendUrl('grafanaUrl', 'grafanaPort', '3002', '/grafana'),
+    prometheus: _backendUrl('prometheusUrl', 'prometheusPort', '9090', '/prometheus'),
+    alertmanager: _backendUrl('alertmanagerUrl', 'alertmanagerPort', '9093', '/alertmanager'),
+};
+function externalUrl(backend, path = '/') {
+    const base = EXTERNAL_BACKENDS[backend];
+    if (!base) return '#';
+    const p = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${p}`;
+}
+function initExternalLinks() {
+    document.querySelectorAll('a[data-ext]').forEach((a) => {
+        const backend = a.getAttribute('data-ext');
+        const path = a.getAttribute('data-ext-path') || '/';
+        const url = externalUrl(backend, path);
+        if (url && url !== '#') a.setAttribute('href', url);
+    });
+    const loc = document.getElementById('dashboardLocation');
+    if (loc) loc.textContent = `Prometheus-connected static dashboard (${location.host || 'localhost:8081'})`;
+}
+
 const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
 
 let refreshIntervalMs = DEFAULT_REFRESH_INTERVAL;
@@ -302,6 +343,7 @@ function formatRelativeTime(epochSeconds) {
 }
 
 function initializeDashboard() {
+    initExternalLinks();
     initializeChart();
     fetchAllMetrics();
     checkPrometheusConnection();
@@ -517,15 +559,21 @@ function updateDiskMetrics(diskUsage) {
 // Update Network metrics
 function updateNetworkMetrics(networkIn, networkOut) {
     if (networkIn !== null && networkOut !== null) {
-        const totalMB = ((networkIn + networkOut) / 1024 / 1024).toFixed(2);
+        const totalBytes = networkIn + networkOut;
+        const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
         document.getElementById('networkIO').textContent = totalMB + ' MB/s';
         const change = document.getElementById('networkChange');
-        if ((networkIn + networkOut) > 100 * 1024 * 1024) { // > 100 MB/s
+        if (totalBytes > 100 * 1024 * 1024) { // > 100 MB/s
             change.textContent = 'High';
             change.className = 'stat-change negative';
+        } else if (totalBytes < 5120) { // < ~5 KB/s: effectively idle/near-zero; avoid green "Normal" for 0.00
+            change.textContent = 'Idle';
+            change.className = 'stat-change';
+            change.title = 'Near-zero measured RX+TX (5m rate). Verify in Prometheus if unexpected.';
         } else {
             change.textContent = 'Normal';
             change.className = 'stat-change positive';
+            change.title = '';
         }
         clearCardError('networkCard');
         setCardUpdated('networkCard');
@@ -1305,7 +1353,7 @@ function runSecurityScan() {
 
 function viewLogs() {
     showToast('Opening Grafana logs...', 'info');
-    window.open('http://localhost:3002', '_blank');
+    window.open(externalUrl('grafana', '/'), '_blank');
 }
 
 // GitGuardian-inspired shell UX (isolated): keep sidebar nav highlight in sync.
