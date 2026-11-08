@@ -52,3 +52,8 @@
 - **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path absent; expected. GitHub repo is archived/read-only.
 
 **GitHub repo archived (5b complete).**
+
+## Final status confirmation (2026-11-08) + remaining host artifacts
+- **Confirmed:** `bigwalkdoe/spectre-security` is archived on GitHub; local working clone removed. Suite OPA/compat paths are graceful when `SPECTRE_SECURITY_ROOT` is absent; core CI/gate invariants preserved; k8s admission/versions remain vendored/isolated.
+- **Not a blanket “all functions integrated in entirety”:** documented gaps/decisions remain (live-infra input generation parity; k8s/versions isolated by design; SonarQube/ZAP/hosted services disposition evaluated separately, not recorded in-repo).
+- **Remaining host artifact (historical name, suite-owned intent):** user units `~/.config/systemd/user/spectre-security-baseline-metrics.{timer,service}` (installed in Step 3a) run the *suite* exporter via `/usr/bin/python3 -m spectre.cli.main run prometheus/security-baseline-metrics-exporter`. As checked 2026-11-08, the **timer is enabled/active** but the **service is failing** (`ModuleNotFoundError: No module named 'typer'` under system Python). No host mutation performed; fix/rename/retirement of this unit requires explicit confirmation.
