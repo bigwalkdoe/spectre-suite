@@ -426,13 +426,21 @@ async function fetchAllMetrics(opts = {}) {
     if (isRefreshing) return;
     setRefreshing(true);
 
+    const forceSlow = refreshChart;
+    const slowIsCached = !forceSlow && slowMetricsCache && Date.now() - slowMetricsCacheAt < SLOW_METRICS_REFRESH_MS;
+    const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+    const chartNow = Date.now();
+    const shouldRefreshChart = refreshChart || chartNow - lastChartRefreshAt >= CHART_AUTO_REFRESH_MS;
+    if (shouldRefreshChart) lastChartRefreshAt = chartNow;
+
     const cardIds = ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'alertsCard', 'containersCard', 'chartCard', 'backupCard', 'securityCard'];
-    cardIds.forEach(id => { clearCardError(id); setCardLoading(id, true); });
+    const loadingCardIds = ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'alertsCard', 'containersCard'];
+    if (!slowIsCached) loadingCardIds.push('backupCard', 'securityCard');
+    if (shouldRefreshChart) loadingCardIds.push('chartCard');
+    cardIds.forEach(id => clearCardError(id));
+    loadingCardIds.forEach(id => setCardLoading(id, true));
 
     try {
-        const forceSlow = refreshChart;
-        const slowIsCached = !forceSlow && slowMetricsCache && Date.now() - slowMetricsCacheAt < SLOW_METRICS_REFRESH_MS;
-
         // Start core, slow, alerts, and container fetches at the same time.
         // Core previously waited for slow metrics to finish before rendering.
         const corePromise = Promise.all([
@@ -500,10 +508,6 @@ async function fetchAllMetrics(opts = {}) {
             });
         const alertsPromise = checkAlerts();
         const containersPromise = updateContainerStatus();
-        const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
-        const chartNow = Date.now();
-        const shouldRefreshChart = refreshChart || chartNow - lastChartRefreshAt >= CHART_AUTO_REFRESH_MS;
-        if (shouldRefreshChart) lastChartRefreshAt = chartNow;
         const chartPromise = shouldRefreshChart ? updateChart(activeRange) : Promise.resolve();
 
         const coreResults = await corePromise;
