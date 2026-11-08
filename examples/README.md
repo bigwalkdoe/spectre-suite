@@ -46,7 +46,7 @@ nano /etc/spectre-suite/backup-config.yml
 ```bash
 cp examples/prometheus-alerts-example.yml prometheus/alert_rules.yml
 # Reload Prometheus
-curl -X POST http://localhost:9090/-/reload
+curl -X POST http://localhost:9090/prometheus/-/reload
 ```
 
 ### Using Security Configuration Example

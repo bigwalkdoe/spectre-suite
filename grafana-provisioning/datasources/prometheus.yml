@@ -4,7 +4,8 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    # Prometheus serves under --web.route-prefix=/prometheus/ (docker-compose.monitoring.yml)
+    url: http://prometheus:9090/prometheus
     isDefault: true
     editable: true
     jsonData:
