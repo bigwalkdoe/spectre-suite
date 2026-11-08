@@ -30,6 +30,14 @@ def map_nested_to_suite(src: dict[str, Any]) -> tuple[dict[str, Any], dict[str, 
     out: dict[str, Any] = {}
     report: dict[str, Any] = {"mapped": [], "unmapped_suite_controls": [], "notes": []}
 
+    # Provenance/contract metadata (v0 envelope, additive). Never emitted into policy input.
+    snapshot_contract: dict[str, Any] = {"contract": "live_infra_snapshot/v0-compatible"}
+    for key in ("contract_version", "source", "generated_at"):
+        if key in src and src[key] is not None:
+            snapshot_contract[key] = src[key]
+    if len(snapshot_contract) > 1:
+        report["snapshot_contract"] = snapshot_contract
+
     def set_if(field: str, value: Any, note: str = "") -> None:
         if value is None:
             return

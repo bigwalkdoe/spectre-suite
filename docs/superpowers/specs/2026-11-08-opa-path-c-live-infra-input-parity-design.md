@@ -43,7 +43,7 @@
 - **Drift:** multiple input shapes without provenance/versioning. *Mitigation:* explicit `contract_version`/provenance.
 
 ## 7. Recommended next execution steps (small, reviewed slices)
-1. Inventory current live-infra evidence producers in suite (baseline runner/exporters/drift helpers) and document the snapshot shapes they emit/consume.
-2. Define `live_infra_snapshot` contract v0 (schema + fixtures) for the **existing** nested shape, with provenance fields; validate via tests.
-3. Add a suite-normalizer entrypoint that produces canonical flat fields + report (reuse adapter rules) with contract metadata.
+1. **Done (2026-11-08):** Inventory current live-infra evidence producers in suite (baseline runner/exporters/drift helpers) and document snapshot shapes — `2026-11-08-live-infra-evidence-inventory.md`.
+2. **Done (2026-11-08):** `live_infra_snapshot` contract v0 (schema + fixtures) for the existing nested shape, with provenance fields; validated by `tests/test_live_infra_snapshot_contract.py`.
+3. **Done (2026-11-08):** Suite normalizer entrypoint `spectre/actions/security/baseline/live-infra-normalize.py` produces canonical flat fields + report (reuses adapter rules) with contract/provenance metadata; validated by `tests/test_live_infra_normalize.py`. Adapter report now carries additive `snapshot_contract` metadata when present (never in canonical flat input). CI `opa-isolated-k8s` runs snapshot/normalizer tests (additive).
 4. Only after parity fixtures are green, consider suite-native collectors for missing evidence (option 2/3), one domain at a time.
