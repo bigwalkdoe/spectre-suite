@@ -23,16 +23,16 @@
             <nav class="nav">
                 <div class="nav-group">
                     <div class="nav-label">Monitor</div>
-                    <a href="#main-content" class="nav-item active"><i class="fas fa-chart-pie fa-fw" aria-hidden="true"></i><span>Overview</span></a>
-                    <a href="#healthCard" class="nav-item"><i class="fas fa-heartbeat fa-fw" aria-hidden="true"></i><span>System Health</span></a>
-                    <a href="#alertsCard" class="nav-item"><i class="fas fa-bell fa-fw" aria-hidden="true"></i><span>Alerts</span></a>
+                    <a href="#page-overview" class="nav-item active" data-page="overview" data-page-title="Security Overview" data-page-icon="fa-shield-halved"><i class="fas fa-chart-pie fa-fw" aria-hidden="true"></i><span>Overview</span></a>
+                    <a href="#page-health" class="nav-item" data-page="health" data-page-title="System Health" data-page-icon="fa-heartbeat"><i class="fas fa-heartbeat fa-fw" aria-hidden="true"></i><span>System Health</span></a>
+                    <a href="#page-alerts" class="nav-item" data-page="alerts" data-page-title="Active Alerts" data-page-icon="fa-bell"><i class="fas fa-bell fa-fw" aria-hidden="true"></i><span>Alerts</span></a>
                 </div>
                 <div class="nav-group">
                     <div class="nav-label">Operations</div>
-                    <a href="#containersCard" class="nav-item"><i class="fas fa-cubes fa-fw" aria-hidden="true"></i><span>Containers</span></a>
-                    <a href="#chartCard" class="nav-item"><i class="fas fa-chart-line fa-fw" aria-hidden="true"></i><span>Trends</span></a>
-                    <a href="#securityCard" class="nav-item"><i class="fas fa-shield-alt fa-fw" aria-hidden="true"></i><span>Security</span></a>
-                    <a href="#backupCard" class="nav-item"><i class="fas fa-database fa-fw" aria-hidden="true"></i><span>Backup</span></a>
+                    <a href="#page-containers" class="nav-item" data-page="containers" data-page-title="Containers" data-page-icon="fa-cubes"><i class="fas fa-cubes fa-fw" aria-hidden="true"></i><span>Containers</span></a>
+                    <a href="#page-trends" class="nav-item" data-page="trends" data-page-title="Resource Trends" data-page-icon="fa-chart-line"><i class="fas fa-chart-line fa-fw" aria-hidden="true"></i><span>Trends</span></a>
+                    <a href="#page-security" class="nav-item" data-page="security" data-page-title="Security" data-page-icon="fa-shield-alt"><i class="fas fa-shield-alt fa-fw" aria-hidden="true"></i><span>Security</span></a>
+                    <a href="#page-backup" class="nav-item" data-page="backup" data-page-title="Backup" data-page-icon="fa-database"><i class="fas fa-database fa-fw" aria-hidden="true"></i><span>Backup</span></a>
                 </div>
             </nav>
             <div class="sidebar-foot">
@@ -50,7 +50,7 @@
                 <div class="header-content">
                     <div class="page-title">
                         <button id="sidebarToggle" class="btn btn-sm sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
-                        <h1><i class="fas fa-shield-halved" aria-hidden="true"></i> Security Overview</h1>
+                        <h1 id="pageHeading"><i class="fas fa-shield-halved" aria-hidden="true"></i> <span id="pageHeadingText">Security Overview</span></h1>
                         <div class="timestamp page-meta">
                             <span id="timestamp"></span>
                             <span class="last-refreshed" id="lastRefreshed"> | Last refreshed: --</span>
@@ -81,8 +81,15 @@
             </header>
 
             <main id="main-content" class="content" tabindex="-1">
+                <div id="page-overview" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-health" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-alerts" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-containers" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-trends" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-security" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-backup" class="page-anchor" aria-hidden="true"></div>
                 <!-- Quick Stats -->
-                <section class="quick-stats" aria-label="Key metrics">
+                <section class="quick-stats" aria-label="Key metrics" data-show-pages="overview health trends">
                     <div class="stat-card cpu card" id="cpuCard" aria-live="polite">
                         <div class="stat-icon"><i class="fas fa-microchip"></i></div>
                         <div class="stat-content">
@@ -118,7 +125,7 @@
                 </section>
 
                 <div class="dashboard-grid">
-                    <section class="card" id="healthCard">
+                    <section class="card" id="healthCard" data-show-pages="overview health">
                         <div class="card-header">
                             <h2><i class="fas fa-heartbeat"></i> System Health</h2>
                             <span class="badge" id="healthStatus">Checking...</span>
@@ -133,7 +140,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="alertsCard">
+                    <section class="card" id="alertsCard" data-show-pages="overview alerts">
                         <div class="card-header">
                             <h2><i class="fas fa-bell" aria-hidden="true"></i> Active Alerts <a href="#" data-ext="alertmanager" data-ext-path="/" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Alertmanager" aria-label="Open Alertmanager"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <span class="badge badge-warning" id="alertCount">0</span>
@@ -151,7 +158,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="backupCard">
+                    <section class="card" id="backupCard" data-show-pages="overview backup">
                         <div class="card-header">
                             <h2><i class="fas fa-database"></i> Backup Status</h2>
                             <span class="badge badge-success" id="backupStatus">OK</span>
@@ -167,7 +174,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="containersCard">
+                    <section class="card" id="containersCard" data-show-pages="overview containers">
                         <div class="card-header">
                             <h2><i class="fas fa-cubes" aria-hidden="true"></i> Container Status <a href="#" data-ext="prometheus" data-ext-path="/targets" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus targets" aria-label="Open Prometheus targets"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <span class="badge" id="containerStatus">Running</span>
@@ -177,7 +184,7 @@
                         </div>
                     </section>
 
-                    <section class="card full-width" id="chartCard">
+                    <section class="card full-width" id="chartCard" data-show-pages="overview trends">
                         <div class="card-header">
                             <h2><i class="fas fa-chart-line" aria-hidden="true"></i> Resource Trends <a href="#" data-ext="prometheus" data-ext-path="/graph" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus graph" aria-label="Open Prometheus graph"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <div class="chart-controls" role="group" aria-label="Chart time range">
@@ -194,7 +201,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="securityCard">
+                    <section class="card" id="securityCard" data-show-pages="overview security">
                         <div class="card-header">
                             <h2><i class="fas fa-shield-alt"></i> Security Status</h2>
                             <span class="badge badge-success" id="securityStatus">Secure</span>
@@ -209,7 +216,7 @@
                         </div>
                     </section>
 
-                    <section class="card">
+                    <section class="card" data-show-pages="overview">
                         <div class="card-header">
                             <h2><i class="fas fa-tools"></i> Quick Actions</h2>
                         </div>
@@ -223,7 +230,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="diagnosticsCard">
+                    <section class="card" id="diagnosticsCard" data-show-pages="overview security">
                         <div class="card-header">
                             <h2><i class="fas fa-stethoscope"></i> Diagnostics</h2>
                             <span class="badge" id="diagnosticsStatus">--</span>

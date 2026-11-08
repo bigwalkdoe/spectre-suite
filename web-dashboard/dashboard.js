@@ -1461,46 +1461,93 @@ function viewLogs() {
     window.open(externalUrl('grafana', '/'), '_blank');
 }
 
-// GitGuardian-inspired shell UX (isolated): keep sidebar nav highlight in sync.
-// Does not affect Prometheus/Chart.js data or action behavior.
-(function initSidebarNavSync() {
-    const links = Array.from(document.querySelectorAll('.nav-item[href^="#"]'));
-    if (!links.length) return;
-    function setActive(hash) {
-        const h = hash && document.querySelector(hash) ? hash : '#main-content';
-        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === h));
-    }
-    links.forEach(a => a.addEventListener('click', () => setActive(a.getAttribute('href'))));
-    window.addEventListener('hashchange', () => setActive(location.hash));
-    if ('IntersectionObserver' in window) {
-        const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
-        const io = new IntersectionObserver((entries) => {
-            const visible = entries.filter(e => e.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
-            if (visible && visible.target && visible.target.id) setActive('#' + visible.target.id);
-        }, { rootMargin: '-20% 0px -70% 0px', threshold: [0.01, 0.25, 0.5] });
-        targets.forEach(t => io.observe(t));
-    }
-    setActive(location.hash || '#main-content');
-})();
-
-// Isolated mobile sidebar toggle (no data/Chart/Prometheus impact).
-(function initSidebarToggle() {
-    const btn = document.getElementById('sidebarToggle');
+// Dashboard shell: page routing for side-panel tabs, nav state, and mobile sidebar.
+(function initDashboardShell() {
+    if (!('querySelectorAll' in document)) return;
+    const links = Array.from(document.querySelectorAll('.nav-item[data-page]'));
+    const pageSections = Array.from(document.querySelectorAll('[data-show-pages]'));
     const shell = document.querySelector('.app-shell');
-    if (!btn || !shell) return;
-    btn.addEventListener('click', () => {
-        const collapsed = shell.classList.toggle('sidebar-collapsed');
-        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    });
-    // On narrow screens, start collapsed to prioritize content; desktop unaffected.
-    if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
-        shell.classList.add('sidebar-collapsed');
-        btn.setAttribute('aria-expanded', 'false');
+    const main = document.querySelector('.app-main');
+    const headingIcon = document.querySelector('#pageHeading i');
+    const headingText = document.getElementById('pageHeadingText');
+    const sidebarBtn = document.getElementById('sidebarToggle');
+    const validPages = new Set(links.map(a => a.dataset.page));
+    const legacyPageMap = {
+        '': 'overview',
+        '#main-content': 'overview',
+        '#page-overview': 'overview',
+        '#page-health': 'health',
+        '#healthCard': 'health',
+        '#page-alerts': 'alerts',
+        '#alertsCard': 'alerts',
+        '#page-containers': 'containers',
+        '#containersCard': 'containers',
+        '#page-trends': 'trends',
+        '#chartCard': 'trends',
+        '#page-security': 'security',
+        '#securityCard': 'security',
+        '#page-backup': 'backup',
+        '#backupCard': 'backup'
+    };
+
+    function pageFromHash(hash) {
+        if (!hash) return 'overview';
+        if (legacyPageMap[hash]) return legacyPageMap[hash];
+        const byHref = links.find(a => a.getAttribute('href') === hash);
+        if (byHref?.dataset.page) return byHref.dataset.page;
+        return 'overview';
     }
-    document.querySelectorAll('.nav-item[href^="#"]').forEach(a => a.addEventListener('click', () => {
+
+    function setPage(page, opts = {}) {
+        const activePage = validPages.has(page) ? page : 'overview';
+        const activeLink = links.find(a => a.dataset.page === activePage) || links[0];
+        links.forEach(a => {
+            const active = a === activeLink;
+            a.classList.toggle('active', active);
+            if (active) a.setAttribute('aria-current', 'page');
+            else a.removeAttribute('aria-current');
+        });
+        pageSections.forEach(el => {
+            const pages = (el.getAttribute('data-show-pages') || '').split(/\s+/).filter(Boolean);
+            const show = pages.includes(activePage);
+            el.setAttribute('data-page-hidden', show ? 'false' : 'true');
+            el.setAttribute('aria-hidden', show ? 'false' : 'true');
+        });
+        document.body.dataset.activePage = activePage;
+        if (shell) shell.classList.toggle('dashboard-page--focused', activePage !== 'overview');
+        if (headingText && activeLink?.dataset.pageTitle) headingText.textContent = activeLink.dataset.pageTitle;
+        if (headingIcon && activeLink?.dataset.pageIcon) headingIcon.className = `fas ${activeLink.dataset.pageIcon}`;
+        if (main) main.scrollTo({ top: 0, behavior: opts.smooth ? 'smooth' : 'auto' });
+        if (activePage === 'overview' || activePage === 'trends') {
+            requestAnimationFrame(() => { if (chart && typeof chart.resize === 'function') chart.resize(); });
+        }
+        if (sidebarBtn && shell && window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
+            shell.classList.add('sidebar-collapsed');
+            sidebarBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    links.forEach(a => a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = a.dataset.page || 'overview';
+        const hash = `#page-${page}`;
+        if (location.hash !== hash) history.pushState(null, '', hash);
+        setPage(page, { smooth: false });
+    }));
+
+    window.addEventListener('hashchange', () => setPage(pageFromHash(location.hash), { smooth: false }));
+    window.addEventListener('popstate', () => setPage(pageFromHash(location.hash), { smooth: false }));
+
+    if (sidebarBtn && shell) {
+        sidebarBtn.addEventListener('click', () => {
+            const collapsed = shell.classList.toggle('sidebar-collapsed');
+            sidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        });
         if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
             shell.classList.add('sidebar-collapsed');
-            btn.setAttribute('aria-expanded', 'false');
+            sidebarBtn.setAttribute('aria-expanded', 'false');
         }
-    }));
+    }
+
+    setPage(pageFromHash(location.hash), { smooth: false });
 })();
