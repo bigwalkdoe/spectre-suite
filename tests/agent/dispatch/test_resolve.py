@@ -117,9 +117,14 @@ def test_git_provenance_is_read_when_available(tmp_path: Path, monkeypatch: pyte
     assert isinstance(got.git_dirty, bool)
 
 
-def test_actions_root_defaults_below_repo_root(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_actions_root_defaults_to_canonical_layout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SPECTRE_ACTIONS_ROOT", raising=False)
-    assert actions_root() == repo_root() / "actions"
+    # Unified layout prefers <repo>/spectre/actions when present; legacy fallbacks exist.
+    root = repo_root()
+    expected = root / "spectre" / "actions"
+    if not expected.is_dir():
+        expected = root / "scripts" if (root / "scripts").is_dir() else root / "actions"
+    assert actions_root() == expected.resolve()
 
 
 def test_an_empty_actions_root_env_falls_back_to_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,7 +132,11 @@ def test_an_empty_actions_root_env_falls_back_to_the_default(monkeypatch: pytest
     directory, which would make the entire checkout the actions root — and the
     containment guard would then bless every file in it."""
     monkeypatch.setenv("SPECTRE_ACTIONS_ROOT", "")
-    assert actions_root() == repo_root() / "actions"
+    root = repo_root()
+    expected = root / "spectre" / "actions"
+    if not expected.is_dir():
+        expected = root / "scripts" if (root / "scripts").is_dir() else root / "actions"
+    assert actions_root() == expected.resolve()
 
 
 def test_an_actions_root_reached_through_a_symlink_contains_its_actions(
@@ -175,6 +184,7 @@ def test_the_default_actions_root_is_resolved_before_the_containment_check(
 
 
 def test_git_commit_is_the_short_head_sha(git_actions_root: Path) -> None:
+    pytest.importorskip("git")
     got = resolve(make_job())
     assert got.git_commit == _git(git_actions_root, "rev-parse", "--short", "HEAD")
     assert got.git_dirty is False
@@ -183,6 +193,7 @@ def test_git_commit_is_the_short_head_sha(git_actions_root: Path) -> None:
 def test_git_dirty_flips_when_a_committed_action_changes(git_actions_root: Path) -> None:
     """A dirty checkout must be recorded, or a run record cannot say the run used
     unreviewed code."""
+    pytest.importorskip("git")
     assert resolve(make_job()).git_dirty is False
     action = git_actions_root / "ok.sh"
     action.write_text("#!/bin/bash\nexit 1\n")
