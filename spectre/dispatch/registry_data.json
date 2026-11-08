@@ -708,5 +708,23 @@
     "summary": "ISOLATED read-only report: list spectre-security OPA versions/index.json and per-policy metadata presence (not in data.security[k].deny aggregation; no CI gate change)",
     "mutates": false,
     "concurrency": "allow"
+  },
+  {
+    "name": "security/baseline/live-infra-normalize",
+    "action": "security/baseline/live-infra-normalize.sh",
+    "group": "security",
+    "summary": "Path C: normalize live-infra snapshot (v0/legacy) to canonical flat OPA input + provenance report (report-only, reuses adapter rules)",
+    "sudo": false,
+    "mutates": false,
+    "concurrency": "allow"
+  },
+  {
+    "name": "security/baseline/live-infra-collect",
+    "action": "security/baseline/live-infra-collect.sh",
+    "group": "security",
+    "summary": "Path C: collect v0 live-infra snapshot for selected domains (fixture-driven; optional --probe read-only best-effort, absent/fail-closed)",
+    "sudo": false,
+    "mutates": false,
+    "concurrency": "allow"
   }
 ]

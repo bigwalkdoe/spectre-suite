@@ -201,3 +201,23 @@ def test_probe_evidence_explicit_overrides_probe(monkeypatch, tmp_path):
     assert snap["compliance"]["firewall_enabled"] is False  # explicit override
     assert snap["backup"]["retention_days"] == 14
     assert snap["source"] == "test/probe"
+
+
+def test_collect_network_and_docker_domains_parity_with_existing_mappings():
+    """Item 4 (additive): fixture-driven network/docker evidence uses existing mappings only."""
+    collector = _load(COLLECTOR, "live_infra_collect_netdock")
+    normalizer = _load(NORMALIZER, "live_infra_normalize_netdock")
+    evidence = {
+        "network": {"vpn_enabled": True},
+        "docker": [{"name": "app", "privileged": False, "memory_limit": 512}],
+    }
+    snap = collector.collect_snapshot(evidence, domains=["network", "docker", "compliance", "backup"])
+    assert snap["network"]["vpn_enabled"] is True
+    assert snap["docker"][0]["name"] == "app"
+    flat = normalizer.normalize(snap)["canonical_flat_input"]
+    assert flat["vpn_enabled"] is True
+    assert flat["docker_privileged_disabled"] is True
+    assert flat["docker_resource_limits"] is True
+    # Never invented from docker/network evidence
+    for never in ("docker_not_root", "docker_no_new_privileges", "network_segmentation_enabled", "dmz_isolated"):
+        assert never not in flat
