@@ -64,6 +64,24 @@ let currentAlerts = [];
 let activeAlertFilter = 'all';
 let lastQueryStats = { total: 0, succeeded: 0, failed: 0 };
 let lastExporterStatus = { backup: false, security: false };
+let lastChartRefreshAt = 0;
+let slowMetricsCache = null;
+let slowMetricsCacheAt = 0;
+let lastContainerSignature = null;
+
+const FETCH_TIMEOUT_MS = 12000;
+const CHART_AUTO_REFRESH_MS = 5 * 60 * 1000;
+const SLOW_METRICS_REFRESH_MS = 5 * 60 * 1000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 // UI helpers: loading states, error states, and toasts
 function setCardLoading(cardId, isLoading) {
@@ -134,7 +152,7 @@ function applyRefreshInterval() {
         clearInterval(refreshTimerId);
         refreshTimerId = null;
     }
-    if (refreshIntervalMs > 0) {
+    if (refreshIntervalMs > 0 && !document.hidden) {
         refreshTimerId = setInterval(fetchAllMetrics, refreshIntervalMs);
     }
     updateDiagnostics();
@@ -148,6 +166,20 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimestamp();
     setInterval(updateTimestamp, 1000);
     applyRefreshInterval();
+
+    // Stop polling while the tab is hidden and refresh once when it becomes
+    // visible again. Background tabs otherwise keep querying Prometheus forever.
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (refreshTimerId) {
+                clearInterval(refreshTimerId);
+                refreshTimerId = null;
+            }
+        } else {
+            applyRefreshInterval();
+            fetchAllMetrics();
+        }
+    });
     
     // Event listeners
     document.getElementById('refreshBtn').addEventListener('click', fetchAllMetrics);
@@ -345,11 +377,12 @@ function formatRelativeTime(epochSeconds) {
 function initializeDashboard() {
     initExternalLinks();
     initializeChart();
-    fetchAllMetrics();
+    fetchAllMetrics({ refreshChart: true });
     checkPrometheusConnection();
 }
 
 function updateTimestamp() {
+    if (document.hidden) return;
     const now = new Date();
     document.getElementById('timestamp').textContent = now.toLocaleString();
 }
@@ -357,7 +390,7 @@ function updateTimestamp() {
 // Prometheus query function
 async function queryPrometheus(query) {
     try {
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
+        const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
         if (!response.ok) {
             console.error(`Prometheus query HTTP ${response.status} for: ${query}`);
             return null;
@@ -375,7 +408,7 @@ async function queryPrometheus(query) {
 
 async function queryPrometheusFirst(query) {
     try {
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
+        const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
         if (!response.ok) return null;
         const data = await response.json();
         if (data.status !== 'success' || !Array.isArray(data.data?.result) || data.data.result.length === 0) {
@@ -388,7 +421,8 @@ async function queryPrometheusFirst(query) {
 }
 
 // Fetch all metrics
-async function fetchAllMetrics() {
+async function fetchAllMetrics(opts = {}) {
+    const refreshChart = opts instanceof Event ? true : !!(opts && opts.refreshChart);
     if (isRefreshing) return;
     setRefreshing(true);
 
@@ -396,7 +430,12 @@ async function fetchAllMetrics() {
     cardIds.forEach(id => { clearCardError(id); setCardLoading(id, true); });
 
     try {
-        const metricResults = await Promise.all([
+        const forceSlow = refreshChart;
+        const slowIsCached = !forceSlow && slowMetricsCache && Date.now() - slowMetricsCacheAt < SLOW_METRICS_REFRESH_MS;
+
+        // Start core, slow, alerts, and container fetches at the same time.
+        // Core previously waited for slow metrics to finish before rendering.
+        const corePromise = Promise.all([
             queryPrometheus('100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))'),
             queryPrometheus('100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'),
             queryPrometheus('100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))'),
@@ -406,58 +445,73 @@ async function fetchAllMetrics() {
             queryPrometheus('node_boot_time_seconds'),
             queryPrometheus('node_procs_running'),
             queryPrometheus('avg(node_hwmon_temp_celsius)'),
-            queryPrometheus('avg(node_thermal_zone_temp)'),
-            queryPrometheus('backup_last_success_timestamp'),
-            queryPrometheus('backup_health_check_ok'),
-            queryPrometheus('backup_health_check_timestamp'),
-            queryPrometheus('backup_repo_size_bytes'),
-            queryPrometheus('backup_repo_fs_free_bytes'),
-            queryPrometheus('restic_last_success_timestamp'),
-            queryPrometheus('restic_last_offsite_success_timestamp'),
-            queryPrometheus('restic_verify_ok'),
-            queryPrometheus('restic_verify_timestamp'),
-            queryPrometheus('spectre_agent_up'),
-            queryPrometheus('spectre_security_ever_scanned'),
-            queryPrometheus('security_last_scan_timestamp'),
-            queryPrometheus('security_findings_unresolved'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="high"}'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="medium"}'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="low"}'),
-            queryPrometheus('max(spectre_security_baseline_exporter_up)'),
-            queryPrometheus('max(spectre_security_baseline_never_run)'),
-            queryPrometheus('max(spectre_security_baseline_last_run_timestamp_seconds)'),
-            queryPrometheus('max(spectre_security_baseline_stale)'),
-            queryPrometheus('max(spectre_security_baseline_opa_check_ok)'),
-            queryPrometheus('max(spectre_security_baseline_drift_detected)'),
-            queryPrometheus('max(spectre_security_baseline_trivy_fs_ok)'),
-            queryPrometheus('max(spectre_security_baseline_gitleaks_ok)')
+            queryPrometheus('avg(node_thermal_zone_temp)')
         ]);
-        const [
-            cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal,
-            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
-            resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
-            spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
-            findingsCritical, findingsHigh, findingsMedium, findingsLow,
-            baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
-            baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk
-        ] = metricResults;
-        const agentReasonResult = await queryPrometheusFirst('spectre_agent_up_reason');
+        const slowPromise = slowIsCached
+            ? Promise.resolve(slowMetricsCache)
+            : Promise.all([
+                queryPrometheus('backup_last_success_timestamp'),
+                queryPrometheus('backup_health_check_ok'),
+                queryPrometheus('backup_health_check_timestamp'),
+                queryPrometheus('backup_repo_size_bytes'),
+                queryPrometheus('backup_repo_fs_free_bytes'),
+                queryPrometheus('restic_last_success_timestamp'),
+                queryPrometheus('restic_last_offsite_success_timestamp'),
+                queryPrometheus('restic_verify_ok'),
+                queryPrometheus('restic_verify_timestamp'),
+                queryPrometheus('spectre_agent_up'),
+                queryPrometheus('spectre_security_ever_scanned'),
+                queryPrometheus('security_last_scan_timestamp'),
+                queryPrometheus('security_findings_unresolved'),
+                queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
+                queryPrometheus('security_findings_unresolved_by_severity{severity="high"}'),
+                queryPrometheus('security_findings_unresolved_by_severity{severity="medium"}'),
+                queryPrometheus('security_findings_unresolved_by_severity{severity="low"}'),
+                queryPrometheus('max(spectre_security_baseline_exporter_up)'),
+                queryPrometheus('max(spectre_security_baseline_never_run)'),
+                queryPrometheus('max(spectre_security_baseline_last_run_timestamp_seconds)'),
+                queryPrometheus('max(spectre_security_baseline_stale)'),
+                queryPrometheus('max(spectre_security_baseline_opa_check_ok)'),
+                queryPrometheus('max(spectre_security_baseline_drift_detected)'),
+                queryPrometheus('max(spectre_security_baseline_trivy_fs_ok)'),
+                queryPrometheus('max(spectre_security_baseline_gitleaks_ok)'),
+                queryPrometheusFirst('spectre_agent_up_reason')
+            ]).then((slowResults) => {
+                const [
+                    backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
+                    resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+                    spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
+                    findingsCritical, findingsHigh, findingsMedium, findingsLow,
+                    baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
+                    baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk,
+                    agentReasonResult
+                ] = slowResults;
+                slowMetricsCache = {
+                    backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
+                    resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+                    spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
+                    findingsCritical, findingsHigh, findingsMedium, findingsLow,
+                    baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
+                    baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk,
+                    agentReasonResult
+                };
+                slowMetricsCacheAt = Date.now();
+                return slowMetricsCache;
+            });
+        const alertsPromise = checkAlerts();
+        const containersPromise = updateContainerStatus();
+        const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+        const chartNow = Date.now();
+        const shouldRefreshChart = refreshChart || chartNow - lastChartRefreshAt >= CHART_AUTO_REFRESH_MS;
+        if (shouldRefreshChart) lastChartRefreshAt = chartNow;
+        const chartPromise = shouldRefreshChart ? updateChart(activeRange) : Promise.resolve();
+
+        const coreResults = await corePromise;
+        const [cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal] = coreResults;
         const temp = tempHwmon ?? tempThermal;
-        const baseline = {
-            exporterUp: baselineExporterUp, neverRun: baselineNeverRun, lastRun: baselineLastRun, stale: baselineStale,
-            opaOk: baselineOpaOk, drift: baselineDrift, trivyFsOk: baselineTrivyFsOk, gitleaksOk: baselineGitleaksOk
-        };
 
-        const totalQueries = metricResults.length;
-        const succeeded = metricResults.filter(v => v !== null).length;
-        lastQueryStats = { total: totalQueries, succeeded, failed: totalQueries - succeeded };
-        lastExporterStatus = {
-            backup: [backupLastSuccess, backupHealthOk, resticLastSuccess].some(v => v !== null),
-            security: spectreUp !== null || baselineExporterUp === 1
-        };
-
-        // Treat all-null from core Prometheus as unreachable
+        // Render core cards as soon as their queries resolve; slow backup/security
+        // queries keep running in the background.
         const coreAllNull = [cpu, mem, disk, netIn, netOut, load1, bootTime].every(v => v === null);
         if (coreAllNull) {
             showToast('Prometheus unreachable — showing no data', 'error');
@@ -474,14 +528,40 @@ async function fetchAllMetrics() {
             if (disk === null) setCardError('diskCard', 'Disk data unavailable');
             if (netIn === null && netOut === null) setCardError('networkCard', 'Network data unavailable');
         }
+        ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard'].forEach(id => setCardLoading(id, false));
+
+        const slow = await slowPromise;
+        const slowFetched = !slowIsCached;
+        const {
+            backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
+            resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+            spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
+            findingsCritical, findingsHigh, findingsMedium, findingsLow,
+            baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
+            baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk,
+            agentReasonResult
+        } = slow;
+        const baseline = {
+            exporterUp: baselineExporterUp, neverRun: baselineNeverRun, lastRun: baselineLastRun, stale: baselineStale,
+            opaOk: baselineOpaOk, drift: baselineDrift, trivyFsOk: baselineTrivyFsOk, gitleaksOk: baselineGitleaksOk
+        };
+
+        const slowValues = [backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs, spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale, baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk];
+        const executed = coreResults.length + (slowFetched ? 26 : 0);
+        const executedValues = slowFetched ? [...coreResults, ...slowValues] : coreResults;
+        const succeeded = executedValues.filter(v => v !== null).length + (slowFetched && agentReasonResult ? 1 : 0);
+        lastQueryStats = { total: executed, succeeded, failed: executed - succeeded };
+        lastExporterStatus = {
+            backup: [backupLastSuccess, backupHealthOk, resticLastSuccess].some(v => v !== null),
+            security: spectreUp !== null || baselineExporterUp === 1
+        };
 
         const agentReason = agentReasonResult?.metric?.reason || null;
         updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs);
         updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason, baseline);
-        updateContainerStatus();
-        checkAlerts();
-        const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
-        updateChart(activeRange);
+        ['backupCard', 'securityCard'].forEach(id => setCardLoading(id, false));
+        await Promise.allSettled([alertsPromise, containersPromise, chartPromise]);
+        ['alertsCard', 'containersCard', 'chartCard'].forEach(id => setCardLoading(id, false));
         updateLastRefreshed();
         updateDiagnostics();
     } catch (err) {
@@ -820,7 +900,7 @@ async function updateContainerStatus() {
         // with a 24h recency window (same window the Grafana resource dashboard
         // uses: container_last_seen > (time() - 86400)). Containers with recent
         // activity are reported running; an empty set means no recent data.
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent('container_last_seen')}`);
+        const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent('container_last_seen')}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.status !== 'success') throw new Error('Invalid container response');
@@ -836,39 +916,44 @@ async function updateContainerStatus() {
         }
 
         const containerNames = [...seen.keys()].sort();
-        const containers = containerNames.map(name => ({ name, status: 'running' }));
-
-        // Presentational grouping by name prefix (first token before -/_); data/count semantics unchanged.
-        const groups = new Map();
-        for (const c of containers) {
-            const key = (c.name || '').split(/[-_]/)[0] || c.name || 'other';
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key).push(c);
-        }
-        const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-        const renderItem = (container) => `
-            <div class="container-item">
-                <div class="container-name">${container.name}</div>
-                <span class="container-status ${container.status}">${container.status}</span>
-            </div>`;
-        const grid = document.getElementById('containersGrid');
-        grid.innerHTML = sortedGroups.length ? sortedGroups.map(([key, items]) => `
-            <section class="container-group" aria-label="${key} containers">
-                <div class="container-group-header">
-                    <span class="container-group-name">${key}</span>
-                    <span class="container-group-count">${items.length}</span>
-                </div>
-                <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
-            </section>`).join('') : '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
-
         const containerStatus = document.getElementById('containerStatus');
         const hasData = containerNames.length > 0;
+        const signature = containerNames.join('|');
+
+        if (signature !== lastContainerSignature) {
+            lastContainerSignature = signature;
+            const containers = containerNames.map(name => ({ name, status: 'running' }));
+            // Presentational grouping by name prefix (first token before -/_); data/count semantics unchanged.
+            const groups = new Map();
+            for (const c of containers) {
+                const key = (c.name || '').split(/[-_]/)[0] || c.name || 'other';
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(c);
+            }
+            const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+            const renderItem = (container) => `
+                <div class="container-item">
+                    <div class="container-name">${container.name}</div>
+                    <span class="container-status ${container.status}">${container.status}</span>
+                </div>`;
+            const grid = document.getElementById('containersGrid');
+            grid.innerHTML = sortedGroups.length ? sortedGroups.map(([key, items]) => `
+                <section class="container-group" aria-label="${key} containers">
+                    <div class="container-group-header">
+                        <span class="container-group-name">${key}</span>
+                        <span class="container-group-count">${items.length}</span>
+                    </div>
+                    <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
+                </section>`).join('') : '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+        }
+
         containerStatus.textContent = hasData ? `${containerNames.length} Running` : 'No data';
         containerStatus.className = hasData ? 'badge badge-success' : 'badge';
         clearCardError('containersCard');
         setCardUpdated('containersCard');
     } catch (error) {
         console.error('Error fetching container status:', error);
+        lastContainerSignature = null;
         setCardError('containersCard', 'Container data unavailable');
         document.getElementById('containersGrid').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Container data unavailable.</strong> Unable to fetch recent container status.</span></div>';
         const containerStatus = document.getElementById('containerStatus');
@@ -946,7 +1031,7 @@ function renderAlerts() {
 // Check Alerts
 async function checkAlerts() {
     try {
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
+        const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/alerts`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.status !== 'success' || !Array.isArray(data.data?.alerts)) {
@@ -970,7 +1055,7 @@ async function checkPrometheusConnection() {
     const statusIndicator = document.getElementById('systemStatus');
     const statusText = document.getElementById('systemStatusText');
     try {
-        const response = await fetch(`${PROMETHEUS_URL}/api/v1/status/buildinfo`);
+        const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/status/buildinfo`);
         const prometheusStatus = document.getElementById('prometheusStatus');
         if (response.ok) {
             prometheusStatus.textContent = 'Connected';
@@ -1139,7 +1224,10 @@ function initializeChart() {
 async function updateChart(range) {
     const secondsMap = { '1h': 3600, '6h': 21600, '24h': 86400, '7d': 604800 };
     const seconds = secondsMap[range] || 3600;
-    const step = range === '7d' ? 3600 : 60;
+    // Cap chart resolution to roughly 400 points per series. The previous 60s
+    // step produced 1,440 points per series over 24h, which is more detail than
+    // the chart can show and makes both Prometheus response and rendering heavier.
+    const step = range === '7d' ? 3600 : Math.max(60, Math.ceil(seconds / 400));
     const spansMultipleDays = seconds > 86400;
 
     const now = Math.floor(Date.now() / 1000);
@@ -1157,7 +1245,7 @@ async function updateChart(range) {
 
     try {
         const responses = await Promise.all(queries.map(q =>
-            fetch(`${PROMETHEUS_URL}/api/v1/query_range?query=${encodeURIComponent(q)}&start=${start}&end=${now}&step=${step}`)
+            fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/query_range?query=${encodeURIComponent(q)}&start=${start}&end=${now}&step=${step}`, {}, 20000)
         ));
 
         if (myToken !== chartRequestToken) return; // a newer update has superseded us
@@ -1186,6 +1274,7 @@ async function updateChart(range) {
             chart.data.labels = [];
             chart.data.datasets.forEach(d => { d.data = []; });
             chart.update();
+            lastChartRefreshAt = Date.now();
             setCardError('chartCard', 'No trend data available');
             return;
         }
@@ -1204,6 +1293,7 @@ async function updateChart(range) {
             dataset.data = results[i]?.data?.result?.[0]?.values?.map(v => parseFloat(v[1])) || [];
         });
         chart.update();
+        lastChartRefreshAt = Date.now();
         clearCardError('chartCard');
         setCardUpdated('chartCard');
     } catch (e) {
