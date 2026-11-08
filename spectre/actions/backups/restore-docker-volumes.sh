@@ -19,7 +19,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../.." && pwd)"}"
+PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../../.." && pwd)"}"
 
 COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.monitoring.yml}"
 # Needed to map a real volume name back to the name Compose declares it under.

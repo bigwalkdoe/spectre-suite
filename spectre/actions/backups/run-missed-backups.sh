@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../.." && pwd)"}"
+PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../../.." && pwd)"}"
 HEALTH_CHECK="$SCRIPT_DIR/check-backup-health.sh"
 BACKUP_ALL="$SCRIPT_DIR/backup-all.sh"
 

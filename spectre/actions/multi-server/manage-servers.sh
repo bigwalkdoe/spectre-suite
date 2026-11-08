@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../.." && pwd)"}"
+REPO_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../../.." && pwd)"}"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Multi-Server Management Script
 # Foundation for managing multiple servers from a central location
