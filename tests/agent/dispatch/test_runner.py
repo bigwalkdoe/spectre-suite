@@ -26,7 +26,7 @@ import pytest
 from spectre.dispatch.envelope import OUTPUT_LIMIT
 from spectre.dispatch.resolve import resolve
 from spectre.dispatch.runner import RunOutcome, _BoundedOutput, run_action
-from tests.dispatch.conftest import make_job
+from tests.agent.dispatch.conftest import make_job
 
 # The elision notice Task 3 established, matched rather than rebuilt so that a change
 # to its wording shows up here as a failure instead of as a silent mismatch.

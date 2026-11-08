@@ -54,7 +54,7 @@ from spectre.dispatch.retention import (
 )
 from spectre.memory import db as db_module
 from spectre.memory.db import MaintenanceRecord, save_run
-from tests.dispatch.conftest import make_job
+from tests.agent.dispatch.conftest import make_job
 
 # A fixed instant, so a row placed exactly on a cutoff is placed exactly on it.
 # `datetime.now()` would drift under the test's own runtime and turn the boundary

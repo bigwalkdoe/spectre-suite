@@ -41,7 +41,7 @@ import pytest
 
 import spectre.dispatch.verify as verify_mod
 from spectre.dispatch.verify import HostInventory, verify
-from tests.dispatch.conftest import make_job
+from tests.agent.dispatch.conftest import make_job
 
 # The real implementation, captured before the guard fixture replaces it. Only the
 # two tests that exist to pin `read_host_inventory`'s never-raise contract use it,

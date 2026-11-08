@@ -30,7 +30,7 @@ from spectre.dispatch.envelope import (
     truncate_output,
 )
 from spectre.dispatch.resolve import ResolvedAction
-from tests.dispatch.conftest import make_job
+from tests.agent.dispatch.conftest import make_job
 
 _STARTED = datetime(2026, 10, 5, 3, 0, tzinfo=UTC)
 
