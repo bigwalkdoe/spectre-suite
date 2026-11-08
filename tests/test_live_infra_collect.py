@@ -143,3 +143,61 @@ def test_collector_cli_from_evidence(tmp_path):
     assert snap["contract_version"] == "live_infra_snapshot/v0"
     assert snap["backup"]["encrypted"] is True
     assert snap["docker"] == []
+
+
+# --- Slice B: best-effort read-only probes (opt-in). Deterministic tests via mocking. ---
+
+
+def test_probe_compliance_omits_uncertain_fields(monkeypatch):
+    collector = _load(COLLECTOR, "live_infra_collect_probe1")
+    monkeypatch.setattr(collector.shutil, "which", lambda x: None)
+    ev = collector._probe_compliance()
+    # No tools/evidence => absent (fail-closed), never invented.
+    assert ev == {}
+
+
+def test_probe_compliance_maps_definitive_systemctl_states(monkeypatch):
+    collector = _load(COLLECTOR, "live_infra_collect_probe2")
+    monkeypatch.setattr(collector.shutil, "which", lambda x: "/usr/bin/systemctl" if x == "systemctl" else None)
+
+    def fake_run(cmd, capture_output=True, text=True, timeout=5):
+        unit = cmd[-1]
+        out = {"firewalld": "active", "auditd": "inactive", "wazuh-agent": "inactive", "suricata": "inactive", "snort": "inactive"}.get(unit, "unknown")
+        return subprocess.CompletedProcess(cmd, 0, out, "")
+
+    monkeypatch.setattr(collector.subprocess, "run", fake_run)
+    ev = collector._probe_compliance()
+    assert ev["firewall_enabled"] is True
+    assert ev["audit_logging_enabled"] is False  # definitive inactive
+    assert "ssh_password_auth" not in ev  # never guessed
+    assert "intrusion_detection_active" not in ev
+    assert "file_integrity_monitoring" not in ev
+
+
+def test_probe_backup_uses_nonsecret_markers_only(tmp_path, monkeypatch):
+    collector = _load(COLLECTOR, "live_infra_collect_probe3")
+    state = tmp_path / ".local/state/spectre-suite/backups"
+    state.mkdir(parents=True)
+    (state / "last-success").write_text("123 5a8836ff\n", encoding="utf-8")
+    (state / "last-offsite-success").write_text("124 1ff42d3a\n", encoding="utf-8")
+    monkeypatch.setattr(collector.Path, "home", staticmethod(lambda: tmp_path))
+    ev = collector._probe_backup()
+    assert ev == {"encrypted": True, "offsite_replication": True}
+    assert "retention_days" not in ev
+
+
+def test_probe_evidence_explicit_overrides_probe(monkeypatch, tmp_path):
+    collector = _load(COLLECTOR, "live_infra_collect_probe4")
+    monkeypatch.setattr(collector.shutil, "which", lambda x: None)
+    evfile = tmp_path / "ev.json"
+    evfile.write_text(json.dumps({"compliance": {"firewall_enabled": False}, "backup": {"retention_days": 14}}), encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, str(COLLECTOR), "--probe", "--from-evidence", str(evfile), "--domains", "compliance,backup", "--source", "test/probe"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    snap = json.loads(r.stdout)
+    assert snap["compliance"]["firewall_enabled"] is False  # explicit override
+    assert snap["backup"]["retention_days"] == 14
+    assert snap["source"] == "test/probe"
