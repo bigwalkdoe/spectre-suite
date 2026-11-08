@@ -48,26 +48,42 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A003
         sys.stderr.write("%s - %s\n" % (self.address_string(), format % args))
 
+    def _audit(self, event: str, **fields) -> None:
+        # Never log tokens or request bodies. Keep stderr structured for operators.
+        payload = {"ts": datetime.now(timezone.utc).isoformat(), "event": event, **fields}
+        sys.stderr.write(json.dumps(payload, sort_keys=True) + "\n")
+
+    def _remote(self) -> str | None:
+        xff = self.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip() or None
+        return self.client_address[0] if self.client_address else None
+
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/healthz":
             json_response(self, 200, {"ok": True, "service": "dashboard-actions", "actions": sorted(ALLOWLIST)})
             return
+        self._audit("request_rejected", method="GET", path=self.path, status=404, remote=self._remote())
         json_response(self, 404, {"ok": False, "error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        remote = self._remote()
         # Token auth (required when DASHBOARD_ACTION_TOKEN is set)
         if TOKEN:
             provided = self.headers.get("X-Dashboard-Action-Token", "")
             if provided != TOKEN:
+                self._audit("auth_rejected", path=self.path, status=401, remote=remote)
                 json_response(self, 401, {"ok": False, "error": "unauthorized", "message": "Missing or invalid X-Dashboard-Action-Token"})
                 return
         else:
             # No token configured - reject by default for safety
+            self._audit("not_configured", path=self.path, status=503, remote=remote)
             json_response(self, 503, {"ok": False, "error": "not_configured", "message": "DASHBOARD_ACTION_TOKEN is not set; actions are disabled"})
             return
 
         action = self.path.strip("/").split("/")[-1]
         if action not in ALLOWLIST:
+            self._audit("action_rejected", action=action, path=self.path, status=400, remote=remote)
             json_response(self, 400, {"ok": False, "error": "action_not_allowed", "allowed": sorted(ALLOWLIST)})
             return
 
@@ -77,6 +93,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             script_path.relative_to(REPO_ROOT.resolve())
         except Exception:
+            self._audit("action_rejected", action=action, reason="invalid_script_path", status=400, remote=remote)
             json_response(self, 400, {"ok": False, "error": "invalid_script_path"})
             return
 
@@ -85,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
             "action": action,
             "script": script_rel,
             "requestedAt": datetime.now(timezone.utc).isoformat(),
-            "remote": self.client_address[0] if self.client_address else None,
+            "remote": remote,
             "status": "queued",
         }
 
@@ -96,9 +113,11 @@ class Handler(BaseHTTPRequestHandler):
             tmp.write_text(json.dumps(trigger, indent=2) + "\n", encoding="utf-8")
             tmp.replace(target)
         except Exception as exc:
+            self._audit("trigger_write_failed", action=action, trigger_id=trigger["id"], status=500, remote=remote)
             json_response(self, 500, {"ok": False, "error": "trigger_write_failed", "message": str(exc)})
             return
 
+        self._audit("action_queued", action=action, trigger_id=trigger["id"], script=script_rel, status=202, remote=remote)
         json_response(self, 202, {
             "ok": True,
             "queued": True,
