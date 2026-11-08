@@ -201,10 +201,17 @@ If you encounter CORS errors when accessing Prometheus:
 ## Performance
 
 ### Optimizations
-- Efficient Prometheus queries
-- Minimal data transfer
-- Client-side caching
-- Lazy loading for charts
+- Core system metrics refresh on the normal interval; backup/security/baseline
+  metrics are cached and refreshed at most every 5 minutes (or immediately on a
+  manual refresh)
+- Chart history is refreshed on load, manual refresh, range changes, or every
+  5 minutes during auto-refresh instead of on every polling tick
+- Chart history resolution is capped at roughly 400 points per series
+- Prometheus requests time out after 12-20 seconds so a stalled backend cannot
+  block the whole dashboard
+- Container list DOM is only rebuilt when the container set changes
+- Auto-refresh and the live clock pause while the browser tab is hidden
+- nginx gzip compression for static assets and proxied JSON responses
 
 ### Scalability
 - Supports multiple servers with proper Prometheus configuration
