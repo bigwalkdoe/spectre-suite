@@ -163,16 +163,18 @@ Planned features include:
 ## Security Considerations
 
 ### Production Hardening (nginx)
-The dashboard nginx config includes baseline hardening: `server_tokens off`, `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, and an enforced `Content-Security-Policy` compatible with same-origin dashboard scripts, Font Awesome CDN fonts/styles, and proxied backend frames/connections. Dotfiles and dashboard internals (`nginx.conf`, `README.md`, `actions-backend/`) are denied from the bind-mounted document root.
+The dashboard nginx config includes baseline hardening: `server_tokens off`, `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, and an enforced same-origin `Content-Security-Policy` (Font Awesome is vendored under `vendor/fontawesome/`; no CDN script/style/font dependency). Dotfiles and dashboard internals (`nginx.conf`, `README.md`, `actions-backend/`, `edge-hardening.example.nginx.conf`, `00-http-hardening.conf`) are denied from the bind-mounted document root.
+
+`00-http-hardening.conf` defines http-level request/connection limits; it is mounted into nginx `conf.d` by `docker-compose.monitoring.yml`. `/api/` is limited to `GET|HEAD` and `/actions/` to `POST` with stricter rate limits. The web-dashboard container runs read-only with tmpfs and `no-new-privileges`.
 
 ### Production Deployment
 For production use:
-1. Enable authentication (reverse proxy / SSO)
-2. Use HTTPS and add HSTS at the TLS termination layer
-3. Restrict network access (dashboard is published on `127.0.0.1:8081` by default)
-4. Add rate limiting for `/actions/` and API proxy endpoints
-5. Add audit logging for dashboard actions and access
-6. Review CSP reports/violations before adding new script/style sources
+1. Enable authentication (reverse proxy / SSO). See `web-dashboard/edge-hardening.example.nginx.conf` for a TLS/auth edge example.
+2. Use HTTPS and add HSTS at the TLS termination layer.
+3. Restrict network access (dashboard is published on `127.0.0.1:8081` by default).
+4. Keep and tune rate limiting for `/actions/` and API proxy endpoints; add edge/WAF limits before public exposure.
+5. Collect audit logs: nginx access logs and `dashboard-actions` JSON stderr audit events (`auth_rejected`, `action_rejected`, `action_queued`, failures). Never log action tokens.
+6. Review CSP violations before adding new script/style sources.
 
 ### Current Limitations
 - No built-in authentication (use reverse proxy)
