@@ -368,6 +368,27 @@ sudo spectre-suite/install.sh
 
 ---
 
+## Monitoring Stack / Prometheus & Grafana Connectivity
+
+**Symptoms:** Grafana shows "Prometheus unreachable" / datasource unhealthy; `monitoring-stack` alerts fire (`PrometheusRoutePrefixUnhealthy`, `GrafanaCannotReachPrometheus`, `GrafanaPrometheusDatasourceURLDrift`, `GrafanaPrometheusDatasourceUnhealthy`).
+
+**First check (read-only):**
+```bash
+spectre run monitoring/check-monitoring-stack
+# or: ./spectre/actions/monitoring/check-monitoring-stack.sh
+curl -sS http://localhost:9090/prometheus/-/ready   # host-published, respects route-prefix
+docker exec grafana wget -qO- --timeout=3 http://prometheus:9090/prometheus/-/healthy
+```
+
+**Interpretation:**
+- Host Prometheus ready but Grafana/in-network probes fail with "no route to host"/"host unreachable": Docker bridge/iptables-nft forwarding is broken (containers may reach gateway but not peers). Inspect `docker network inspect spectre-suite_monitoring`, bridge interface, and host `FORWARD`/`DOCKER-FORWARD`/`ip filter DOCKER` rules. Least disruptive: `docker compose -f docker-compose.monitoring.yml up -d --force-recreate <affected>`. If rules are corrupt (e.g. missing isolation chains/bad DOCKER filter behavior), `sudo systemctl restart docker` then bring the monitoring stack up (**disruptive to all containers**).
+- Grafana datasource health 404 / URL drift: Prometheus serves under `--web.route-prefix=/prometheus/`; datasource URL must include `/prometheus` (e.g. `http://prometheus:9090/prometheus`). Fix provisioning (`grafana-provisioning/datasources/prometheus.yml`) and live datasource (Grafana UI/API), then Save & test.
+- Route-prefix endpoints 404 at root but 200 under `/prometheus/`: expected when route-prefix is configured.
+
+**Metrics:** `spectre_monitoring_prometheus_routeprefix_healthy`, `spectre_monitoring_prometheus_ready`, `spectre_monitoring_grafana_to_prometheus_reachable`, `spectre_monitoring_grafana_datasource_provisioning_ok`, `spectre_monitoring_grafana_datasource_url_matches`, `spectre_monitoring_grafana_datasource_healthy` (1 ok, 0 bad, -1 unknown). Exporter: `spectre run prometheus/monitoring-stack-metrics-exporter`.
+
+---
+
 ## Incident Log Template
 
 ```
