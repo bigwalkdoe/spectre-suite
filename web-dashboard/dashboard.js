@@ -752,13 +752,28 @@ async function updateContainerStatus() {
         const containerNames = [...seen.keys()].sort();
         const containers = containerNames.map(name => ({ name, status: 'running' }));
 
-        const grid = document.getElementById('containersGrid');
-        grid.innerHTML = containers.map(container => `
+        // Presentational grouping by name prefix (first token before -/_); data/count semantics unchanged.
+        const groups = new Map();
+        for (const c of containers) {
+            const key = (c.name || '').split(/[-_]/)[0] || c.name || 'other';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(c);
+        }
+        const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const renderItem = (container) => `
             <div class="container-item">
                 <div class="container-name">${container.name}</div>
                 <span class="container-status ${container.status}">${container.status}</span>
-            </div>
-        `).join('');
+            </div>`;
+        const grid = document.getElementById('containersGrid');
+        grid.innerHTML = sortedGroups.length ? sortedGroups.map(([key, items]) => `
+            <section class="container-group" aria-label="${key} containers">
+                <div class="container-group-header">
+                    <span class="container-group-name">${key}</span>
+                    <span class="container-group-count">${items.length}</span>
+                </div>
+                <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
+            </section>`).join('') : '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
 
         const containerStatus = document.getElementById('containerStatus');
         const hasData = containerNames.length > 0;
