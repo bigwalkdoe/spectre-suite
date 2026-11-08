@@ -53,7 +53,7 @@
 
 **GitHub repo archived (5b complete).**
 
-## Final status confirmation (2026-11-08) + remaining host artifacts
+## Final status confirmation (2026-11-08) + host artifacts
 - **Confirmed:** `bigwalkdoe/spectre-security` is archived on GitHub; local working clone removed. Suite OPA/compat paths are graceful when `SPECTRE_SECURITY_ROOT` is absent; core CI/gate invariants preserved; k8s admission/versions remain vendored/isolated.
 - **Not a blanket “all functions integrated in entirety”:** documented gaps/decisions remain (live-infra input generation parity; k8s/versions isolated by design; SonarQube/ZAP/hosted services disposition evaluated separately, not recorded in-repo).
-- **Remaining host artifact (historical name, suite-owned intent):** user units `~/.config/systemd/user/spectre-security-baseline-metrics.{timer,service}` (installed in Step 3a) run the *suite* exporter via `/usr/bin/python3 -m spectre.cli.main run prometheus/security-baseline-metrics-exporter`. As checked 2026-11-08, the **timer is enabled/active** but the **service is failing** (`ModuleNotFoundError: No module named 'typer'` under system Python). No host mutation performed; fix/rename/retirement of this unit requires explicit confirmation.
+- **Host baseline-metrics unit (3a, suite-owned):** renamed 2026-11-08 from `spectre-security-baseline-metrics.{timer,service}` (historical name) to `~/.config/systemd/user/spectre-baseline-metrics.{timer,service}`. Fixed to run via `/usr/local/bin/spectre run prometheus/security-baseline-metrics-exporter` (previous system-Python `typer` failure resolved). **Timer enabled/active**; service verified successful. Old unit files moved to `~/.local/state/spectre-suite/retired-units/`. No remaining `spectre-security`-named active host units found in readable locations; this entry records the rename history.
