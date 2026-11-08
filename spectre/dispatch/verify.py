@@ -575,6 +575,22 @@ def _exec_start_command(value: str) -> str:
     return text[len(_EXEC_START_PREFIX) :] if text.startswith(_EXEC_START_PREFIX) else text
 
 
+def _is_dispatcher_token(tokens: list[str], index: int) -> bool:
+    """Whether `tokens[index]` is the spectre dispatcher for a migrated `run` form.
+
+    Accepts the installed/entrypoint form (`spectre run <job>`, or a path whose
+    basename is `spectre`) and the checkout/module form
+    (`python3 -m spectre.cli.main run <job>`), which is how repo-managed units and
+    local verification commonly invoke the dispatcher.
+    """
+    token = tokens[index]
+    if Path(token).name == _DISPATCHER:
+        return True
+    if token in {"spectre.cli.main", "spectre.cli"}:
+        return index > 0 and tokens[index - 1] == "-m"
+    return index > 0 and tokens[index - 1] == "-m" and token.startswith("spectre.")
+
+
 def _migrated_job_index(tokens: list[str]) -> int | None:
     """The index of the job name in a `spectre run <job>` command, or `None`.
 
@@ -586,7 +602,7 @@ def _migrated_job_index(tokens: list[str]) -> int | None:
     visible.
     """
     for index in range(len(tokens) - 2):
-        if tokens[index + 1] == "run" and Path(tokens[index]).name == _DISPATCHER:
+        if tokens[index + 1] == "run" and _is_dispatcher_token(tokens, index):
             return index + 2
     return None
 

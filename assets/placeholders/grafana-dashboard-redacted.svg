@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="t d">
+  <title id="t">Grafana dashboard redacted placeholder</title>
+  <desc id="d">Safe placeholder template for a redacted Grafana dashboard screenshot.</desc>
+  <rect width="1200" height="720" fill="#0f172a"/>
+  <rect x="24" y="24" width="1152" height="672" rx="16" fill="#111827" stroke="#334155"/>
+  <text x="56" y="72" font-family="ui-monospace, monospace" font-size="28" fill="#e2e8f0">Grafana Dashboard — REDACTED CAPTURE TEMPLATE</text>
+  <text x="56" y="104" font-family="ui-monospace, monospace" font-size="16" fill="#94a3b8">Replace with a real screenshot from a safe/demo view. Remove tokens, hostnames, IPs, emails, webhook URLs, and customer data.</text>
+  <rect x="56" y="132" width="520" height="240" rx="12" fill="#020617" stroke="#475569"/>
+  <rect x="596" y="132" width="520" height="240" rx="12" fill="#020617" stroke="#475569"/>
+  <rect x="56" y="392" width="1060" height="250" rx="12" fill="#020617" stroke="#475569"/>
+  <g font-family="ui-monospace, monospace" fill="#f8fafc">
+    <rect x="96" y="210" width="420" height="44" fill="#334155"/><text x="112" y="239" font-size="18">REDACTED: panel title / datasource</text>
+    <rect x="636" y="210" width="420" height="44" fill="#334155"/><text x="652" y="239" font-size="18">REDACTED: queries / labels</text>
+    <rect x="96" y="480" width="980" height="44" fill="#334155"/><text x="112" y="509" font-size="18">REDACTED: table rows, instances, hostnames, IPs, user identifiers</text>
+  </g>
+  <text x="56" y="672" font-family="ui-monospace, monospace" font-size="14" fill="#fbbf24">⚠ Capture from a non-production or sanitized view only. Review pixels/text before commit.</text>
+</svg>

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Spectre Security Baseline Metrics Exporter every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+Unit=spectre-security-baseline-metrics.service
+
+[Install]
+WantedBy=timers.target
