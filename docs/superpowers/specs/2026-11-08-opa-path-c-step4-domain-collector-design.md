@@ -42,9 +42,9 @@ Implement **one** suite-native, versioned evidence collector that produces a `li
 - **Scope creep into docker/network:** *Mitigation:* strict domain flag; docker/network emitted as empty structures in initial slice unless explicitly implemented with fixtures+parity.
 
 ## 6. Implementation slices (recommended)
-1. **Slice A (testable, no host deps):** pure normalization/producer helpers + fixture-driven collector core + schema validation + unit/OPA tests.
-2. **Slice B (optional, host-gated):** read-only local probes for compliance/backup markers behind explicit flags; skipped in CI.
-3. **Slice C (integration):** wire into `SECURITY_OPA_COMPAT`/baseline flow as an **optional, report-only** source behind a flag (non-gating), with provenance.
+1. **Slice A (testable, no host deps):** pure normalization/producer helpers + fixture-driven collector core + schema validation + unit/OPA tests. **Done (2026-11-08).**
+2. **Slice B (optional, host-gated):** read-only local probes for compliance/backup markers behind explicit flags; skipped in CI. **Done (2026-11-08, opt-in `--probe`; best-effort, non-privileged, absent/fail-closed when uncertain; deterministic mocked tests).**
+3. **Slice C (integration):** wire into `SECURITY_OPA_COMPAT`/baseline flow as an **optional, report-only** source behind a flag (non-gating), with provenance. **Done (2026-11-08, additive):** `opa-compat-report.py` supports `--collect-domains`/`--collect-probe`/`--collect-evidence` (report-only) and surfaces `snapshot_contract`/collection metadata.
 
 ## 7. Acceptance for “step 4 started/complete (initial domain)”
 - [x] v0 snapshot producer for `compliance`+`backup` (Slice A) with fixtures and tests — `spectre/actions/security/baseline/live-infra-collect.py`, `tests/test_live_infra_collect.py` (fixture-driven, no host deps).
