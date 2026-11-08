@@ -9,8 +9,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 echo "Running backup script tests..."
 
 _resolve_action() { # args: relpath
-    if [ -f "$PROJECT_ROOT/spectre/actions/$1" ]; then echo "$PROJECT_ROOT/spectre/actions/$1";
-    elif [ -f "$PROJECT_ROOT/scripts/$1" ]; then echo "$PROJECT_ROOT/scripts/$1"; else return 1; fi
+    if [ -f "$PROJECT_ROOT/spectre/actions/$1" ]; then echo "$PROJECT_ROOT/spectre/actions/$1"; else return 1; fi
 }
 
 # Test 1: Check if backup script exists

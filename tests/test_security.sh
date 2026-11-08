@@ -21,7 +21,7 @@ test_security_scripts_exist() {
     
     local all_exist=true
     for script in "${security_scripts[@]}"; do
-        if [ ! -f "$PROJECT_ROOT/spectre/actions/$script" ] && [ ! -f "$PROJECT_ROOT/scripts/$script" ]; then
+        if [ ! -f "$PROJECT_ROOT/spectre/actions/$script" ]; then
             echo "❌ Missing security script: $script"
             all_exist=false
         fi
@@ -46,7 +46,7 @@ test_security_scripts_executable() {
     
     local all_executable=true
     for script in "${security_scripts[@]}"; do
-        local _p="$PROJECT_ROOT/spectre/actions/$script"; [ -f "$_p" ] || _p="$PROJECT_ROOT/scripts/$script"
+        local _p="$PROJECT_ROOT/spectre/actions/$script"
         if [ ! -x "$_p" ]; then
             echo "❌ Security script not executable: $script"
             all_executable=false
@@ -66,7 +66,7 @@ test_security_scripts_syntax() {
     echo "Test 3: Check if security scripts have correct syntax"
     local syntax_errors=0
     
-    local _secdir="$PROJECT_ROOT/spectre/actions/security"; [ -d "$_secdir" ] || _secdir="$PROJECT_ROOT/scripts/security"
+    local _secdir="$PROJECT_ROOT/spectre/actions/security"
     for script in "$_secdir"/*.sh; do
         if [ -f "$script" ]; then
             if ! bash -n "$script"; then
