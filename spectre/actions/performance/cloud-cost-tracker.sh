@@ -30,6 +30,9 @@ docker stats --no-stream 2>/dev/null >> "$REPORT_DIR/cost-report-$DATE.md" || tr
 # Disk usage by service
 echo "" >> "$REPORT_DIR/cost-report-$DATE.md"
 echo "## Disk Usage by Directory" >> "$REPORT_DIR/cost-report-$DATE.md"
-du -sh /home/deon/scripts/ /home/deon/projects/ /backups/ /var/log/ 2>/dev/null >> "$REPORT_DIR/cost-report-$DATE.md"
+# CLOUD_COST_DISK_PATHS: space-separated paths to measure (override per host).
+disk_paths="${CLOUD_COST_DISK_PATHS:-${SPECTRE_REPO_ROOT:-} ${PROJECTS_DIR:-${PROJECTS_ROOT:-}} /backups /var/log}"
+# shellcheck disable=SC2086
+du -sh $disk_paths 2>/dev/null >> "$REPORT_DIR/cost-report-$DATE.md" || true
 
 echo "Cost report: $REPORT_DIR/cost-report-$DATE.md"
