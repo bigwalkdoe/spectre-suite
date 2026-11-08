@@ -88,17 +88,20 @@ function setCardLoading(cardId, isLoading) {
     const card = document.getElementById(cardId);
     if (!card) return;
     card.classList.toggle('card--loading', isLoading);
+    card.setAttribute('aria-busy', isLoading ? 'true' : 'false');
 }
 
 function setCardError(cardId, message) {
     const card = document.getElementById(cardId);
     if (!card) return;
     card.classList.remove('card--loading');
+    card.setAttribute('aria-busy', 'false');
     card.classList.add('card--error');
     let errorEl = card.querySelector('.error-message');
     if (!errorEl) {
         errorEl = document.createElement('div');
         errorEl.className = 'error-message';
+        errorEl.setAttribute('role', 'alert');
         const body = card.querySelector('.card-body') || card;
         body.appendChild(errorEl);
     }
@@ -109,6 +112,7 @@ function clearCardError(cardId) {
     const card = document.getElementById(cardId);
     if (!card) return;
     card.classList.remove('card--error', 'card--loading');
+    card.setAttribute('aria-busy', 'false');
     const errorEl = card.querySelector('.error-message');
     if (errorEl) errorEl.remove();
 }
@@ -118,13 +122,19 @@ function showToast(message, type = 'info') {
     if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast toast--${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
     toast.innerHTML = `<i class="fas ${iconClass}"></i><span class="toast-message">${message}</span>`;
     container.appendChild(toast);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(120%)';
-        setTimeout(() => toast.remove(), 300);
+        if (!reduceMotion) {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(120%)';
+            setTimeout(() => toast.remove(), 300);
+        } else {
+            toast.remove();
+        }
     }, 4000);
 }
 
@@ -133,6 +143,7 @@ function setRefreshing(refreshing) {
     const btn = document.getElementById('refreshBtn');
     if (!btn) return;
     btn.disabled = refreshing;
+    btn.setAttribute('aria-busy', refreshing ? 'true' : 'false');
     btn.classList.toggle('btn--loading', refreshing);
 }
 
