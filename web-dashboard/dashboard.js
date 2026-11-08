@@ -381,24 +381,38 @@ async function fetchAllMetrics() {
             queryPrometheus('security_findings_unresolved_by_severity{severity="critical"}'),
             queryPrometheus('security_findings_unresolved_by_severity{severity="high"}'),
             queryPrometheus('security_findings_unresolved_by_severity{severity="medium"}'),
-            queryPrometheus('security_findings_unresolved_by_severity{severity="low"}')
+            queryPrometheus('security_findings_unresolved_by_severity{severity="low"}'),
+            queryPrometheus('max(spectre_security_baseline_exporter_up)'),
+            queryPrometheus('max(spectre_security_baseline_never_run)'),
+            queryPrometheus('max(spectre_security_baseline_last_run_timestamp_seconds)'),
+            queryPrometheus('max(spectre_security_baseline_stale)'),
+            queryPrometheus('max(spectre_security_baseline_opa_check_ok)'),
+            queryPrometheus('max(spectre_security_baseline_drift_detected)'),
+            queryPrometheus('max(spectre_security_baseline_trivy_fs_ok)'),
+            queryPrometheus('max(spectre_security_baseline_gitleaks_ok)')
         ]);
         const [
             cpu, mem, disk, netIn, netOut, load1, bootTime, processes, tempHwmon, tempThermal,
             backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
             resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
             spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
-            findingsCritical, findingsHigh, findingsMedium, findingsLow
+            findingsCritical, findingsHigh, findingsMedium, findingsLow,
+            baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
+            baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk
         ] = metricResults;
         const agentReasonResult = await queryPrometheusFirst('spectre_agent_up_reason');
         const temp = tempHwmon ?? tempThermal;
+        const baseline = {
+            exporterUp: baselineExporterUp, neverRun: baselineNeverRun, lastRun: baselineLastRun, stale: baselineStale,
+            opaOk: baselineOpaOk, drift: baselineDrift, trivyFsOk: baselineTrivyFsOk, gitleaksOk: baselineGitleaksOk
+        };
 
         const totalQueries = metricResults.length;
         const succeeded = metricResults.filter(v => v !== null).length;
         lastQueryStats = { total: totalQueries, succeeded, failed: totalQueries - succeeded };
         lastExporterStatus = {
             backup: [backupLastSuccess, backupHealthOk, resticLastSuccess].some(v => v !== null),
-            security: spectreUp !== null
+            security: spectreUp !== null || baselineExporterUp === 1
         };
 
         // Treat all-null from core Prometheus as unreachable
@@ -421,7 +435,7 @@ async function fetchAllMetrics() {
 
         const agentReason = agentReasonResult?.metric?.reason || null;
         updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs);
-        updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason);
+        updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason, baseline);
         updateContainerStatus();
         checkAlerts();
         const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
@@ -650,15 +664,40 @@ function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes, repoFree
 }
 
 // Update Security Status
-function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, critical, high, medium, low, agentReason) {
+function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, critical, high, medium, low, agentReason, baseline) {
     const statusEl = document.getElementById('securityStatus');
     const agentEl = document.getElementById('agentStatusDetail');
     const scanEl = document.getElementById('lastSecurityScan');
     const vulnEl = document.getElementById('vulnerabilities');
     const severityEl = document.getElementById('severityBreakdown');
+    const checkLabel = (v) => (v === 1 ? 'OK' : v === 0 ? 'Issue' : 'Unknown');
 
     const hasSecurityMetrics = spectreUp !== null;
     if (!hasSecurityMetrics) {
+        const b = baseline || {};
+        const hasBaseline = b.exporterUp === 1 || b.neverRun !== null || b.lastRun !== null;
+        if (hasBaseline) {
+            if (statusEl) {
+                statusEl.textContent = b.neverRun === 1 ? 'Baseline Pending' : (b.stale === 1 ? 'Baseline Stale' : 'Baseline Only');
+                statusEl.className = b.stale === 1 ? 'badge badge-warning' : (b.neverRun === 1 ? 'badge badge-warning' : 'badge badge-success');
+            }
+            if (agentEl) agentEl.textContent = 'Agent metrics unavailable';
+            if (scanEl) {
+                if (b.neverRun === 1) scanEl.textContent = 'No baseline evidence yet';
+                else if (b.lastRun && b.lastRun > 0) { scanEl.textContent = formatRelativeTime(b.lastRun); scanEl.title = new Date(b.lastRun * 1000).toLocaleString(); }
+                else scanEl.textContent = 'Unknown';
+            }
+            if (vulnEl) vulnEl.textContent = b.neverRun === 1 ? '—' : 'n/a (agent metrics)';
+            if (severityEl) {
+                const parts = [`OPA ${checkLabel(b.opaOk)}`, `Drift ${checkLabel(b.drift === 1 ? 0 : b.drift === 0 ? 1 : -1)}`, `TrivyFS ${checkLabel(b.trivyFsOk)}`, `Gitleaks ${checkLabel(b.gitleaksOk)}`];
+                severityEl.textContent = parts.join(' · ');
+                severityEl.title = 'Security baseline pipeline checks (distinct from agent/runtime findings). OPA/TrivyFS/Gitleaks: 1=ok, 0=issue, -1=unknown. Drift shown as OK/Issue.';
+            }
+            clearCardError('securityCard');
+            if (b.neverRun === 1) setCardError('securityCard', 'Security agent metrics unavailable. Baseline exporter is publishing, but no baseline evidence has run yet.');
+            setCardUpdated('securityCard');
+            return;
+        }
         if (statusEl) { statusEl.textContent = 'No data'; statusEl.className = 'badge'; }
         [agentEl, scanEl, vulnEl, severityEl].forEach(el => { if (el) el.textContent = 'No data'; });
         setCardError('securityCard', 'Security metrics unavailable');
@@ -726,7 +765,6 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
     clearCardError('securityCard');
     setCardUpdated('securityCard');
 }
-
 // Update Container Status
 async function updateContainerStatus() {
     try {
