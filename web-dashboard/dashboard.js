@@ -206,7 +206,13 @@ function applyChartTheme() {
         chart.options.scales.y1.ticks.color = theme.tickColor;
         if (chart.options.scales.y1.title) chart.options.scales.y1.title.color = theme.tickColor;
     }
-    chart.options.plugins.legend.labels = { color: theme.legendColor };
+    chart.options.plugins.legend.labels = { ...(chart.options.plugins.legend.labels || {}), color: theme.legendColor };
+    if (chart.options.plugins.tooltip) {
+        chart.options.plugins.tooltip.backgroundColor = theme.tooltipBg;
+        chart.options.plugins.tooltip.titleColor = theme.tooltipText;
+        chart.options.plugins.tooltip.bodyColor = theme.tooltipText;
+        chart.options.plugins.tooltip.borderColor = theme.tooltipBorder;
+    }
     chart.update('none');
 }
 
@@ -763,7 +769,7 @@ async function updateContainerStatus() {
     } catch (error) {
         console.error('Error fetching container status:', error);
         setCardError('containersCard', 'Container data unavailable');
-        document.getElementById('containersGrid').innerHTML = '<div class="no-alerts">Unable to fetch container status</div>';
+        document.getElementById('containersGrid').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Container data unavailable.</strong> Unable to fetch recent container status.</span></div>';
         const containerStatus = document.getElementById('containerStatus');
         if (containerStatus) {
             containerStatus.textContent = 'No data';
@@ -803,11 +809,11 @@ function renderAlerts() {
     countEl.className = hasCritical ? 'badge badge-danger' : hasWarning ? 'badge badge-warning' : 'badge badge-success';
 
     if (currentAlerts.length === 0) {
-        alertsList.innerHTML = '<div class="no-alerts"><i class="fas fa-check-circle"></i> No active alerts</div>';
+        alertsList.innerHTML = '<div class="no-alerts no-alerts--ok"><i class="fas fa-check-circle" aria-hidden="true"></i><span><strong>All clear.</strong> No active alerts are firing.</span></div>';
         return;
     }
     if (filtered.length === 0) {
-        alertsList.innerHTML = `<div class="empty-state"><i class="fas fa-filter"></i>No ${activeAlertFilter} alerts</div>`;
+        alertsList.innerHTML = `<div class="empty-state"><i class="fas fa-filter" aria-hidden="true"></i><span>No <strong>${activeAlertFilter}</strong> alerts match the current filter.</span></div>`;
         return;
     }
 
@@ -854,7 +860,7 @@ async function checkAlerts() {
         console.error('Error checking alerts:', error);
         currentAlerts = [];
         setCardError('alertsCard', 'Alerts unavailable');
-        document.getElementById('alertsList').innerHTML = '<div class="no-alerts">Unable to fetch alerts</div>';
+        document.getElementById('alertsList').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Alerts unavailable.</strong> Unable to fetch alert data from Prometheus/Alertmanager.</span></div>';
     }
 }
 
@@ -1001,9 +1007,19 @@ function initializeChart() {
                 }
             },
             plugins: {
-                legend: { position: 'bottom', labels: { color: theme.legendColor } },
+                legend: {
+                    position: 'bottom',
+                    labels: { color: theme.legendColor, usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 14 }
+                },
                 tooltip: {
                     animation: !reduceMotion,
+                    backgroundColor: theme.tooltipBg,
+                    titleColor: theme.tooltipText,
+                    bodyColor: theme.tooltipText,
+                    borderColor: theme.tooltipBorder,
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: true,
                     callbacks: {
                         label: (ctx) => {
                             const v = ctx.parsed.y;
