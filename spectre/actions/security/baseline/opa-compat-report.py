@@ -29,23 +29,45 @@ def main() -> int:
     ap.add_argument("input", nargs="?", default="", help="nested current-infrastructure.json (or set SECURITY_BASELINE_FILE)")
     ap.add_argument("--policy-dir", default=str(POLICY_DIR))
     ap.add_argument("--verbose", action="store_true", help="include report-only detail (e.g. docker_evidence per-container lists)")
+    ap.add_argument("--collect-domains", default="", help="optional Slice C: collect v0 snapshot for comma-separated domains (e.g. compliance,backup) instead of reading an input file; report-only/non-gating")
+    ap.add_argument("--collect-probe", action="store_true", help="with --collect-domains, use best-effort read-only host probes (opt-in; uncertain fields absent/fail-closed)")
+    ap.add_argument("--collect-evidence", default="", help="with --collect-domains, JSON evidence file to inject (overrides probe values)")
     args = ap.parse_args()
     verbose = args.verbose or os.environ.get("SECURITY_OPA_COMPAT_VERBOSE", "") == "1"
-    src = args.input or str(Path.home() / ".local/state/spectre/security-baseline/current-infrastructure.json")
-    if not Path(src).exists():
-        # compat fallback (spectre-security repo is archived; SPECTRE_SECURITY_ROOT may be set explicitly)
-        sec_root = Path(os.environ.get("SPECTRE_SECURITY_ROOT", "/home/deon/dev/github/spectre-security"))
-        cand = sec_root / "security/test-data/current-infrastructure.json"
-        if cand.exists():
-            src = str(cand)
-        else:
-            print(
-                f"input not found: {src} (compat fallback also missing: {cand}; "
-                "provide an explicit input path or set SECURITY_BASELINE_FILE/SPECTRE_SECURITY_ROOT as appropriate)",
-                file=sys.stderr,
-            )
-            return 2
     with tempfile.TemporaryDirectory() as td:
+        collected_input = None
+        if args.collect_domains:
+            collector = SCRIPT_DIR / "live-infra-collect.py"
+            if not collector.exists():
+                print(f"collector not found: {collector}", file=sys.stderr)
+                return 2
+            collected = Path(td) / "collected-snapshot.json"
+            cmd = [sys.executable, str(collector), "--domains", args.collect_domains, "--output", str(collected), "--source", "spectre-suite/opa-compat-collect"]
+            if args.collect_probe:
+                cmd.append("--probe")
+            if args.collect_evidence:
+                cmd.extend(["--from-evidence", args.collect_evidence])
+            r = run(cmd)
+            if r.returncode != 0:
+                sys.stderr.write(r.stderr or r.stdout)
+                return r.returncode
+            src = str(collected)
+            collected_input = {"domains": args.collect_domains, "probe": args.collect_probe, "evidence": args.collect_evidence or None}
+        else:
+            src = args.input or str(Path.home() / ".local/state/spectre/security-baseline/current-infrastructure.json")
+            if not Path(src).exists():
+                # compat fallback (spectre-security repo is archived; SPECTRE_SECURITY_ROOT may be set explicitly)
+                sec_root = Path(os.environ.get("SPECTRE_SECURITY_ROOT", "/home/deon/dev/github/spectre-security"))
+                cand = sec_root / "security/test-data/current-infrastructure.json"
+                if cand.exists():
+                    src = str(cand)
+                else:
+                    print(
+                        f"input not found: {src} (compat fallback also missing: {cand}; "
+                        "provide an explicit input path or set SECURITY_BASELINE_FILE/SPECTRE_SECURITY_ROOT as appropriate)",
+                        file=sys.stderr,
+                    )
+                    return 2
         adapted = Path(td) / "adapted.json"
         report = Path(td) / "report.json"
         r = run([sys.executable, str(ADAPTER), src, "-o", str(adapted), "--report", str(report)])
@@ -77,6 +99,8 @@ def main() -> int:
         "gating": "non-gating; canonical data.security[k].deny gates unchanged",
     }
     # Additive provenance/contract metadata (v0 normalizer/adapter; never policy input).
+    if collected_input is not None:
+        summary["collected_input"] = collected_input
     if mapping.get("snapshot_contract"):
         summary["snapshot_contract"] = mapping["snapshot_contract"]
     if "docker_evidence" in mapping:
