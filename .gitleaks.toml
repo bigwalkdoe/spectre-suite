@@ -1,0 +1,17 @@
+# Gitleaks config for spectre-suite (filesystem and git scans).
+# Extends defaults; allowlist only reviewed false positives / generated artifacts.
+# Local gitignored secrets (.env, prometheus/alertmanager-secrets/*) are intentionally
+# NOT allowlisted: filesystem scans should flag them (keep untracked/rotate if exposed).
+
+title = "spectre-suite gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated artifacts and reviewed test fixtures (synthetic, not production secrets)."
+paths = [
+  '''(^|/)(__pycache__|\.pytest_cache|\.mypy_cache)/''',
+  '''\.pyc$''',
+  '''(^|/)tests/agent/test_agents\.py$''',
+]
