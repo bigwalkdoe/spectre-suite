@@ -8,6 +8,7 @@ report was produced; denials are informational under the Option A adapter flow.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -88,3 +89,23 @@ def test_compat_report_unmapped_controls_fail_closed_and_reported():
     assert d["mapped_count"] == 0
     assert d["denial_count"] > 0
     assert d["unmapped_suite_controls_note"]
+
+
+def test_compat_report_slice_c_collect_domains_report_only(tmp_path):
+    """Slice C (additive): collect v0 snapshot via fixture evidence; report-only, non-gating."""
+    if shutil.which("opa") is None:
+        pytest.skip("opa not available")
+    ev = tmp_path / "ev.json"
+    ev.write_text(json.dumps({
+        "compliance": {"firewall_enabled": True, "ssh_password_auth": False, "audit_logging_enabled": True, "intrusion_detection_active": True, "file_integrity_monitoring": True},
+        "backup": {"encrypted": True, "retention_days": 30, "offsite_replication": True},
+    }), encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, str(TOOL), "--collect-domains", "compliance,backup", "--collect-evidence", str(ev), "--policy-dir", str(POLICY_DIR)],
+        capture_output=True, text=True, check=True,
+    )
+    out = json.loads(r.stdout)
+    assert out["compat_mode"] == "report-only"
+    assert out["collected_input"]["domains"] == "compliance,backup"
+    assert "snapshot_contract" in out
+    assert "backup_encryption_enabled" in out["mapped_fields"]
