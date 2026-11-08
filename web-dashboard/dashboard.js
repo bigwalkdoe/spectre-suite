@@ -1238,3 +1238,25 @@ function viewLogs() {
     showToast('Opening Grafana logs...', 'info');
     window.open('http://localhost:3002', '_blank');
 }
+
+// GitGuardian-inspired shell UX (isolated): keep sidebar nav highlight in sync.
+// Does not affect Prometheus/Chart.js data or action behavior.
+(function initSidebarNavSync() {
+    const links = Array.from(document.querySelectorAll('.nav-item[href^="#"]'));
+    if (!links.length) return;
+    function setActive(hash) {
+        const h = hash && document.querySelector(hash) ? hash : '#main-content';
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === h));
+    }
+    links.forEach(a => a.addEventListener('click', () => setActive(a.getAttribute('href'))));
+    window.addEventListener('hashchange', () => setActive(location.hash));
+    if ('IntersectionObserver' in window) {
+        const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+        const io = new IntersectionObserver((entries) => {
+            const visible = entries.filter(e => e.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
+            if (visible && visible.target && visible.target.id) setActive('#' + visible.target.id);
+        }, { rootMargin: '-20% 0px -70% 0px', threshold: [0.01, 0.25, 0.5] });
+        targets.forEach(t => io.observe(t));
+    }
+    setActive(location.hash || '#main-content');
+})();
