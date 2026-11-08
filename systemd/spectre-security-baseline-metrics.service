@@ -1,0 +1,13 @@
+[Unit]
+Description=Spectre Security Baseline Metrics Exporter (textfile, dispatched)
+After=network.target
+
+[Service]
+Type=oneshot
+# Adjust WorkingDirectory and python path for your checkout/install.
+WorkingDirectory=~//dev/github/spectre-suite
+Environment=SPECTRE_REPO_ROOT=~//dev/github/spectre-suite
+ExecStart=/usr/bin/python3 -m spectre.cli.main run prometheus/security-baseline-metrics-exporter
+
+[Install]
+WantedBy=default.target
