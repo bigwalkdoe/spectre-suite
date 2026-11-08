@@ -262,4 +262,4 @@ jobs:
       - name: K8s admission + compat report tests (vendored policy)
         run: |
           python3 -m pip install --quiet pytest jsonschema
-          python3 -m pytest tests/test_k8s_admission_report.py tests/test_opa_compat_report.py tests/test_opa_versions_index_report.py tests/test_opa_path_c_contract.py tests/test_opa_contract_adapter.py tests/test_live_infra_snapshot_contract.py tests/test_live_infra_normalize.py -q
+          python3 -m pytest tests/test_k8s_admission_report.py tests/test_opa_compat_report.py tests/test_opa_versions_index_report.py tests/test_opa_path_c_contract.py tests/test_opa_contract_adapter.py tests/test_live_infra_snapshot_contract.py tests/test_live_infra_normalize.py tests/test_live_infra_collect.py -q

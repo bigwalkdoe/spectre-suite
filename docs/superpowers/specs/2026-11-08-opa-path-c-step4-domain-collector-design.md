@@ -47,7 +47,7 @@ Implement **one** suite-native, versioned evidence collector that produces a `li
 3. **Slice C (integration):** wire into `SECURITY_OPA_COMPAT`/baseline flow as an **optional, report-only** source behind a flag (non-gating), with provenance.
 
 ## 7. Acceptance for “step 4 started/complete (initial domain)”
-- [ ] v0 snapshot producer for `compliance`+`backup` (Slice A) with fixtures and tests.
-- [ ] `live-infra-normalize` + adapter parity proven on fixtures.
-- [ ] No changes to `data.security[k].deny` aggregation, core CI gate semantics, or k8s isolation.
-- [ ] All relevant existing OPA/contract tests remain green; new tests added additively.
+- [x] v0 snapshot producer for `compliance`+`backup` (Slice A) with fixtures and tests — `spectre/actions/security/baseline/live-infra-collect.py`, `tests/test_live_infra_collect.py` (fixture-driven, no host deps).
+- [x] `live-infra-normalize` + adapter parity proven on fixtures.
+- [x] No changes to `data.security[k].deny` aggregation, core CI gate semantics, or k8s isolation.
+- [x] All relevant existing OPA/contract tests remain green; new tests added additively (CI `opa-isolated-k8s` gates snapshot/normalizer/collector tests).
