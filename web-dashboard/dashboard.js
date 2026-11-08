@@ -197,6 +197,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('themeToggle').addEventListener('click', toggleDarkMode);
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) exportBtn.addEventListener('click', exportSnapshot);
+    document.querySelectorAll('[data-dashboard-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.dashboardAction;
+            if (action === 'backup') runBackup();
+            else if (action === 'maintenance') runMaintenance();
+            else if (action === 'security-scan') runSecurityScan();
+            else if (action === 'logs') viewLogs();
+        });
+    });
     document.getElementById('refreshInterval').addEventListener('change', (e) => {
         refreshIntervalMs = parseInt(e.target.value, 10) || 0;
         localStorage.setItem('spectre-refresh-interval', String(refreshIntervalMs));
