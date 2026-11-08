@@ -932,17 +932,26 @@ async function updateContainerStatus() {
         const now = Math.floor(Date.now() / 1000);
         const windowSeconds = 86400;
         const seen = new Map();
+        let hasUnlabeledRecent = false;
         for (const series of (data.data?.result || [])) {
-            const lastSeen = series.value?.[1];
-            if (!lastSeen || lastSeen < now - windowSeconds) continue;
-            const name = series.metric?.name || series.metric?.container_name;
-            if (name) seen.set(name, lastSeen);
+            const lastSeen = Number(series.value?.[1]);
+            if (!Number.isFinite(lastSeen) || lastSeen < now - windowSeconds) continue;
+            const m = series.metric || {};
+            const rawName = m.name || m.container_name || m.container || m.container_label_com_docker_compose_service || m['container_label_com.docker.compose.service'] || '';
+            const id = String(m.id || '');
+            const name = String(rawName).trim();
+            const isRootOrSystem = !name || name === '/' || name === 'POD' || id === '/' || /^\/(docker|kubepods|system\.slice)?$/.test(id);
+            if (isRootOrSystem) {
+                hasUnlabeledRecent = true;
+                continue;
+            }
+            seen.set(name, Math.max(seen.get(name) || 0, lastSeen));
         }
 
         const containerNames = [...seen.keys()].sort();
         const containerStatus = document.getElementById('containerStatus');
         const hasData = containerNames.length > 0;
-        const signature = containerNames.join('|');
+        const signature = `${containerNames.join('|')}|${hasUnlabeledRecent ? 'u' : ''}`;
 
         if (signature !== lastContainerSignature) {
             lastContainerSignature = signature;
@@ -961,18 +970,24 @@ async function updateContainerStatus() {
                     <span class="container-status ${container.status}">${container.status}</span>
                 </div>`;
             const grid = document.getElementById('containersGrid');
-            grid.innerHTML = sortedGroups.length ? sortedGroups.map(([key, items]) => `
+            if (sortedGroups.length) {
+                grid.innerHTML = sortedGroups.map(([key, items]) => `
                 <section class="container-group" aria-label="${key} containers">
                     <div class="container-group-header">
                         <span class="container-group-name">${key}</span>
                         <span class="container-group-count">${items.length}</span>
                     </div>
                     <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
-                </section>`).join('') : '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+                </section>`).join('');
+            } else if (hasUnlabeledRecent) {
+                grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>';
+            } else {
+                grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+            }
         }
 
-        containerStatus.textContent = hasData ? `${containerNames.length} Running` : 'No data';
-        containerStatus.className = hasData ? 'badge badge-success' : 'badge';
+        containerStatus.textContent = hasData ? `${containerNames.length} Running` : (hasUnlabeledRecent ? 'Labels missing' : 'No data');
+        containerStatus.className = hasData ? 'badge badge-success' : (hasUnlabeledRecent ? 'badge badge-warning' : 'badge');
         clearCardError('containersCard');
         setCardUpdated('containersCard');
     } catch (error) {
