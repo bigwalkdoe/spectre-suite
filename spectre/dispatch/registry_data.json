@@ -726,5 +726,15 @@
     "sudo": false,
     "mutates": false,
     "concurrency": "allow"
+  },
+  {
+    "name": "monitoring/check-monitoring-stack",
+    "action": "monitoring/check-monitoring-stack.sh",
+    "group": "monitoring",
+    "summary": "Check Prometheus route-prefix endpoints and Grafana datasource/connectivity drift",
+    "mutates": false,
+    "sudo": false,
+    "concurrency": "allow",
+    "timeout": 120
   }
 ]
