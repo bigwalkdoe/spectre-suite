@@ -6,7 +6,6 @@ This folder holds README/marketing visuals.
 
 | File | Type | Notes |
 |---|---|---|
-| `spectre-suite-banner.svg` | SVG banner | Hero banner used by the root README. Safe to edit/replace. |
 | `monitoring-preview.svg` | SVG illustration | Illustrative monitoring/dispatch preview. |
 | `spectre-cli-help.png` | PNG screenshot | Locally rendered terminal capture of `spectre --help`. |
 | `spectre-actions-list.png` | PNG screenshot | Locally rendered terminal capture of `spectre actions list`. |

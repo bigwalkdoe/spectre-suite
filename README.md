@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/spectre-suite-banner.svg" alt="Spectre Suite — Linux maintenance, backups, monitoring, and security automation" width="100%">
-</p>
-
 <h1 align="center">SPECTRE SUITE ☤</h1>
 
 <p align="center">
