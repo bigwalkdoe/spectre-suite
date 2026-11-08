@@ -177,3 +177,14 @@ main.content { display: grid; gap: 16px; }
 .stat-card .card-updated { margin-top: 8px; }
 #systemStatus.offline .status-dot { animation: none; opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .status-dot, .card--loading::after { animation: none !important; } }
+
+/* Mobile sidebar toggle (isolated, preserves desktop layout) */
+.sidebar-toggle { display: none; }
+.page-title { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.page-title h1 { flex: 1 1 220px; }
+.page-title .page-meta { flex-basis: 100%; margin-left: 0; }
+@media (max-width: 980px) {
+  .sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .app-shell.sidebar-collapsed .sidebar { display: none; }
+  .app-shell .sidebar { min-height: auto; }
+}

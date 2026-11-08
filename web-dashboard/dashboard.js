@@ -1260,3 +1260,25 @@ function viewLogs() {
     }
     setActive(location.hash || '#main-content');
 })();
+
+// Isolated mobile sidebar toggle (no data/Chart/Prometheus impact).
+(function initSidebarToggle() {
+    const btn = document.getElementById('sidebarToggle');
+    const shell = document.querySelector('.app-shell');
+    if (!btn || !shell) return;
+    btn.addEventListener('click', () => {
+        const collapsed = shell.classList.toggle('sidebar-collapsed');
+        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+    // On narrow screens, start collapsed to prioritize content; desktop unaffected.
+    if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
+        shell.classList.add('sidebar-collapsed');
+        btn.setAttribute('aria-expanded', 'false');
+    }
+    document.querySelectorAll('.nav-item[href^="#"]').forEach(a => a.addEventListener('click', () => {
+        if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
+            shell.classList.add('sidebar-collapsed');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    }));
+})();
