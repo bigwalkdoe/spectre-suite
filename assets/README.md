@@ -10,8 +10,10 @@ This folder holds README/marketing visuals.
 | `monitoring-preview.svg` | SVG illustration | Illustrative monitoring/dispatch preview. |
 | `spectre-cli-help.png` | PNG screenshot | Locally rendered terminal capture of `spectre --help`. |
 | `spectre-actions-list.png` | PNG screenshot | Locally rendered terminal capture of `spectre actions list`. |
-| `spectre-actions-verify.png` | PNG screenshot | Locally rendered terminal capture of `spectre actions verify`. |
-| `render_terminal_screenshots.py` | Script | Regenerates the terminal PNGs from real `spectre` command output. |
+| `spectre-actions-verify.png` | PNG screenshot | Locally rendered terminal capture of `spectre actions verify` (dark). |
+| `spectre-actions-show.png` | PNG screenshot | Locally rendered terminal capture of `spectre actions show backups/backup-all`. |
+| `spectre-actions-verify-light.png` | PNG screenshot | Light-theme sample from the generator. |
+| `render_terminal_screenshots.py` | Script | Regenerates terminal PNGs from real `spectre` output (themes, ANSI/plain modes, selectable commands). |
 
 ## Regenerate terminal screenshots
 
@@ -21,12 +23,22 @@ The terminal PNGs are rendered locally from live `spectre` output (Pillow, monos
 # from repo root
 python3 assets/render_terminal_screenshots.py
 
-# optional: custom output dir / width / font
+# all known captures
+python3 assets/render_terminal_screenshots.py --commands all
+
+# themes / variants
+python3 assets/render_terminal_screenshots.py --theme dark --theme light --suffix-theme
+python3 assets/render_terminal_screenshots.py --theme nord --color ansi --commands help,verify --suffix-theme
+
+# custom output / width / font
 python3 assets/render_terminal_screenshots.py --out assets --columns 110
 python3 assets/render_terminal_screenshots.py --font /usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf
 ```
 
-Requirements: Python 3, Pillow, and a monospace font (DejaVu Sans Mono / Noto Sans Mono / Liberation Mono). Review the generated images before committing — terminal captures can include host-specific paths or names.
+Available command keys: `help`, `list`, `verify`, `show`, `run-help`, `all`.  
+Modes/themes: `--color plain|ansi`, `--theme dark|light|nord` (repeatable).
+
+Requirements: Python 3, Pillow, and a monospace font (DejaVu Sans Mono / Noto Sans Mono / Liberation Mono). Review generated images before committing — terminal captures can include host-specific paths or names.
 
 ## Capture real browser/dashboard screenshots (running desktop/browser session)
 

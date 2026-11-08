@@ -10,17 +10,30 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge"></a>
+  <a href="pyproject.toml"><img alt="Version 0.3.0" src="https://img.shields.io/badge/Version-0.3.0-0ea5e9?style=for-the-badge"></a>
   <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white"></a>
   <a href="https://www.linux.org/"><img alt="Linux" src="https://img.shields.io/badge/Platform-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=111827"></a>
-  <a href="docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md"><img alt="Dispatch: spectre run" src="https://img.shields.io/badge/Dispatch-spectre%20run-60a5fa?style=for-the-badge"></a>
-  <a href="docs/TESTING_AND_CICD.md"><img alt="Ops Suite" src="https://img.shields.io/badge/Focus-Backups%20%7C%20Monitoring%20%7C%20Security-a78bfa?style=for-the-badge"></a>
 </p>
 
 <p align="center">
-  <code>◆ backups/restic</code> · <code>◆ prometheus/grafana/alertmanager</code> · <code>◆ security &amp; maintenance actions</code> · <code>◆ registry + provenance</code>
+  <a href="https://github.com/bigwalkdoe/spectre-suite/actions/workflows/lint.yml"><img alt="Lint workflow" src="https://img.shields.io/github/actions/workflow/status/bigwalkdoe/spectre-suite/lint.yml?branch=main&style=flat-square&label=lint"></a>
+  <a href="https://github.com/bigwalkdoe/spectre-suite/actions/workflows/test-suite.yml"><img alt="Test suite workflow" src="https://img.shields.io/github/actions/workflow/status/bigwalkdoe/spectre-suite/test-suite.yml?branch=main&style=flat-square&label=tests"></a>
+  <a href="https://github.com/bigwalkdoe/spectre-suite/actions/workflows/security-scanning.yml"><img alt="Security scanning workflow" src="https://img.shields.io/github/actions/workflow/status/bigwalkdoe/spectre-suite/security-scanning.yml?branch=main&style=flat-square&label=security"></a>
+  <a href="docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md"><img alt="Dispatch: spectre run" src="https://img.shields.io/badge/dispatch-spectre%20run-60a5fa?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <sub><code>╭─◆ backups/restic ─◆ prometheus/grafana/alertmanager ─◆ security &amp; maintenance ─◆ registry+provenance ◆─╮</code></sub>
 </p>
 
 ---
+
+```text
+                          ╔══════════════════════════════════════════╗
+                          ║   S P E C T R E   S U I T E   ·  ☤      ║
+                          ╚══════════════════════════════════════════╝
+                    backups · observability · hardening · maintenance · proof
+```
 
 ## ▸ What Spectre Suite is
 
@@ -29,9 +42,15 @@ Spectre Suite is a consolidated Linux operations suite for **automated backups**
 Instead of calling legacy scripts directly, scheduled and manual jobs run through the unified `spectre` dispatch surface:
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  spectre run <job>  ──► registry resolve ──► action/exporter ──► provenance │
-│  spectre actions verify  checks registry ↔ disk ↔ scheduler (truthful gate) │
+┌─[ dispatch fabric ]──────────────────────────────────────────────────────────┐
+│                                                                              │
+│   operator / timer / cron                                                    │
+│          │                                                                   │
+│          ▼                                                                   │
+│   spectre run <job> ──► registry resolve ──► action/exporter ──► provenance  │
+│          ▲                                                                   │
+│          └── spectre actions verify  ·  registry ↔ disk ↔ scheduler [gate]  │
+│                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -63,6 +82,12 @@ Loki, Promtail, Wazuh, OWASP ZAP orchestration, SonarQube orchestration, Trivy w
 
 ## ◈ Visuals & screenshots
 
+```text
+╔═◈═ preview ═════════════════════════════════════════════════════════════════╗
+║  terminal captures · illustrative observability · safe capture workflow     ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+```
+
 <p align="center">
   <img src="assets/monitoring-preview.svg" alt="Illustrative Spectre Suite monitoring preview" width="100%">
 </p>
@@ -82,19 +107,42 @@ Loki, Promtail, Wazuh, OWASP ZAP orchestration, SonarQube orchestration, Trivy w
       <img src="assets/spectre-actions-verify.png" alt="spectre actions verify terminal screenshot" width="100%">
     </td>
   </tr>
+  <tr>
+    <td align="center" width="33%">
+      <strong>Job metadata</strong><br>
+      <img src="assets/spectre-actions-show.png" alt="spectre actions show terminal screenshot" width="100%">
+    </td>
+    <td align="center" colspan="2">
+      <sub><code>◆ rendered locally · ◆ real command output · ◆ themes/ANSI modes available</code></sub><br><br>
+      <img src="assets/spectre-actions-verify-light.png" alt="spectre actions verify light theme sample" width="88%">
+      <br><sub>light-theme sample (generator: <code>--theme light --suffix-theme</code>)</sub>
+    </td>
+  </tr>
 </table>
 
 ```text
-╭─ screenshot note ───────────────────────────────────────────────────────────╮
-│ Terminal PNGs above are rendered locally from real command output.          │
-│ Add redacted Grafana/Alertmanager/dashboard captures to assets/ for         │
-│ full observability screenshots (see assets/README.md).                      │
+╭─[ capture workflow ]────────────────────────────────────────────────────────╮
+│ Terminal PNGs are regenerated locally from real `spectre` output:           │
+│   python3 assets/render_terminal_screenshots.py --commands all              │
+│   python3 assets/render_terminal_screenshots.py --theme dark --theme light  │
+│   python3 assets/render_terminal_screenshots.py --color ansi --theme nord   │
+│                                                                             │
+│ Grafana/Alertmanager: use the browser/desktop workflow in assets/README.md  │
+│ on a SAFE, redacted/demo view. A local monitoring stack may expose targets, │
+│ instance labels, internal IPs, routes, or config — do not commit live      │
+│ dashboard/status captures without review and redaction.                     │
 ╰─────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ---
 
 ## ▸ Quick start
+
+```text
+  ◆ inspect  →  ◆ verify  →  ◆ dispatch  →  ◆ review provenance
+      │             │            │                  │
+      └─────────────┴────────────┴─ truth before trust ─┘
+```
 
 ```bash
 git clone https://github.com/bigwalkdoe/spectre-suite.git
