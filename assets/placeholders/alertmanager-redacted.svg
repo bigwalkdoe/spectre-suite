@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="t d">
+  <title id="t">Alertmanager redacted placeholder</title>
+  <desc id="d">Safe placeholder template for a redacted Alertmanager screenshot.</desc>
+  <rect width="1200" height="720" fill="#0f172a"/>
+  <rect x="24" y="24" width="1152" height="672" rx="16" fill="#111827" stroke="#334155"/>
+  <text x="56" y="72" font-family="ui-monospace, monospace" font-size="28" fill="#e2e8f0">Alertmanager — REDACTED CAPTURE TEMPLATE</text>
+  <text x="56" y="104" font-family="ui-monospace, monospace" font-size="16" fill="#94a3b8">Prefer Alerts/Silences views on sanitized data. Status/config can expose routes, receivers, internal addresses, and service URLs.</text>
+  <rect x="56" y="132" width="1060" height="190" rx="12" fill="#020617" stroke="#475569"/>
+  <rect x="56" y="342" width="1060" height="300" rx="12" fill="#020617" stroke="#475569"/>
+  <g font-family="ui-monospace, monospace" fill="#f8fafc">
+    <rect x="96" y="190" width="980" height="44" fill="#334155"/><text x="112" y="219" font-size="18">REDACTED: receiver names, routes, cluster peers, internal IPs/URLs</text>
+    <rect x="96" y="430" width="980" height="44" fill="#334155"/><text x="112" y="459" font-size="18">REDACTED: alert labels/annotations, instance/job targets, secrets/config</text>
+    <rect x="96" y="494" width="980" height="44" fill="#334155"/><text x="112" y="523" font-size="18">SAFE: use demo data or crop to non-sensitive UI chrome if necessary</text>
+  </g>
+  <text x="56" y="672" font-family="ui-monospace, monospace" font-size="14" fill="#fbbf24">⚠ Do not capture /api/v2/status or config views from live instances without strict redaction review.</text>
+</svg>

@@ -14,6 +14,8 @@ This folder holds README/marketing visuals.
 | `spectre-actions-show.png` | PNG screenshot | Locally rendered terminal capture of `spectre actions show backups/backup-all`. |
 | `spectre-actions-verify-light.png` | PNG screenshot | Light-theme sample from the generator. |
 | `render_terminal_screenshots.py` | Script | Regenerates terminal PNGs from real `spectre` output (themes, ANSI/plain modes, selectable commands). |
+| `placeholders/grafana-dashboard-redacted.svg` | SVG template | Safe redaction-frame placeholder for Grafana dashboard captures. |
+| `placeholders/alertmanager-redacted.svg` | SVG template | Safe redaction-frame placeholder for Alertmanager captures. |
 
 ## Regenerate terminal screenshots
 
@@ -52,6 +54,8 @@ docker compose -f docker-compose.monitoring.yml up -d
 ```
 
 Before capturing: log in with a non-production/demo view if possible, hide sensitive panels, avoid showing webhook URLs/tokens, private IPs, hostnames, emails, API keys, or customer data. Crop/redact after capture.
+
+Safe placeholders (use as layout/redaction guides): `assets/placeholders/grafana-dashboard-redacted.svg`, `assets/placeholders/alertmanager-redacted.svg`.
 
 ### 2. Headless browser capture (scriptable)
 
