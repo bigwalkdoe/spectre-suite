@@ -25,7 +25,7 @@ import pytest
 
 from spectre.dispatch.lock import JobLock, LockUnavailable, lock_path, read_lock
 from spectre.dispatch.registry import Job
-from tests.dispatch.conftest import make_job
+from tests.agent.dispatch.conftest import make_job
 
 # The timeout the jobs under test carry, so the staleness arithmetic in the tests
 # that exercise it reads as the arithmetic in the module.

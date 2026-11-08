@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 from spectre.dispatch.resolve import DispatchError, actions_root, repo_root, resolve
-from tests.dispatch.conftest import make_job
+from tests.agent.dispatch.conftest import make_job
 
 _BODY = "#!/bin/bash\nexit 0\n"
 
