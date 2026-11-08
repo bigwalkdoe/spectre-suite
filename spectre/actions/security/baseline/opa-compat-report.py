@@ -73,7 +73,12 @@ def main() -> int:
         "denials": denials,
         "adapter_notes": mapping.get("notes", []),
         "unmapped_suite_controls_note": mapping.get("unmapped_suite_controls_note", ""),
+        "compat_mode": "report-only",
+        "gating": "non-gating; canonical data.security[k].deny gates unchanged",
     }
+    # Additive provenance/contract metadata (v0 normalizer/adapter; never policy input).
+    if mapping.get("snapshot_contract"):
+        summary["snapshot_contract"] = mapping["snapshot_contract"]
     if "docker_evidence" in mapping:
         ev = mapping["docker_evidence"] or {}
         summary["docker_evidence"] = {
