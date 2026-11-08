@@ -9,7 +9,7 @@
 #   ML_FIX_PROVIDER=ollama|openai-compatible
 #   ML_FIX_MODEL=llama3.2
 #   OLLAMA_HOST=http://localhost:11434
-#   ML_FIX_WEBHOOK=http://localhost:9093/api/v1/alerts   (optional)
+#   ML_FIX_WEBHOOK=http://localhost:9093/alertmanager/api/v2/alerts   (optional)
 
 set -euo pipefail
 

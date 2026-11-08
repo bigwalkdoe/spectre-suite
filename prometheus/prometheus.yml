@@ -8,7 +8,8 @@ global:
 # Alertmanager configuration
 alerting:
   alertmanagers:
-    - static_configs:
+    - path_prefix: /alertmanager
+      static_configs:
         - targets:
             - 'alertmanager:9093'
 
@@ -18,11 +19,11 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Prometheus self-monitoring
+  # Prometheus self-monitoring (route-prefix=/prometheus/)
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-    metrics_path: '/metrics'
+    metrics_path: '/prometheus/metrics'
     scrape_interval: 15s
 
   # Node Exporter - System metrics
@@ -49,10 +50,11 @@ scrape_configs:
       - targets: ['postgres-exporter:9187']
     scrape_interval: 15s
 
-  # Alertmanager
+  # Alertmanager (route-prefix=/alertmanager/)
   - job_name: 'alertmanager'
     static_configs:
       - targets: ['alertmanager:9093']
+    metrics_path: '/alertmanager/metrics'
     scrape_interval: 15s
 
   # Blackbox Exporter - HTTP checks
