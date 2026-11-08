@@ -664,8 +664,8 @@ function updateDiskMetrics(diskUsage) {
 function updateNetworkMetrics(networkIn, networkOut) {
     if (networkIn !== null && networkOut !== null) {
         const totalBytes = networkIn + networkOut;
-        const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
-        document.getElementById('networkIO').textContent = totalMB + ' MB/s';
+        document.getElementById('networkIO').textContent = formatBytesPerSec(totalBytes);
+        document.getElementById('networkIO').title = `${(totalBytes / 1024).toFixed(1)} KB/s (RX+TX, 5m rate)`;
         const change = document.getElementById('networkChange');
         if (totalBytes > 100 * 1024 * 1024) { // > 100 MB/s
             change.textContent = 'High';
@@ -1180,7 +1180,7 @@ function initializeChart() {
                     borderWidth: 1.5
                 },
                 {
-                    label: 'Network I/O',
+                    label: 'Network I/O (RX+TX, 5m rate)',
                     data: [],
                     borderColor: '#f59e0b',
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',

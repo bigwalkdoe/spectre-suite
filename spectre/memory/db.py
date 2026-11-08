@@ -533,7 +533,26 @@ def recent_runs(limit: int = 50, job: str | None = None) -> list[MaintenanceReco
 
 
 def save_security_incident(incident: SecurityIncident) -> None:
+    """Persist an incident, deduplicating identical open findings.
+
+    The security scanner runs repeatedly; saving every hit as a new row inflated
+    unresolved counts (and made the same finding look perpetually new) because
+    `get_security_summary` counts unresolved rows. If an unresolved incident with
+    the same rule and message already exists, keep it (preserving
+    `oldest_unresolved_timestamp` semantics) instead of inserting a duplicate.
+    Resolved findings are not collapsed here so a recurrence can be recorded as a
+    new open incident.
+    """
     with Session(engine) as session:
+        existing = session.exec(
+            select(SecurityIncident).where(
+                SecurityIncident.resolved == False,  # noqa: E712
+                SecurityIncident.rule_id == incident.rule_id,
+                SecurityIncident.message == incident.message,
+            )
+        ).first()
+        if existing is not None:
+            return
         session.add(incident)
         session.commit()
 

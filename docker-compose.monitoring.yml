@@ -184,11 +184,18 @@ services:
     # "Container  is using +Inf of its memory limit" -- all critical-looking and
     # none actionable. Host metrics come from node-exporter; this is for
     # containers only.
+    # --docker points at the socket explicitly so cAdvisor discovers containers
+    # even when /var/run bind propagation/permissions are restrictive. The socket
+    # is mounted separately; without container-name discovery cAdvisor only
+    # exports the root cgroup (id="/") and dashboards report "no named container
+    # labels found".
     command:
       - --docker_only=true
+      - --docker=unix:///var/run/docker.sock
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
@@ -199,6 +206,7 @@ services:
       - SYS_PTRACE
     security_opt:
       - no-new-privileges:true
+      - label=disable
     restart: unless-stopped
     networks:
       - monitoring
