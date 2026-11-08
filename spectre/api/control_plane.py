@@ -16,7 +16,7 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from spectre.dispatch import registry
 from spectre.dispatch.verify import read_host_inventory, verify
@@ -179,34 +179,5 @@ def register(app, verify_api_key):
                 "replaces": list(j.replaces),
             })
         return {"count": len(items), "actions": items}
-
-    @router.post("/actions/{job:path}/run")
-    async def run_action(job: str, _: bool = dep) -> dict[str, Any]:
-        """Authenticated dispatch trigger via the normal `spectre run` path.
-
-        Uses the CLI dispatch path so resolve/lock/sudo checks/provenance/run
-        records behave exactly as operator/cron dispatch does.
-        """
-        import subprocess
-        import sys
-
-        # Validate job exists before executing.
-        try:
-            registry.get_job(job)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=f"unknown job: {job}") from exc
-
-        cmd = [sys.executable, "-m", "spectre.cli.main", "run", job]
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, check=False)  # noqa: S603
-        payload = {
-            "job": job,
-            "exit_code": p.returncode,
-            "stdout": (p.stdout or "")[-6000:],
-            "stderr": (p.stderr or "")[-6000:],
-        }
-        if p.returncode != 0:
-            raise HTTPException(status_code=500, detail=payload)
-        payload["status"] = "ok"
-        return payload
 
     app.include_router(router)
