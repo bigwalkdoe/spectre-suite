@@ -15,22 +15,32 @@ mkdir -p "$LOG_DIR"
 
 # Baseline contract: spectre-security's current-infrastructure.json schema by default.
 # Provide SECURITY_BASELINE_FILE/SPECTRE_BASELINE for an explicit canonical/approved baseline.
+# Resolution order (additive): explicit env -> spectre-security compat -> suite state dir
+# (written by update-baseline.sh) -> clear error. Suite spectre/policies/baseline.json is
+# a different (flat Rego) contract and is never used as a docker/network drift baseline.
+STATE_DIR="${SECURITY_BASELINE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/spectre/security-baseline}"
 BASELINE_FILE="${SECURITY_BASELINE_FILE:-${SPECTRE_BASELINE:-}}"
 if [ -z "$BASELINE_FILE" ]; then
-  if [ -f "$SPECTRE_SECURITY_ROOT/security/test-data/current-infrastructure.json" ]; then
-    BASELINE_FILE="$SPECTRE_SECURITY_ROOT/security/test-data/current-infrastructure.json"
-  elif [ -f "$SUITE_ROOT/spectre/policies/baseline.json" ]; then
-    # Suite policy baseline has a different schema; drift-detection currently expects
-    # spectre-security's docker/compliance structure. Fail clearly rather than misreport.
+  for _cand in \
+    "$SPECTRE_SECURITY_ROOT/security/test-data/current-infrastructure.json" \
+    "$STATE_DIR/current-infrastructure.json" \
+    "$LOG_DIR/current-infrastructure.json"; do
+    if [ -f "$_cand" ]; then BASELINE_FILE="$_cand"; break; fi
+  done
+fi
+if [ -z "$BASELINE_FILE" ]; then
+  if [ -f "$SUITE_ROOT/spectre/policies/baseline.json" ]; then
+    # Suite policy baseline has a different schema; drift-detection expects
+    # spectre-security's docker/network/compliance structure. Fail clearly rather than misreport.
     echo "drift-detection: no compatible baseline file found." >&2
-    echo "  Set SECURITY_BASELINE_FILE (or SPECTRE_BASELINE) to a spectre-security-compatible baseline JSON," >&2
-    echo "  or provide SPECTRE_SECURITY_ROOT with security/test-data/current-infrastructure.json." >&2
-    echo "  (suite spectre/policies/baseline.json uses a different contract; adapter pending)" >&2
-    exit 2
-  else
-    echo "drift-detection: baseline file not found; set SECURITY_BASELINE_FILE/SPECTRE_BASELINE" >&2
+    echo "  Generate one (captures live Docker/network/compliance):" >&2
+    echo "    bash spectre/actions/security/baseline/update-baseline.sh" >&2
+    echo "  Or set SECURITY_BASELINE_FILE (or SPECTRE_BASELINE) to a spectre-security-compatible JSON." >&2
+    echo "  (suite spectre/policies/baseline.json is a flat Rego contract; docker/network drift needs a captured baseline)" >&2
     exit 2
   fi
+  echo "drift-detection: baseline file not found; set SECURITY_BASELINE_FILE/SPECTRE_BASELINE or run update-baseline.sh" >&2
+  exit 2
 fi
 [ -f "$BASELINE_FILE" ] || { echo "drift-detection: baseline file missing: $BASELINE_FILE" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "drift-detection: jq required" >&2; exit 2; }
