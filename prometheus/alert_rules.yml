@@ -691,3 +691,84 @@ groups:
             SBOM generation reported issues (source={{ $labels.source }}).
             Evidence/SBOM completeness may be degraded; unknown/skipped (-1)
             does not trigger this alert.
+
+  # Monitoring stack self-checks (route-prefix, Grafana->Prometheus reachability,
+  # datasource config/health drift), published by
+  # spectre/monitoring/exporters/monitoring-stack-metrics-exporter.sh via
+  # `spectre run prometheus/monitoring-stack-metrics-exporter`.
+  # -1 = unknown/skipped (credentials unavailable, container absent, inconclusive);
+  # alerts fire only on explicit 0 (bad) values unless noted.
+  - name: monitoring_stack_alerts
+    interval: 60s
+    rules:
+      - alert: MonitoringStackMetricsMissing
+        expr: absent(spectre_monitoring_check_ok)
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Monitoring stack self-check metrics are missing"
+          description: >-
+            No spectre_monitoring_check_ok series is present. The monitoring stack
+            exporter may not be scheduled/scraped. Route-prefix and Grafana datasource
+            drift may be invisible. Run:
+            `spectre run prometheus/monitoring-stack-metrics-exporter` and verify
+            prometheus/business-metrics/monitoring_stack_metrics.prom.
+
+      - alert: PrometheusRoutePrefixUnhealthy
+        expr: spectre_monitoring_prometheus_routeprefix_healthy == 0 or spectre_monitoring_prometheus_ready == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus is unhealthy/not ready under its configured route prefix"
+          description: >-
+            The monitoring stack check cannot reach Prometheus health/ready endpoints
+            at the configured route prefix (e.g. /prometheus). Host-published ports may
+            work while path config is wrong, or Prometheus may be down. Check
+            --web.route-prefix/--web.external-url, container logs, and
+            `spectre run monitoring/check-monitoring-stack`. See RUNBOOKS.md
+            "Monitoring Stack / Prometheus & Grafana Connectivity".
+
+      - alert: GrafanaCannotReachPrometheus
+        expr: spectre_monitoring_grafana_to_prometheus_reachable == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Grafana container cannot reach Prometheus in-network"
+          description: >-
+            In-network probe from Grafana to Prometheus failed (no route to host,
+            unreachable, timeout, or refused). Prometheus may be healthy from the host
+            while Docker bridge/iptables forwarding is broken. Check
+            `docker exec grafana wget ... http://prometheus:9090/prometheus/-/healthy`,
+            `docker network inspect spectre-suite_monitoring`, and host firewall/
+            Docker FORWARD/DOCKER chains. See RUNBOOKS.md.
+
+      - alert: GrafanaPrometheusDatasourceURLDrift
+        expr: spectre_monitoring_grafana_datasource_provisioning_ok == 0 or spectre_monitoring_grafana_datasource_url_matches == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Grafana Prometheus datasource URL has drifted from expected route-prefix config"
+          description: >-
+            Provisioned or live Grafana Prometheus datasource URL does not include the
+            expected Prometheus route prefix (e.g. missing /prometheus). Grafana queries
+            may 404 while Prometheus is healthy. Fix datasource URL to
+            http://prometheus:9090/prometheus (or expected prefix) and Save & test.
+            Run `spectre run monitoring/check-monitoring-stack` for details.
+
+      - alert: GrafanaPrometheusDatasourceUnhealthy
+        expr: spectre_monitoring_grafana_datasource_healthy == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Grafana reports its Prometheus datasource unhealthy"
+          description: >-
+            Grafana datasource health check failed (network reachability, 404 due to
+            route-prefix drift, or API error). This is the operator-facing symptom;
+            inspect MonitoringStack/GrafanaCannotReachPrometheus and
+            GrafanaPrometheusDatasourceURLDrift alerts and run
+            `spectre run monitoring/check-monitoring-stack`.

@@ -736,5 +736,17 @@
     "sudo": false,
     "concurrency": "allow",
     "timeout": 120
+  },
+  {
+    "name": "prometheus/monitoring-stack-metrics-exporter",
+    "action": "prometheus/monitoring-stack-metrics-exporter.sh",
+    "group": "monitoring",
+    "summary": "Export Prometheus route-prefix and Grafana datasource reachability/drift metrics for textfile collector",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*/5 * * * *",
+    "replaces": [
+      "crontab:*/5 * * * *"
+    ]
   }
 ]
