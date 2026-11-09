@@ -105,7 +105,7 @@ function setCardError(cardId, message) {
         const body = card.querySelector('.card-body') || card;
         body.appendChild(errorEl);
     }
-    errorEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+    errorEl.innerHTML = `<i class="fas fa-exclamation-circle" aria-hidden="true"></i> ${message}`;
 }
 
 function clearCardError(cardId) {
@@ -124,7 +124,7 @@ function showToast(message, type = 'info') {
     toast.className = `toast toast--${type}`;
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-    toast.innerHTML = `<i class="fas ${iconClass}"></i><span class="toast-message">${message}</span>`;
+    toast.innerHTML = `<i class="fas ${iconClass}" aria-hidden="true"></i><span class="toast-message">${message}</span>`;
     container.appendChild(toast);
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     setTimeout(() => {
@@ -327,7 +327,7 @@ function setCardUpdated(cardId) {
         const target = card.querySelector('.stat-content') || card.querySelector('.card-body') || card;
         target.appendChild(el);
     }
-    el.innerHTML = `<i class="fas fa-clock"></i> ${text}`;
+    el.innerHTML = `<i class="fas fa-clock" aria-hidden="true"></i> ${text}`;
 }
 
 function updateDiagnostics() {
