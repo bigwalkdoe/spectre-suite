@@ -13,7 +13,7 @@ fail() { echo "❌ $1"; exit 1; }
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/restic-adopted.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 export HOME="$tmp/home"
-mkdir -p "$HOME/.config" "$HOME/dev" "$HOME/docs" "$HOME/.secrets" "$HOME/archive/old-projects"
+mkdir -p "$HOME/.config" "$HOME/dev" "$HOME/docs" "$HOME/.secrets" "$HOME/Archive/old-projects"
 export RESTIC_REPOSITORY_LOCAL="/backups/spectre-backup"
 export RESTIC_REPOSITORY="rclone:spectre-backup:"
 export RESTIC_TAG="spectre-suite"
@@ -57,7 +57,7 @@ fixture_real="$tmp/include-real.conf"
 cat > "$fixture_real" <<EOF
 $HOME/dev
 $HOME/docs
-$HOME/archive/old-projects
+$HOME/Archive/old-projects
 EOF
 declare -a t_real=()
 build_targets "$fixture_real" t_real
