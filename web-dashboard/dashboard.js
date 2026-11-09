@@ -41,6 +41,10 @@ function externalUrl(backend, path = '/') {
     const p = path.startsWith('/') ? path : `/${path}`;
     return `${base}${p}`;
 }
+function extBase(key) {
+    const v = EXTERNAL_BACKENDS && EXTERNAL_BACKENDS[key] ? String(EXTERNAL_BACKENDS[key]) : '';
+    return v.replace(/\/$/, '');
+}
 function initExternalLinks() {
     document.querySelectorAll('a[data-ext]').forEach((a) => {
         const backend = a.getAttribute('data-ext');
@@ -68,6 +72,8 @@ let lastChartRefreshAt = 0;
 let slowMetricsCache = null;
 let slowMetricsCacheAt = 0;
 let lastContainerSignature = null;
+let currentContainerNames = [];
+let lastContainerMeta = { hasUnlabeledRecent: false };
 
 const FETCH_TIMEOUT_MS = 12000;
 const CHART_AUTO_REFRESH_MS = 5 * 60 * 1000;
@@ -169,10 +175,39 @@ function applyRefreshInterval() {
     updateDiagnostics();
 }
 
+function restorePersistedUiState() {
+    const savedSeverity = localStorage.getItem('spectre-alert-severity-filter');
+    if (savedSeverity) {
+        const btn = document.querySelector(`#alertFilters .btn[data-severity="${CSS.escape(savedSeverity)}"]`);
+        if (btn) {
+            document.querySelectorAll('#alertFilters .btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+            activeAlertFilter = savedSeverity;
+        }
+    }
+    const savedRange = localStorage.getItem('spectre-chart-range');
+    if (savedRange && { '1h': 1, '6h': 1, '24h': 1, '7d': 1 }[savedRange]) {
+        const btn = document.querySelector(`.chart-controls .btn[data-range="${CSS.escape(savedRange)}"]`);
+        if (btn) {
+            document.querySelectorAll('.chart-controls .btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+        }
+    }
+}
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
     loadRefreshInterval();
+    restorePersistedUiState();
     initializeDashboard();
     updateTimestamp();
     setInterval(updateTimestamp, 1000);
@@ -223,7 +258,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             target.classList.add('active');
             target.setAttribute('aria-pressed', 'true');
-            updateChart(target.dataset.range);
+            const range = target.dataset.range || '1h';
+            localStorage.setItem('spectre-chart-range', range);
+            updateChart(range);
         });
     });
 
@@ -238,9 +275,15 @@ document.addEventListener('DOMContentLoaded', () => {
             target.classList.add('active');
             target.setAttribute('aria-pressed', 'true');
             activeAlertFilter = target.dataset.severity || 'all';
+            localStorage.setItem('spectre-alert-severity-filter', activeAlertFilter);
             renderAlerts();
         });
     });
+
+    const containerFilter = document.getElementById('containerFilter');
+    if (containerFilter) {
+        containerFilter.addEventListener('input', () => renderContainers());
+    }
 });
 
 function initializeTheme() {
@@ -936,6 +979,52 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
     clearCardError('securityCard');
     setCardUpdated('securityCard');
 }
+function renderContainers() {
+    const grid = document.getElementById('containersGrid');
+    if (!grid) return;
+    const q = (document.getElementById('containerFilter')?.value || '').trim().toLowerCase();
+    const names = Array.isArray(currentContainerNames) ? currentContainerNames : [];
+    const filteredNames = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+    const renderKey = `${lastContainerSignature}|${q}`;
+    if (renderKey === lastRenderedContainerKey) return;
+    lastRenderedContainerKey = renderKey;
+
+    if (!names.length) {
+        if (lastContainerMeta.hasUnlabeledRecent) {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>';
+        } else {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+        }
+        return;
+    }
+    if (!filteredNames.length) {
+        grid.innerHTML = `<div class="empty-state"><i class="fas fa-filter" aria-hidden="true"></i><span>No containers match <strong>${escapeHtml(q)}</strong>.</span></div>`;
+        return;
+    }
+
+    const containers = filteredNames.map(name => ({ name, status: 'running' }));
+    const groups = new Map();
+    for (const c of containers) {
+        const key = (c.name || '').split(/[-_]/)[0] || c.name || 'other';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(c);
+    }
+    const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const renderItem = (container) => `
+        <div class="container-item">
+            <div class="container-name">${escapeHtml(container.name)}</div>
+            <span class="container-status ${escapeHtml(container.status)}">${escapeHtml(container.status)}</span>
+        </div>`;
+    grid.innerHTML = sortedGroups.map(([key, items]) => `
+        <section class="container-group" aria-label="${escapeHtml(key)} containers">
+            <div class="container-group-header">
+                <span class="container-group-name">${escapeHtml(key)}</span>
+                <span class="container-group-count">${items.length}</span>
+            </div>
+            <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
+        </section>`).join('');
+}
+
 // Update Container Status
 async function updateContainerStatus() {
     try {
@@ -970,40 +1059,11 @@ async function updateContainerStatus() {
         const containerNames = [...seen.keys()].sort();
         const containerStatus = document.getElementById('containerStatus');
         const hasData = containerNames.length > 0;
-        const signature = `${containerNames.join('|')}|${hasUnlabeledRecent ? 'u' : ''}`;
-
-        if (signature !== lastContainerSignature) {
-            lastContainerSignature = signature;
-            const containers = containerNames.map(name => ({ name, status: 'running' }));
-            // Presentational grouping by name prefix (first token before -/_); data/count semantics unchanged.
-            const groups = new Map();
-            for (const c of containers) {
-                const key = (c.name || '').split(/[-_]/)[0] || c.name || 'other';
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key).push(c);
-            }
-            const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-            const renderItem = (container) => `
-                <div class="container-item">
-                    <div class="container-name">${escapeHtml(container.name)}</div>
-                    <span class="container-status ${escapeHtml(container.status)}">${escapeHtml(container.status)}</span>
-                </div>`;
-            const grid = document.getElementById('containersGrid');
-            if (sortedGroups.length) {
-                grid.innerHTML = sortedGroups.map(([key, items]) => `
-                <section class="container-group" aria-label="${escapeHtml(key)} containers">
-                    <div class="container-group-header">
-                        <span class="container-group-name">${escapeHtml(key)}</span>
-                        <span class="container-group-count">${items.length}</span>
-                    </div>
-                    <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
-                </section>`).join('');
-            } else if (hasUnlabeledRecent) {
-                grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>';
-            } else {
-                grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
-            }
-        }
+        currentContainerNames = containerNames;
+        lastContainerMeta = { hasUnlabeledRecent };
+        lastContainerSignature = `${containerNames.join('|')}|${hasUnlabeledRecent ? 'u' : ''}`;
+        lastRenderedContainerKey = null;
+        renderContainers();
 
         containerStatus.textContent = hasData ? `${containerNames.length} Running` : (hasUnlabeledRecent ? 'Labels missing' : 'No data');
         containerStatus.className = hasData ? 'badge badge-success' : (hasUnlabeledRecent ? 'badge badge-warning' : 'badge');
@@ -1012,6 +1072,9 @@ async function updateContainerStatus() {
     } catch (error) {
         console.error('Error fetching container status:', error);
         lastContainerSignature = null;
+        lastRenderedContainerKey = null;
+        currentContainerNames = [];
+        lastContainerMeta = { hasUnlabeledRecent: false };
         setCardError('containersCard', 'Container data unavailable');
         document.getElementById('containersGrid').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Container data unavailable.</strong> Unable to fetch recent container status.</span></div>';
         const containerStatus = document.getElementById('containerStatus');
@@ -1073,6 +1136,21 @@ function renderAlerts() {
         safeDesc.textContent = description;
         const timeStr = startMs ? new Date(startMs).toLocaleString() : 'Unknown time';
         const ageStr = formatAlertAge(startMs);
+        const promBase = extBase('prometheus');
+        const amBase = extBase('alertmanager');
+        const alertname = alert.labels?.alertname ? String(alert.labels.alertname) : '';
+        const promqlName = alertname.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ');
+        const amFilter = alertname ? encodeURIComponent(`{alertname="${alertname.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ')}"}`) : '';
+        const promGraphHref = (promBase && alertname)
+            ? `${promBase}/graph?g0.expr=${encodeURIComponent(`ALERTS{alertname="${promqlName}"}`)}&g0.tab=1`
+            : (promBase ? `${promBase}/alerts` : '');
+        const amHref = amBase
+            ? `${amBase}/#/alerts${amFilter ? `?receiver=&silenced=false&inhibited=false&active=true&filter=${amFilter}` : ''}`
+            : '';
+        const links = [
+            promGraphHref ? `<a href="${escapeHtml(promGraphHref)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(alertname ? 'Open in Prometheus with pre-filled ALERTS query' : 'Open Prometheus alerts')}" aria-label="Open in Prometheus">Prometheus</a>` : '',
+            amHref ? `<a href="${escapeHtml(amHref)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(alertname ? 'Open in Alertmanager (filter pre-filled where supported)' : 'Open Alertmanager')}" aria-label="Open in Alertmanager">Alertmanager</a>` : ''
+        ].filter(Boolean).join('');
         return `
         <div class="alert-item ${escapeHtml(severity)}">
             <div class="alert-title">${safeName.innerHTML}</div>
@@ -1081,6 +1159,7 @@ function renderAlerts() {
                 <span class="alert-severity-tag">${escapeHtml(severity)}</span>
                 <span class="alert-age">${escapeHtml(ageStr)}</span>
                 <span class="alert-time">${escapeHtml(timeStr)}</span>
+                ${links ? `<span class="alert-actions">${links}</span>` : ''}
             </div>
         </div>
     `;
