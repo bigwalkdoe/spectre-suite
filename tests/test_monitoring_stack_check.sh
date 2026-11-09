@@ -38,7 +38,7 @@ cp "$TARGET" "$TMP/spectre/actions/monitoring/check-monitoring-stack.sh"
 chmod +x "$TMP/spectre/actions/monitoring/check-monitoring-stack.sh"
 
 PORT=18091
-python3 - "$PORT" <<'PY' >/tmp/opencode/mock-prom.log 2>&1 &
+python3 - "$PORT" <<'PY' >"$TMP/mock-prom.log" 2>&1 &
 import http.server, sys
 port=int(sys.argv[1])
 class H(http.server.BaseHTTPRequestHandler):
@@ -60,7 +60,7 @@ sleep 0.4
 
 set +e
 OUT=$(PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus \
-  SPECTRE_REPO_ROOT="$TMP" GRAFANA_ADMIN_PASSWORD= \
+  SPECTRE_REPO_ROOT="$TMP" GRAFANA_ADMIN_PASSWORD='' \
   bash "$TMP/spectre/actions/monitoring/check-monitoring-stack.sh" 2>&1)
 RC=$?
 set -e
@@ -80,7 +80,7 @@ datasources:
 YML
 set +e
 OUT2=$(PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus \
-  SPECTRE_REPO_ROOT="$TMP" GRAFANA_ADMIN_PASSWORD= \
+  SPECTRE_REPO_ROOT="$TMP" GRAFANA_ADMIN_PASSWORD='' \
   bash "$TMP/spectre/actions/monitoring/check-monitoring-stack.sh" 2>&1)
 RC2=$?
 set -e
