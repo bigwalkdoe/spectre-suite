@@ -63,7 +63,7 @@ let lastPrometheusConnected = null;
 let currentAlerts = [];
 let activeAlertFilter = 'all';
 let lastQueryStats = { total: 0, succeeded: 0, failed: 0 };
-let lastExporterStatus = { backup: false, security: false };
+let lastExporterStatus = { backup: false, agent: false, baseline: false };
 let lastChartRefreshAt = 0;
 let slowMetricsCache = null;
 let slowMetricsCacheAt = 0;
@@ -333,6 +333,8 @@ function setCardUpdated(cardId) {
 function updateDiagnostics() {
     const queryHealth = document.getElementById('queryHealth');
     const backupExporter = document.getElementById('backupExporterStatus');
+    const agentMetrics = document.getElementById('agentMetricsStatus');
+    const baselineExporter = document.getElementById('baselineExporterStatus');
     const securityExporter = document.getElementById('securityExporterStatus');
     const autoRefresh = document.getElementById('autoRefreshStatus');
     const diagStatus = document.getElementById('diagnosticsStatus');
@@ -347,8 +349,14 @@ function updateDiagnostics() {
     if (backupExporter) {
         backupExporter.textContent = lastExporterStatus.backup ? 'Publishing metrics' : 'No data (not scheduled or no output)';
     }
+    if (agentMetrics) {
+        agentMetrics.textContent = lastExporterStatus.agent ? 'Publishing metrics' : 'No data (agent unavailable)';
+    }
+    if (baselineExporter) {
+        baselineExporter.textContent = lastExporterStatus.baseline ? 'Publishing metrics' : 'No data (not scheduled or no output)';
+    }
     if (securityExporter) {
-        securityExporter.textContent = lastExporterStatus.security ? 'Publishing metrics' : 'No data (agent/exporter unavailable)';
+        securityExporter.textContent = (lastExporterStatus.agent || lastExporterStatus.baseline) ? 'Publishing metrics' : 'No data (agent/exporter unavailable)';
     }
     if (autoRefresh) {
         if (refreshIntervalMs > 0) {
@@ -586,6 +594,8 @@ async function fetchAllMetrics(opts = {}) {
         lastQueryStats = { total: executed, succeeded, failed: executed - succeeded };
         lastExporterStatus = {
             backup: [backupLastSuccess, backupHealthOk, resticLastSuccess].some(v => v !== null),
+            agent: spectreUp !== null,
+            baseline: baselineExporterUp === 1,
             security: spectreUp !== null || baselineExporterUp === 1
         };
 
@@ -1397,7 +1407,10 @@ async function exportSnapshot() {
         diagnostics: {
             queryHealth: document.getElementById('queryHealth')?.textContent,
             backupExporter: document.getElementById('backupExporterStatus')?.textContent,
+            agentMetrics: document.getElementById('agentMetricsStatus')?.textContent,
+            baselineExporter: document.getElementById('baselineExporterStatus')?.textContent,
             securityExporter: document.getElementById('securityExporterStatus')?.textContent
+                || ((lastExporterStatus.agent || lastExporterStatus.baseline) ? 'Publishing metrics' : 'No data (agent/exporter unavailable)')
         }
     };
 
