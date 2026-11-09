@@ -1523,7 +1523,10 @@ function viewLogs() {
     function syncSidebarState() {
         if (!shell) return;
         const collapsed = shell.classList.contains('sidebar-collapsed');
-        if (sidebarBtn) sidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        if (sidebarBtn) {
+            sidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            sidebarBtn.setAttribute('aria-label', collapsed ? 'Open navigation' : 'Close navigation');
+        }
         if (sidebarBackdrop) sidebarBackdrop.hidden = !isMobileSidebar() || collapsed;
     }
     function closeSidebarIfMobile() {
@@ -1594,8 +1597,7 @@ function viewLogs() {
             if (!shell) return;
             if (!isMobileSidebar()) {
                 shell.classList.remove('sidebar-collapsed');
-                if (sidebarBackdrop) sidebarBackdrop.hidden = true;
-                if (sidebarBtn) sidebarBtn.setAttribute('aria-expanded', 'true');
+                syncSidebarState();
             } else {
                 shell.classList.add('sidebar-collapsed');
                 syncSidebarState();
