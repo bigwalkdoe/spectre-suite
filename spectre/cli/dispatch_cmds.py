@@ -99,6 +99,7 @@ passes the timeout also quietly invalidates the reasoning that lock is built on.
 from __future__ import annotations
 
 import os
+import subprocess
 from typing import Annotated
 
 import click
@@ -111,7 +112,7 @@ from spectre.dispatch import verify as verify_mod
 from spectre.dispatch.envelope import Status
 from spectre.dispatch.lock import JobLock, LockUnavailable
 from spectre.dispatch.registry import Job
-from spectre.dispatch.resolve import DispatchError, ResolvedAction, actions_root, resolve
+from spectre.dispatch.resolve import DispatchError, ResolvedAction, actions_root, repo_root, resolve
 from spectre.dispatch.runner import run_action
 from spectre.dispatch.verify import Finding
 
@@ -399,6 +400,81 @@ def actions_show(job: str) -> None:
 
 
 # ── actions verify ───────────────────────────────────────────────────────────
+
+# (actions doctor follows verify; it aggregates verify + read-only checks)
+
+
+def _run_doctor_check(job_name: str, label: str) -> tuple[bool, str]:
+    """Run a registered read-only action by resolving and executing its script.
+    Returns (ok, summary). Never raises; failures become a finding-like summary."""
+    try:
+        job = registry.get_job(job_name)
+    except KeyError:
+        return False, f"{label}: not registered ({job_name})"
+    try:
+        resolved = resolve(job)
+    except DispatchError as e:
+        return False, f"{label}: not dispatchable: {e}"
+    try:
+        root = str(repo_root())
+        proc = subprocess.run(
+            [str(resolved.path)],
+            capture_output=True,
+            text=True,
+            timeout=min(getattr(job, "timeout", 120) or 120, 180),
+            cwd=root,
+            env={**os.environ, "SPECTRE_REPO_ROOT": root},
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, f"{label}: could not run: {e}"
+    out = (proc.stdout or "") + (("\n" + proc.stderr) if proc.stderr else "")
+    tail = "\n".join(out.strip().splitlines()[-8:]) if out.strip() else "(no output)"
+    ok = proc.returncode == 0
+    status = "ok" if ok else f"failed (exit {proc.returncode})"
+    return ok, f"{label}: {status}\n{tail}"
+
+
+@actions_app.command("doctor")
+def actions_doctor() -> None:
+    """Aggregate dispatch/monitoring diagnostics: registry+disk+scheduler verify,
+    monitoring stack checks (Prometheus route-prefix/Grafana datasource drift),
+    and config consistency. Read-only; never prints secrets.
+
+    Exit 0 when no blocking verify findings and all doctor checks pass; 1 otherwise.
+    """
+    typer.echo("== spectre actions doctor ==")
+    typer.echo("")
+
+    # 1) Registry/disk/scheduler preflight (reuse verify contract/reporting)
+    inventory = verify_mod.read_host_inventory()
+    findings = verify_mod.verify(inventory)
+    typer.echo("[1/3] actions verify (registry, disk, schedulers)")
+    _print_verify_report(inventory.unreadable, findings)
+    blocking = [f for f in findings if f.code in verify_mod.BLOCKING_CODES]
+    if blocking:
+        typer.echo(f"verify verdict: {len(blocking)} blocking finding(s)")
+    else:
+        typer.echo("verify verdict: no blocking findings")
+    typer.echo("")
+
+    # 2) Monitoring stack (Prometheus route-prefix + Grafana datasource/connectivity)
+    typer.echo("[2/3] monitoring stack (route-prefix / Grafana↔Prometheus)")
+    mon_ok, mon_detail = _run_doctor_check("monitoring/check-monitoring-stack", "monitoring/check-monitoring-stack")
+    typer.echo(mon_detail)
+    typer.echo("")
+
+    # 3) Config consistency
+    typer.echo("[3/3] config consistency")
+    cfg_ok, cfg_detail = _run_doctor_check("check-config-consistency", "check-config-consistency")
+    typer.echo(cfg_detail)
+    typer.echo("")
+
+    failed = bool(blocking) or (not mon_ok) or (not cfg_ok)
+    typer.echo(f"== doctor verdict: {'ISSUES FOUND' if failed else 'OK'} ==")
+    if failed:
+        raise typer.Exit(EXIT_FINDINGS)
+    raise typer.Exit(EXIT_OK)
+
 
 # Findings are indented under their code, and the counts are the block an operator
 # reads and CI diffs. Both are plain aligned text for the same reason `actions
