@@ -1084,7 +1084,9 @@ async function checkAlerts() {
     } catch (error) {
         console.error('Error checking alerts:', error);
         currentAlerts = [];
-        setCardError('alertsCard', 'Alerts unavailable');
+        clearCardError('alertsCard');
+        const alertsCard = document.getElementById('alertsCard');
+        if (alertsCard) alertsCard.classList.add('card--error');
         document.getElementById('alertsList').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Alerts unavailable.</strong> Unable to fetch alert data from Prometheus/Alertmanager.</span></div>';
     }
 }
@@ -1495,6 +1497,7 @@ function viewLogs() {
     const headingIcon = document.querySelector('#pageHeading i');
     const headingText = document.getElementById('pageHeadingText');
     const sidebarBtn = document.getElementById('sidebarToggle');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
     const validPages = new Set(links.map(a => a.dataset.page));
     const legacyPageMap = {
         '': 'overview',
@@ -1513,6 +1516,22 @@ function viewLogs() {
         '#page-backup': 'backup',
         '#backupCard': 'backup'
     };
+
+    function isMobileSidebar() {
+        return !!(window.matchMedia && window.matchMedia('(max-width: 980px)').matches);
+    }
+    function syncSidebarState() {
+        if (!shell) return;
+        const collapsed = shell.classList.contains('sidebar-collapsed');
+        if (sidebarBtn) sidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        if (sidebarBackdrop) sidebarBackdrop.hidden = !isMobileSidebar() || collapsed;
+    }
+    function closeSidebarIfMobile() {
+        if (shell && isMobileSidebar()) {
+            shell.classList.add('sidebar-collapsed');
+            syncSidebarState();
+        }
+    }
 
     function pageFromHash(hash) {
         if (!hash) return 'overview';
@@ -1545,10 +1564,7 @@ function viewLogs() {
         if (activePage === 'overview' || activePage === 'trends') {
             requestAnimationFrame(() => { if (chart && typeof chart.resize === 'function') chart.resize(); });
         }
-        if (sidebarBtn && shell && window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
-            shell.classList.add('sidebar-collapsed');
-            sidebarBtn.setAttribute('aria-expanded', 'false');
-        }
+        closeSidebarIfMobile();
     }
 
     links.forEach(a => a.addEventListener('click', (e) => {
@@ -1564,14 +1580,47 @@ function viewLogs() {
 
     if (sidebarBtn && shell) {
         sidebarBtn.addEventListener('click', () => {
-            const collapsed = shell.classList.toggle('sidebar-collapsed');
-            sidebarBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            shell.classList.toggle('sidebar-collapsed');
+            syncSidebarState();
+            if (isMobileSidebar() && !shell.classList.contains('sidebar-collapsed')) {
+                const firstNav = document.querySelector('.nav-item[data-page]');
+                if (firstNav && typeof firstNav.focus === 'function') firstNav.focus();
+            }
         });
-        if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
-            shell.classList.add('sidebar-collapsed');
-            sidebarBtn.setAttribute('aria-expanded', 'false');
+        if (isMobileSidebar()) shell.classList.add('sidebar-collapsed');
+        syncSidebarState();
+        const mobileSidebarMq = window.matchMedia ? window.matchMedia('(max-width: 980px)') : null;
+        const handleSidebarBreakpoint = () => {
+            if (!shell) return;
+            if (!isMobileSidebar()) {
+                if (sidebarBackdrop) sidebarBackdrop.hidden = true;
+                if (sidebarBtn) sidebarBtn.setAttribute('aria-expanded', 'true');
+            } else {
+                if (!shell.classList.contains('sidebar-collapsed')) {
+                    shell.classList.add('sidebar-collapsed');
+                }
+                syncSidebarState();
+            }
+        };
+        if (mobileSidebarMq) {
+            if (typeof mobileSidebarMq.addEventListener === 'function') mobileSidebarMq.addEventListener('change', handleSidebarBreakpoint);
+            else if (typeof mobileSidebarMq.addListener === 'function') mobileSidebarMq.addListener(handleSidebarBreakpoint);
         }
     }
+    if (sidebarBackdrop && shell) {
+        sidebarBackdrop.addEventListener('click', () => {
+            shell.classList.add('sidebar-collapsed');
+            syncSidebarState();
+            if (sidebarBtn && typeof sidebarBtn.focus === 'function') sidebarBtn.focus();
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && shell && isMobileSidebar() && !shell.classList.contains('sidebar-collapsed')) {
+            shell.classList.add('sidebar-collapsed');
+            syncSidebarState();
+            if (sidebarBtn && typeof sidebarBtn.focus === 'function') sidebarBtn.focus();
+        }
+    });
 
     setPage(pageFromHash(location.hash), { smooth: false });
 })();
