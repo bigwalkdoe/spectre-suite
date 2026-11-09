@@ -1593,12 +1593,11 @@ function viewLogs() {
         const handleSidebarBreakpoint = () => {
             if (!shell) return;
             if (!isMobileSidebar()) {
+                shell.classList.remove('sidebar-collapsed');
                 if (sidebarBackdrop) sidebarBackdrop.hidden = true;
                 if (sidebarBtn) sidebarBtn.setAttribute('aria-expanded', 'true');
             } else {
-                if (!shell.classList.contains('sidebar-collapsed')) {
-                    shell.classList.add('sidebar-collapsed');
-                }
+                shell.classList.add('sidebar-collapsed');
                 syncSidebarState();
             }
         };
