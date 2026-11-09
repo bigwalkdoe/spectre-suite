@@ -553,6 +553,24 @@
     ]
   },
   {
+    "name": "backups/restic/prune",
+    "action": "backups/restic/prune.sh",
+    "group": "backups",
+    "summary": "Tag-scoped restic forget/prune (reclaims unreferenced data; dry-run supported)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": null
+  },
+  {
+    "name": "backups/restic/restore",
+    "action": "backups/restic/restore.sh",
+    "group": "backups",
+    "summary": "Restore from a restic snapshot (supports --include/targeted paths)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": null
+  },
+  {
     "name": "backups/run-missed-backups",
     "action": "backups/run-missed-backups.sh",
     "group": "backups",
