@@ -228,6 +228,7 @@ system_docker_containers_total{state="running"} $DOCKER_RUNNING
 system_docker_containers_total{state="stopped"} $DOCKER_STOPPED
 EOF
 
-rm -f "$OUTPUT_DIR/app_metrics.prom" "$OUTPUT_DIR/security_metrics.prom"
+# security_metrics.prom is owned by prometheus/security-metrics-exporter; do not delete it here.
+rm -f "$OUTPUT_DIR/app_metrics.prom"
 
 echo "Business metrics exported to $OUTPUT_DIR"
