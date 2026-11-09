@@ -1,13 +1,14 @@
 # Phase 2/3 — Scheduler Repointing Runbook
 
 **Generated:** 2026-11-06 on `feat/consolidation-phase1-shims` @ Phase 1 complete (repo-side).  
-**Updated:** 2026-11-06 (session follow-up) — reflects **host repointing completed**; reconciles with `spectre.dispatch.verify`.  
+**Updated:** 2026-11-06 (session follow-up) — host repointing completed; reconciles with `spectre.dispatch.verify`.  
+**Updated:** 2026-11-09 — A1/B/C progress, `spectre-security-metrics` repointed+deduped, `spectre actions verify` clean (0 findings).  
 **Source of truth:** `spectre.dispatch.verify` (unified layout).
 
 ## Current state (verified)
-- `spectre actions verify` (repo `PYTHONPATH`, host inventory via `read_host_inventory()`): **0 findings** (0 blocking, 0 advisory). No `legacy-path` / `unregistered` findings.
-- **Crontab (14 entries):** all invoke `/usr/local/bin/spectre run <job>` (exporters, backups, maintenance, performance) — matches the original inventory targets.
-- **Systemd units (repointed, observed):** `disk-space-check.service`, `performance-check.service`, `security-scan.service`, `spectre-backup-catchup.service` (user), `spectre-dashboard-actions.service` (user), `spectre-restic-backup.service` (user), `spectre-restic-verify.service` (user) all `ExecStart=/usr/local/bin/spectre run …`.
+- `spectre actions verify` (repo `PYTHONPATH`, host inventory via `read_host_inventory()`): **0 findings** (0 blocking, 0 advisory). No `legacy-path` / `unregistered` findings (2026-11-09 recheck).
+- **Crontab:** user crontab invokes `/usr/local/bin/spectre run <job>` for exporter/backup/maintenance/performance targets (including `prometheus/security-metrics-exporter`).
+- **Systemd units (repointed, observed):** `disk-space-check.service`, `performance-check.service`, `security-scan.service`, `spectre-backup-catchup.service` (user), `spectre-dashboard-actions.service` (user), `spectre-restic-backup.service` (user), `spectre-restic-verify.service` (user) all `ExecStart=/usr/local/bin/spectre run …`. `~/.config/systemd/user/spectre-security-metrics.service` repointed to `spectre run prometheus/security-metrics-exporter -- ...` (2026-11-09); duplicate `spectre-security-metrics.timer` disabled/stopped (crontab kept).
 - **CLI:** `/usr/local/bin/spectre` is a wrapper to `~/.local/share/spectre-venv/bin/spectre`.
 - **`~//scripts`:** absent (Phase 4 item satisfied on host).
 - **`/usr/local/bin/cleanup-downloads.sh`:** absent.
@@ -42,20 +43,19 @@ The 21-entry table below is the pre-repoint plan/inventory (kept for audit). All
 ## Remaining items (require explicit confirmation before host changes)
 
 ### A — Stabilize host state
-1. **`~/.config/systemd/user/spectre.service` and `spectre-api.service` (203/EXEC, old layout):** `ExecStart` uses missing `~/.config/spectre/venv/bin/python` and old module paths (`apps.daemon.main`, `uvicorn apps.api.main:app`). Consolidation §8.6 requires update to `spectre.daemon` / `spectre.api.main:app`. Working interpreter with `spectre` installed: `~/.local/share/spectre-venv/bin/python` (verified: `spectre.api.main.app` present). **Do not change without confirmation** (daemon path must not break cron; §12.2 flapping noted). Proposed fix (confirm): repoint both units to `~/.local/share/spectre-venv/bin/python -m spectre.daemon` and `… -m uvicorn spectre.api.main:app …`, `daemon-reload`, restart only if explicitly approved.
-2. **SELinux / exec contexts:** prior `performance-check` failure showed legacy-path exec denied (before unit was repointed on disk). Repointed units now exec `/usr/local/bin/spectre`; confirm next timer runs succeed. If any legacy/forwarder paths remain and are executed, relabel per precondition: `sudo bash scripts/systemd/label-exec-context.sh` then `bash tests/run_tests.sh` — **root/host change, confirm**.
-3. **Operational (not dispatch):** `disk-space-check.service` exits 2 when root fs critical (observed 93%) — expected script behavior; treat as capacity issue. `security-scan.timer` active, next trigger 2026-11-07 04:00 PKT (no recent run shown; confirm outcome).
-4. **§2.5a:** confirm no unintended duplicate system/user runs for `performance-check`/`security-scan`/`disk-space-check`.
+1. **`~/.config/systemd/user/spectre.service` and `spectre-api.service` (203/EXEC, old layout):** **Resolved on host (verified 2026-11-09).** Both units use `%h/.local/share/spectre-venv/bin/python -m spectre.daemon.main` / `… -m uvicorn spectre.api.main:app --host 127.0.0.1 --port 8106 --proxy-headers` and are **active (running)** (daemon health-checks and API 200 observed). No restart/change made in 2026-11-09 session (daemon path must not break cron; §12.2).
+2. **SELinux / exec contexts:** repointed units exec `/usr/local/bin/spectre`; no legacy exec denial observed in 2026-11-09 checks. Confirm next timer runs succeed. If any legacy/forwarder path is still executed, relabel per precondition: `sudo bash scripts/systemd/label-exec-context.sh` then `bash tests/run_tests.sh` — **root/host change, confirm**.
+3. **Operational (not dispatch):** `disk-space-check.service` exits 2 when root fs critical (observed 93% earlier; **82% on 2026-11-09**) — expected script behavior/capacity. `security-scan` last run **failed 2026-11-07 04:00:01 PKT** (`HOME` unbound under systemd + `set -u`); fix in repo `spectre/actions/security/run-security-hardening.sh` (`120e598`, 2026-11-07 10:23 +0500). Unit runs `spectre run security/run-security-hardening` (resolves to repo action); next timer **Sat 2026-11-14 04:00 PKT** should include fix (not manually triggered; `sudo true, mutates true`).
+4. **§2.5a:** **clean (2026-11-09).** `performance-check`/`security-scan`/`disk-space-check` present as **system** timers only (no `--user` duplicates). `security-metrics-exporter` duplicate scheduler resolved (user timer disabled; crontab kept).
 
 ### C — Phase 4 (destructive/host + repo; explicit approval required)
 Per spec: “Remove shims; delete `~//scripts`; archive the agent repo read-only”. 
 - `~//scripts` already absent. 
-- **Forwarder shims in repo:** no `transitional forwarder` / `exec spectre run` shim files found under `scripts/` or `prometheus/` (only spec text). `scripts/*` and `prometheus/*.sh` still exist as repo paths — determine whether any remain as legacy compatibility copies vs canonical sources before removal; schedulers no longer call legacy paths (verify clean).
-- **Archive agent repo read-only:** `~//dev/github/spectre-agent` and mirror `~/.git-mirror/github_spectre-agent.git` exist — **do not archive/modify without explicit confirmation** (confirm no machine/process depends on it).
+- **Forwarder shims in repo:** no `transitional forwarder` / `exec spectre run` shim files found under `scripts/` or `prometheus/` (only spec text). No tracked `scripts/` tree and no tracked `prometheus/*.sh` found in repo; `spectre actions verify` clean (2026-11-09) — no obvious safe legacy-compatibility removals identified. Determine carefully before any removal; schedulers no longer call legacy paths.
+- **Archive agent repo read-only (progress 2026-11-09, explicit approval):** dependency check found no active scheduler/service/process dependents. `spectre-agent` marker committed (`fe65acc`, local, not pushed); mirror `~/.git-mirror/github_spectre-agent.git` origin repointed to `git@github.com:bigwalkdoe/spectre-agent.git`; working copy moved to `~//archive/archived-repos/spectre-agent-20261109` (best-effort `a-w`); user applied `chattr -R +i` (top-level immutable; symlinks reported unsupported).
 
 ### B — Repo-side follow-up
-- This runbook updated to reflect completed repointing and remaining A/C items (2026-11-06).
-- Phase 5 still open: README truth pass, merged CI/doc-drift (README must not advertise capabilities absent from `actions list`).
+- Phase 5 README truth pass / doc-drift vs `actions list` completed in `de247a3` (pushed, CI green, 2026-11-09): removed inaccurate Fail2Ban claim, clarified Wazuh/status-check nuance, removed stale Trivy-wrapper/AIDE-not-implemented claims; `check-docs-references.sh`/config checks OK. Keep README from advertising capabilities absent from `actions list`.
 
 ## Per-entry procedure (reference; repointing complete)
 1. `spectre actions show <job>` / verify resolves it.
@@ -64,5 +64,5 @@ Per spec: “Remove shims; delete `~//scripts`; archive the agent repo read-only
 4. `spectre actions verify` → 0 blocking, legacy-path advisories eliminated.
 
 ## Acceptance (Phase 2/3)
-- **Met (host, current):** `spectre actions verify` → 0 blocking and 0 legacy-path advisories; schedulers dispatch via `spectre run`.
-- **Open:** §8.6 agent/daemon unit module paths (A.1), any remaining SELinux/operational checks (A.2–A.4), Phase 4/5.
+- **Met (host, current):** `spectre actions verify` → 0 blocking and 0 legacy-path advisories; schedulers dispatch via `spectre run` (rechecked 2026-11-09; `security-metrics-exporter` repointed+deduped). §8.6 agent/daemon user unit module paths/interpreter resolved on host (A.1, 2026-11-09). §2.5a clean for targeted jobs (A.4).
+- **Open/ongoing:** A.2 SELinux/next timer-run confirmation as needed; A.3 operational follow-up (`security-scan` next scheduled 2026-11-14 04:00 PKT should include HOME fix `120e598`; disk capacity). B/Phase 5 README truth pass done (`de247a3`, 2026-11-09) — keep docs aligned to `actions list`. C/Phase 4: `spectre-agent` archived/moved (2026-11-09, approved); continue any remaining destructive/repo cleanup only with explicit approval.
