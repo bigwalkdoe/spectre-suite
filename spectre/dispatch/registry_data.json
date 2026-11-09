@@ -172,6 +172,17 @@
     ]
   },
   {
+    "name": "maintenance/check-security-scan-outcome",
+    "action": "maintenance/check-security-scan-outcome.sh",
+    "group": "maintenance",
+    "summary": "Recheck security-scan timer outcome for A2/A3 (read-only)",
+    "sudo": false,
+    "mutates": false,
+    "timeout": 120,
+    "concurrency": "forbid",
+    "schedule_hint": null
+  },
+  {
     "name": "maintenance/check-system-performance",
     "action": "maintenance/check-system-performance.sh",
     "group": "maintenance",
