@@ -62,7 +62,7 @@ Instead of calling legacy scripts directly, scheduled and manual jobs run throug
 | **Dispatch** | `spectre run <job>`, `spectre actions list/show/verify`; registry metadata (`sudo`, `mutates`, `timeout`, `schedule_hint`, `concurrency`) and run provenance. |
 | **Backups** | Database, Docker volume, config, and project backups; replication, encryption/verification helpers; missed-backup catch-up; adopted **restic** engine with tag-scoped retention and degraded-offsite behavior. |
 | **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter, business/security textfile exporters, restic marker metrics, dashboards/provisioning. |
-| **Security** | Fail2Ban/IDS-IPS helpers, Docker/API/network hardening actions, dependency/image scan helpers, OPA policies, Spectre agent security metrics with port/identity collision detection. |
+| **Security** | IDS/IPS helpers (Suricata/OSSEC via `security/install-ids-ips`), Docker/API/network hardening actions, dependency/image scan helpers, Trivy image scan and SBOM/file-integrity baseline actions, OPA policies (including compatibility/version/admission reports), Spectre agent security metrics with port/identity collision detection. |
 | **Maintenance** | Cache/temp/download/resource cleanup, disk/performance checks, DB vacuum, system health, compliance/audit helpers. |
 | **Network & performance** | VPN/network hardening/monitoring and optimization/right-sizing actions where implemented (review `sudo`/`mutates`). |
 | **ML (optional)** | ML anomaly pipeline/actions where dependencies/config are present. |
@@ -70,7 +70,7 @@ Instead of calling legacy scripts directly, scheduled and manual jobs run throug
 <details>
 <summary><strong>Not implemented in this repository</strong> (avoid assuming these exist)</summary>
 
-Loki, Promtail, Wazuh, OWASP ZAP orchestration, SonarQube orchestration, Trivy wrapper script (Trivy runs in CI; run locally via container if needed), PgBouncer/read-replica/Vault deployment, k6/Locust harnesses, or a standalone AIDE scheduler/script beyond host-tool reporting.
+Loki, Promtail, Wazuh orchestration/management (a `security/baseline/check-wazuh-status` status check exists), OWASP ZAP orchestration, SonarQube orchestration, PgBouncer/read-replica/Vault deployment, or k6/Locust harnesses.
 
 </details>
 
