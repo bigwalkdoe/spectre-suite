@@ -181,6 +181,11 @@
                             <span class="badge" id="containerStatus">Checking...</span>
                         </div>
                         <div class="card-body" aria-live="polite">
+                            <label class="container-filter" for="containerFilter">
+                                <span class="visually-hidden">Filter containers</span>
+                                <i class="fas fa-search" aria-hidden="true"></i>
+                                <input id="containerFilter" type="search" class="container-filter-input" placeholder="Filter containers…" autocomplete="off" spellcheck="false">
+                            </label>
                             <div class="containers-grid" id="containersGrid"></div>
                         </div>
                     </section>
