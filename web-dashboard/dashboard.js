@@ -509,8 +509,10 @@ async function fetchAllMetrics(opts = {}) {
     const forceSlow = refreshChart;
     const slowIsCached = !forceSlow && slowMetricsCache && Date.now() - slowMetricsCacheAt < SLOW_METRICS_REFRESH_MS;
     const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+    const activePage = document.body.dataset.activePage || 'overview';
+    const chartVisible = activePage === 'overview' || activePage === 'trends';
     const chartNow = Date.now();
-    const shouldRefreshChart = refreshChart || chartNow - lastChartRefreshAt >= CHART_AUTO_REFRESH_MS;
+    const shouldRefreshChart = chartVisible && (refreshChart || chartNow - lastChartRefreshAt >= CHART_AUTO_REFRESH_MS);
     if (shouldRefreshChart) lastChartRefreshAt = chartNow;
 
     const cardIds = ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard', 'alertsCard', 'containersCard', 'chartCard', 'backupCard', 'securityCard'];
@@ -1668,6 +1670,11 @@ function viewLogs() {
         if (main) main.scrollTo({ top: 0, behavior: opts.smooth ? 'smooth' : 'auto' });
         if (activePage === 'overview' || activePage === 'trends') {
             requestAnimationFrame(() => { if (chart && typeof chart.resize === 'function') chart.resize(); });
+            if (chart && typeof updateChart === 'function') {
+                const range = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+                const stale = !lastChartRefreshAt || (Date.now() - lastChartRefreshAt) >= CHART_AUTO_REFRESH_MS;
+                if (stale) updateChart(range).catch(() => {});
+            }
         }
         closeSidebarIfMobile();
     }

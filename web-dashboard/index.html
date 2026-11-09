@@ -126,21 +126,6 @@
                 </section>
 
                 <div class="dashboard-grid">
-                    <section class="card" id="healthCard" data-show-pages="overview health">
-                        <div class="card-header">
-                            <h2><i class="fas fa-heartbeat" aria-hidden="true"></i> System Health</h2>
-                            <span class="badge" id="healthStatus">Checking...</span>
-                        </div>
-                        <div class="card-body" aria-live="polite">
-                            <div class="health-checks kv-list">
-                                <div class="health-item kv-item"><span class="health-label kv-label">System Load</span><span class="health-value kv-value" id="systemLoad">--</span></div>
-                                <div class="health-item kv-item"><span class="health-label kv-label">Uptime</span><span class="health-value kv-value" id="uptime">--</span></div>
-                                <div class="health-item kv-item"><span class="health-label kv-label">Processes</span><span class="health-value kv-value" id="processes">--</span></div>
-                                <div class="health-item kv-item"><span class="health-label kv-label">Temperature</span><span class="health-value kv-value" id="temperature">--</span></div>
-                            </div>
-                        </div>
-                    </section>
-
                     <section class="card" id="alertsCard" data-show-pages="overview alerts">
                         <div class="card-header">
                             <h2><i class="fas fa-bell" aria-hidden="true"></i> Active Alerts <a href="#" data-ext="alertmanager" data-ext-path="/" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Alertmanager" aria-label="Open Alertmanager"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
@@ -155,6 +140,36 @@
                             </div>
                             <div class="alerts-list" id="alertsList">
                                 <div class="no-alerts">No active alerts</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card" id="securityCard" data-show-pages="overview security">
+                        <div class="card-header">
+                            <h2><i class="fas fa-shield-alt" aria-hidden="true"></i> Security Status</h2>
+                            <span class="badge" id="securityStatus">Checking...</span>
+                        </div>
+                        <div class="card-body" aria-live="polite">
+                            <div class="security-info kv-list">
+                                <div class="security-item kv-item"><span class="security-label kv-label">Agent Status</span><span class="security-value kv-value" id="agentStatusDetail">--</span></div>
+                                <div class="security-item kv-item"><span class="security-label kv-label">Last Security Scan</span><span class="security-value kv-value" id="lastSecurityScan">--</span></div>
+                                <div class="security-item kv-item"><span class="security-label kv-label">Unresolved Findings</span><span class="security-value kv-value" id="vulnerabilities">0</span></div>
+                                <div class="security-item kv-item"><span class="security-label kv-label">Severity Breakdown</span><span class="security-value kv-value" id="severityBreakdown">--</span></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card" id="healthCard" data-show-pages="overview health">
+                        <div class="card-header">
+                            <h2><i class="fas fa-heartbeat" aria-hidden="true"></i> System Health</h2>
+                            <span class="badge" id="healthStatus">Checking...</span>
+                        </div>
+                        <div class="card-body" aria-live="polite">
+                            <div class="health-checks kv-list">
+                                <div class="health-item kv-item"><span class="health-label kv-label">System Load</span><span class="health-value kv-value" id="systemLoad">--</span></div>
+                                <div class="health-item kv-item"><span class="health-label kv-label">Uptime</span><span class="health-value kv-value" id="uptime">--</span></div>
+                                <div class="health-item kv-item"><span class="health-label kv-label">Processes</span><span class="health-value kv-value" id="processes">--</span></div>
+                                <div class="health-item kv-item"><span class="health-label kv-label">Temperature</span><span class="health-value kv-value" id="temperature">--</span></div>
                             </div>
                         </div>
                     </section>
@@ -203,21 +218,6 @@
                         <div class="card-body" aria-live="polite">
                             <div class="chart-container">
                                 <canvas id="resourceChart" role="img" aria-label="Resource usage trends chart showing CPU, memory, and disk usage (percent) and network I/O over time"></canvas>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="card" id="securityCard" data-show-pages="overview security">
-                        <div class="card-header">
-                            <h2><i class="fas fa-shield-alt" aria-hidden="true"></i> Security Status</h2>
-                            <span class="badge" id="securityStatus">Checking...</span>
-                        </div>
-                        <div class="card-body" aria-live="polite">
-                            <div class="security-info kv-list">
-                                <div class="security-item kv-item"><span class="security-label kv-label">Agent Status</span><span class="security-value kv-value" id="agentStatusDetail">--</span></div>
-                                <div class="security-item kv-item"><span class="security-label kv-label">Last Security Scan</span><span class="security-value kv-value" id="lastSecurityScan">--</span></div>
-                                <div class="security-item kv-item"><span class="security-label kv-label">Unresolved Findings</span><span class="security-value kv-value" id="vulnerabilities">0</span></div>
-                                <div class="security-item kv-item"><span class="security-label kv-label">Severity Breakdown</span><span class="security-value kv-value" id="severityBreakdown">--</span></div>
                             </div>
                         </div>
                     </section>
