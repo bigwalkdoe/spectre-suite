@@ -65,7 +65,7 @@
                             <i class="fas fa-download" aria-hidden="true"></i> Export
                         </button>
                         <label class="refresh-interval-label" for="refreshInterval" title="Auto-refresh interval">
-                            <i class="fas fa-clock"></i>
+                            <i class="fas fa-clock" aria-hidden="true"></i>
                             <select id="refreshInterval" class="btn btn-sm refresh-interval-select" aria-label="Refresh interval">
                                 <option value="15000">15s</option>
                                 <option value="30000" selected>30s</option>
@@ -92,7 +92,7 @@
                 <!-- Quick Stats -->
                 <section class="quick-stats" aria-label="Key metrics" data-show-pages="overview health trends">
                     <div class="stat-card cpu card" id="cpuCard">
-                        <div class="stat-icon"><i class="fas fa-microchip"></i></div>
+                        <div class="stat-icon"><i class="fas fa-microchip" aria-hidden="true"></i></div>
                         <div class="stat-content">
                             <div class="stat-label">CPU Usage</div>
                             <div class="stat-value" id="cpuUsage">--%</div>
@@ -100,7 +100,7 @@
                         </div>
                     </div>
                     <div class="stat-card memory card" id="memoryCard">
-                        <div class="stat-icon"><i class="fas fa-memory"></i></div>
+                        <div class="stat-icon"><i class="fas fa-memory" aria-hidden="true"></i></div>
                         <div class="stat-content">
                             <div class="stat-label">Memory Usage</div>
                             <div class="stat-value" id="memoryUsage">--%</div>
@@ -108,7 +108,7 @@
                         </div>
                     </div>
                     <div class="stat-card disk card" id="diskCard">
-                        <div class="stat-icon"><i class="fas fa-hdd"></i></div>
+                        <div class="stat-icon"><i class="fas fa-hdd" aria-hidden="true"></i></div>
                         <div class="stat-content">
                             <div class="stat-label">Disk Usage</div>
                             <div class="stat-value" id="diskUsage">--%</div>
@@ -116,7 +116,7 @@
                         </div>
                     </div>
                     <div class="stat-card network card" id="networkCard">
-                        <div class="stat-icon"><i class="fas fa-network-wired"></i></div>
+                        <div class="stat-icon"><i class="fas fa-network-wired" aria-hidden="true"></i></div>
                         <div class="stat-content">
                             <div class="stat-label">Network I/O</div>
                             <div class="stat-value" id="networkIO">--</div>
@@ -128,7 +128,7 @@
                 <div class="dashboard-grid">
                     <section class="card" id="healthCard" data-show-pages="overview health">
                         <div class="card-header">
-                            <h2><i class="fas fa-heartbeat"></i> System Health</h2>
+                            <h2><i class="fas fa-heartbeat" aria-hidden="true"></i> System Health</h2>
                             <span class="badge" id="healthStatus">Checking...</span>
                         </div>
                         <div class="card-body" aria-live="polite">
@@ -161,7 +161,7 @@
 
                     <section class="card" id="backupCard" data-show-pages="overview backup">
                         <div class="card-header">
-                            <h2><i class="fas fa-database"></i> Backup Status</h2>
+                            <h2><i class="fas fa-database" aria-hidden="true"></i> Backup Status</h2>
                             <span class="badge" id="backupStatus">Checking...</span>
                         </div>
                         <div class="card-body" aria-live="polite">
@@ -204,7 +204,7 @@
 
                     <section class="card" id="securityCard" data-show-pages="overview security">
                         <div class="card-header">
-                            <h2><i class="fas fa-shield-alt"></i> Security Status</h2>
+                            <h2><i class="fas fa-shield-alt" aria-hidden="true"></i> Security Status</h2>
                             <span class="badge" id="securityStatus">Checking...</span>
                         </div>
                         <div class="card-body" aria-live="polite">
@@ -219,21 +219,21 @@
 
                     <section class="card" data-show-pages="overview">
                         <div class="card-header">
-                            <h2><i class="fas fa-tools"></i> Quick Actions</h2>
+                            <h2><i class="fas fa-tools" aria-hidden="true"></i> Quick Actions</h2>
                         </div>
                         <div class="card-body">
                             <div class="quick-actions">
-                                <button class="action-btn" type="button" data-dashboard-action="backup"><i class="fas fa-save"></i><span>Run Backup</span></button>
-                                <button class="action-btn" type="button" data-dashboard-action="maintenance"><i class="fas fa-broom"></i><span>Run Maintenance</span></button>
-                                <button class="action-btn" type="button" data-dashboard-action="security-scan"><i class="fas fa-search"></i><span>Security Scan</span></button>
-                                <button class="action-btn" type="button" data-dashboard-action="logs"><i class="fas fa-file-alt"></i><span>View Logs</span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="backup"><i class="fas fa-save" aria-hidden="true"></i><span>Run Backup</span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="maintenance"><i class="fas fa-broom" aria-hidden="true"></i><span>Run Maintenance</span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="security-scan"><i class="fas fa-search" aria-hidden="true"></i><span>Security Scan</span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="logs"><i class="fas fa-file-alt" aria-hidden="true"></i><span>View Logs</span></button>
                             </div>
                         </div>
                     </section>
 
                     <section class="card" id="diagnosticsCard" data-show-pages="overview security">
                         <div class="card-header">
-                            <h2><i class="fas fa-stethoscope"></i> Diagnostics</h2>
+                            <h2><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnostics</h2>
                             <span class="badge" id="diagnosticsStatus">--</span>
                         </div>
                         <div class="card-body" aria-live="polite">
@@ -264,7 +264,7 @@
 
     <div id="toast-template" style="display:none;">
         <div class="toast" role="alert">
-            <i class="fas fa-info-circle"></i>
+            <i class="fas fa-info-circle" aria-hidden="true"></i>
             <span class="toast-message"></span>
         </div>
     </div>
