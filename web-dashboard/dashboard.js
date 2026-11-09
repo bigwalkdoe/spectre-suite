@@ -105,7 +105,7 @@ function setCardError(cardId, message) {
         const body = card.querySelector('.card-body') || card;
         body.appendChild(errorEl);
     }
-    errorEl.innerHTML = `<i class="fas fa-exclamation-circle" aria-hidden="true"></i> ${message}`;
+    errorEl.innerHTML = `<i class="fas fa-exclamation-circle" aria-hidden="true"></i> ${escapeHtml(message)}`;
 }
 
 function clearCardError(cardId) {
@@ -124,7 +124,7 @@ function showToast(message, type = 'info') {
     toast.className = `toast toast--${type}`;
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-    toast.innerHTML = `<i class="fas ${iconClass}" aria-hidden="true"></i><span class="toast-message">${message}</span>`;
+    toast.innerHTML = `<i class="fas ${iconClass}" aria-hidden="true"></i><span class="toast-message">${escapeHtml(message)}</span>`;
     container.appendChild(toast);
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     setTimeout(() => {
@@ -327,7 +327,7 @@ function setCardUpdated(cardId) {
         const target = card.querySelector('.stat-content') || card.querySelector('.card-body') || card;
         target.appendChild(el);
     }
-    el.innerHTML = `<i class="fas fa-clock" aria-hidden="true"></i> ${text}`;
+    el.innerHTML = `<i class="fas fa-clock" aria-hidden="true"></i> ${escapeHtml(text)}`;
 }
 
 function updateDiagnostics() {
@@ -364,6 +364,15 @@ function updateDiagnostics() {
         diagStatus.textContent = healthy ? 'OK' : degraded ? 'Degraded' : lastQueryStats.total === 0 ? '--' : 'Issues';
         diagStatus.className = healthy ? 'badge badge-success' : degraded ? 'badge badge-warning' : 'badge';
     }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function formatBytes(bytes) {
@@ -966,15 +975,15 @@ async function updateContainerStatus() {
             const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
             const renderItem = (container) => `
                 <div class="container-item">
-                    <div class="container-name">${container.name}</div>
-                    <span class="container-status ${container.status}">${container.status}</span>
+                    <div class="container-name">${escapeHtml(container.name)}</div>
+                    <span class="container-status ${escapeHtml(container.status)}">${escapeHtml(container.status)}</span>
                 </div>`;
             const grid = document.getElementById('containersGrid');
             if (sortedGroups.length) {
                 grid.innerHTML = sortedGroups.map(([key, items]) => `
-                <section class="container-group" aria-label="${key} containers">
+                <section class="container-group" aria-label="${escapeHtml(key)} containers">
                     <div class="container-group-header">
-                        <span class="container-group-name">${key}</span>
+                        <span class="container-group-name">${escapeHtml(key)}</span>
                         <span class="container-group-count">${items.length}</span>
                     </div>
                     <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
@@ -1043,7 +1052,8 @@ function renderAlerts() {
     }
 
     alertsList.innerHTML = filtered.map(alert => {
-        const severity = alert.labels?.severity || 'info';
+        const rawSeverity = String(alert.labels?.severity || 'info').toLowerCase();
+        const severity = ['critical', 'warning', 'info'].includes(rawSeverity) ? rawSeverity : 'info';
         const name = alert.labels?.alertname || 'Unnamed alert';
         const description = alert.annotations?.description || alert.annotations?.summary || '';
         const startMs = parseAlertTime(alert.activeAt || alert.startsAt);
@@ -1054,13 +1064,13 @@ function renderAlerts() {
         const timeStr = startMs ? new Date(startMs).toLocaleString() : 'Unknown time';
         const ageStr = formatAlertAge(startMs);
         return `
-        <div class="alert-item ${severity}">
+        <div class="alert-item ${escapeHtml(severity)}">
             <div class="alert-title">${safeName.innerHTML}</div>
             <div class="alert-description">${safeDesc.innerHTML}</div>
             <div class="alert-meta">
-                <span class="alert-severity-tag">${severity}</span>
-                <span class="alert-age">${ageStr}</span>
-                <span class="alert-time">${timeStr}</span>
+                <span class="alert-severity-tag">${escapeHtml(severity)}</span>
+                <span class="alert-age">${escapeHtml(ageStr)}</span>
+                <span class="alert-time">${escapeHtml(timeStr)}</span>
             </div>
         </div>
     `;
