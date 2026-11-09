@@ -50,7 +50,7 @@ df -h / /backups /home
 | `~/.local/bin/spectre-backup.sh` / suite `scripts/backups/restic-backup.sh` | `scripts/backups/restic/backup.sh` |
 | suite `scripts/backups/restic-maintenance.sh` / `restic-forget-prune.sh` | `scripts/backups/restic/prune.sh [--dry-run] [--repo local\|offsite\|all]` (tag-scoped) |
 | *(new)* verify | `scripts/backups/restic/verify.sh [--full] [--local]` |
-| *(new)* restore | `scripts/backups/restic/restore.sh --list\|--snapshot <id>\|--latest [--dry-run] [--target DIR] [--local] [paths...]` |
+| *(new)* restore | `spectre/actions/backups/restic/restore.sh --list\|--snapshot <id>\|--latest [--dry-run] [--target DIR] [--local] [--include <path>] [paths...]` |
 | `scripts/systemd/install-restic-maintenance-timer.sh` | `scripts/systemd/install-restic-verify-timer.sh` |
 | `scripts/backups/restic.env.example` | `config/backups/restic/env.example` |
 
@@ -71,7 +71,7 @@ df -h / /backups /home
    `restic -r /backups/spectre-backup ls <id>` must contain `home/deon/dev`, `home/deon/docs`, `home/deon/.secrets` (allowed), `home/deon/archive/old-projects`, dump dir, artifact paths; and must **not** contain `spectre-restic-password`, `restic-repo-password`, or `.config/spectre-backup/password` (Review Focus 1).
 5. **Verify + restore rehearsal (to `/tmp`, compare)**  
    `scripts/backups/restic/verify.sh`  
-   `scripts/backups/restic/restore.sh --snapshot <id> --dry-run`  
+   `spectre/actions/backups/restic/restore.sh --snapshot <id> --dry-run`  
    Restore to `/tmp/spectre-restore-rehearsal/<ts>/`: one file from `~/dev`, one from `~/docs`, one non-key file from `~/.secrets`, one artifact, one host dump. `diff`/`cmp`/`sha256sum` against originals. Record all commands/results.
 6. **Retire home-backup timer (files kept)** — only if Step 5 passed  
    `systemctl --user disable --now home-backup.timer` (do not delete `~/.local/bin/backup-home` or `~/archive/backups`).
@@ -84,7 +84,7 @@ df -h / /backups /home
 ## Restore paths (keep clearly separated)
 
 - **Restore an artifact backup** (tar/db dumps produced by suite backup scripts): use `scripts/backups/restore-databases.sh`, `scripts/backups/restore-docker-volumes.sh`, `scripts/backups/restore-from-remote.sh` as appropriate. These operate on `/backups/*` archives and are independent of restic snapshots.
-- **Restore from a restic snapshot** (adopted engine): `scripts/backups/restic/restore.sh --list`, then `--snapshot <id> --dry-run`, then `--snapshot <id> --target /tmp/restore-test [paths...]`. Use `--local` to read the local repo. Verify restored files before replacing originals.
+- **Restore from a restic snapshot** (adopted engine): `spectre/actions/backups/restic/restore.sh --list`, then `--snapshot <id> --dry-run`, then `--snapshot <id> --target /tmp/restore-test [--include <path> | paths...]`. Use `--local` to read the local repo. Verify restored files before replacing originals.
 
 ## Monitoring / alerts
 
@@ -150,7 +150,7 @@ df -h / /backups /home
 - Backup: `RESTIC_CONFIG=$HOME/.secrets/spectre-suite-backups.env scripts/backups/restic/backup.sh` completed. **Local snapshot `5a8836ff`** `2026-11-06T08:03:03.09893535+05:00` host `fedora` tags `["spectre-suite","workstation"]` 22.802 GiB (local repo). **Offsite snapshot `1ff42d3a`** (offsite success marker). Markers: `last-attempt=1793934178`, `last-success=1793934407 5a8836ff`, `last-offsite-success=1793934569 1ff42d3a`, `last-health=1 1793934578`, `last-verify=1793934763 1` (after verify).
 - **`restic ls 5a8836ff` key-absence: OK (no matches)** for `spectre-restic-password|restic-repo-password|.config/spectre-backup/password|spectre-suite-backups.env|.config/spectre-backup/.env`. Required scope present (dev, docs, `.secrets` with allowed non-key files only — excluded keys/envs absent, `restic.env` present as a non-excluded `~/.secrets` file), `archive/old-projects`, dumps (`~//.local/state/spectre-suite/backups/dumps/20261106-080258/host-pg_dumpall.sql.gz`), `/backups/{databases,configurations,projects,volumes}` artifacts.
 - **Verify:** `scripts/backups/restic/verify.sh` (quick, local) RC 0 — “check snapshots, trees and blobs … no errors were found” / “Verify OK”. (Non-critical note: 170 additional files/duplicate data; `prune` can address.) Initial attempts hit stale repo locks (PIDs gone, from completed/interrupted runs); `restic unlock` cleared them.
-- **Restore rehearsal** (`/tmp/spectre-restore-rehearsal/20261106-081053/`, snapshot `5a8836ff`, local): `restore.sh --local --snapshot 5a8836ff --dry-run` RC 0. Targeted restore via `restic restore ... --target ... --include <5 paths>` RC 0 (5 files). Note: `scripts/backups/restic/restore.sh` does **not** pass extra path args as includes (a full dry-run was observed to traverse the whole snapshot; targeted restore was done with `restic restore --include` directly).
+- **Restore rehearsal** (`/tmp/spectre-restore-rehearsal/20261106-081053/`, snapshot `5a8836ff`, local): `restore.sh --local --snapshot 5a8836ff --dry-run` RC 0. Targeted restore via `restic restore ... --target ... --include <5 paths>` RC 0 (5 files). Note (historical, 2026-11-06): at that time `scripts/backups/restic/restore.sh` did not pass extra path args as includes, so a full dry-run traversed the whole snapshot and targeted restore used `restic restore --include` directly. Current `spectre/actions/backups/restic/restore.sh` supports extra path args and `--include <path>`.
 
 | Source | Restored path (under `/tmp/spectre-restore-rehearsal/20261106-081053`) | sha256 (orig == restored) | Result |
 |---|---|---|---|
