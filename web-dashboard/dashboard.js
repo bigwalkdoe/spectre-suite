@@ -852,13 +852,13 @@ function updateSecurityStatus(spectreUp, everScanned, lastScan, unresolved, crit
                 statusEl.textContent = b.neverRun === 1 ? 'Baseline Pending' : (b.stale === 1 ? 'Baseline Stale' : 'Baseline Only');
                 statusEl.className = b.stale === 1 ? 'badge badge-warning' : (b.neverRun === 1 ? 'badge badge-warning' : 'badge badge-success');
             }
-            if (agentEl) agentEl.textContent = 'Agent metrics unavailable';
+            if (agentEl) agentEl.textContent = 'Unavailable';
             if (scanEl) {
                 if (b.neverRun === 1) scanEl.textContent = 'No baseline evidence yet';
                 else if (b.lastRun && b.lastRun > 0) { scanEl.textContent = formatRelativeTime(b.lastRun); scanEl.title = new Date(b.lastRun * 1000).toLocaleString(); }
                 else scanEl.textContent = 'Unknown';
             }
-            if (vulnEl) vulnEl.textContent = b.neverRun === 1 ? '—' : 'n/a (agent metrics)';
+            if (vulnEl) vulnEl.textContent = b.neverRun === 1 ? '—' : 'n/a';
             if (severityEl) {
                 const parts = [`OPA ${checkLabel(b.opaOk)}`, `Drift ${checkLabel(b.drift === 1 ? 0 : b.drift === 0 ? 1 : -1)}`, `TrivyFS ${checkLabel(b.trivyFsOk)}`, `Gitleaks ${checkLabel(b.gitleaksOk)}`];
                 severityEl.textContent = parts.join(' · ');
