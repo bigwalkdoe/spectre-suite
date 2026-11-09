@@ -36,13 +36,13 @@ http.server.HTTPServer(('127.0.0.1',port), H).serve_forever()
 PY
 SRV_PID=$!; sleep 0.3
 
-OUT=$(PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus SPECTRE_REPO_ROOT="$TMP" GRAFANA_ADMIN_PASSWORD= MONITORING_CHECK_FORMAT=prom bash "$CHECK" 2>&1) || true
+OUT=$(PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus SPECTRE_REPO_ROOT="$TMP" GRAFANA_ADMIN_PASSWORD='' MONITORING_CHECK_FORMAT=prom bash "$CHECK" 2>&1) || true
 assert_contains "$OUT" "spectre_monitoring_check_ok 1" "overall ok"
 assert_contains "$OUT" "spectre_monitoring_prometheus_routeprefix_healthy 1" "routeprefix healthy"
 assert_contains "$OUT" "spectre_monitoring_grafana_datasource_provisioning_ok 1" "provisioning ok"
 assert_contains "$OUT" "spectre_monitoring_grafana_datasource_url_matches -1" "live url unknown without creds"
 
-SPECTRE_REPO_ROOT="$TMP" PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus GRAFANA_ADMIN_PASSWORD= "$EXPORTER" "$TMP/out" >/dev/null 2>&1
+SPECTRE_REPO_ROOT="$TMP" PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus GRAFANA_ADMIN_PASSWORD='' "$EXPORTER" "$TMP/out" >/dev/null 2>&1
 assert_contains "$(cat "$TMP/out/monitoring_stack_metrics.prom")" "spectre_monitoring_check_ok 1" "exporter writes file"
 
 echo "== Summary: pass=$pass fail=$fail =="

@@ -154,6 +154,9 @@ spectre_monitoring_prometheus_routeprefix_healthy $M_PROM_HEALTHY
 # HELP spectre_monitoring_prometheus_ready 1 ready under configured route prefix, 0 not ready, -1 unknown
 # TYPE spectre_monitoring_prometheus_ready gauge
 spectre_monitoring_prometheus_ready $M_PROM_READY
+# HELP spectre_monitoring_prometheus_buildinfo_reachable 1 buildinfo reachable under configured route prefix, 0 not reachable, -1 unknown
+# TYPE spectre_monitoring_prometheus_buildinfo_reachable gauge
+spectre_monitoring_prometheus_buildinfo_reachable $M_PROM_BUILDINFO
 # HELP spectre_monitoring_grafana_to_prometheus_reachable 1 Grafana container can reach Prometheus in-network, 0 unreachable, -1 unknown/skipped
 # TYPE spectre_monitoring_grafana_to_prometheus_reachable gauge
 spectre_monitoring_grafana_to_prometheus_reachable $M_GRAFANA_NET
