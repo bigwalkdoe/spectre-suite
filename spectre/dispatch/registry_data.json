@@ -573,6 +573,15 @@
     "schedule_hint": "*-*-* 05:30:00"
   },
   {
+    "name": "backups/trim-backup-artifacts",
+    "action": "backups/trim-backup-artifacts.sh",
+    "group": "backups",
+    "summary": "Conservatively trim local backup artifacts (hollow/unusable, old beyond retention, stale dumps)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*-*-* 05:45:00"
+  },
+  {
     "name": "backups/restic/restore",
     "action": "backups/restic/restore.sh",
     "group": "backups",

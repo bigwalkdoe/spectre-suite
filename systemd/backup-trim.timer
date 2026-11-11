@@ -1,0 +1,11 @@
+[Unit]
+Description=Spectre Suite daily local backup artifact trimming timer
+
+[Timer]
+OnCalendar=*-*-* 05:45:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=backup-trim.service
+
+[Install]
+WantedBy=timers.target
