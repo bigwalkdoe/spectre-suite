@@ -240,7 +240,7 @@ class SecurityAgent(BaseAgent):
             ".git", ".hg", ".svn",
             ".venv", "venv", ".mypy_cache", ".pytest_cache", "__pycache__",
             "node_modules", ".cache", ".pyenv", ".cargo", ".rustup", ".npm", ".nvm",
-            "site-packages", "dist-packages",
+            "site-packages", "dist-packages", "tests",
         }
         ignore_path_parts = {Path.home() / ".local" / "lib", Path.home() / ".cache", Path.home() / "go" / "pkg" / "mod"}
 
