@@ -130,7 +130,7 @@ restic_backup_args() {
 }
 
 restic_forget_args() {
-  printf '%s' "--tag ${RESTIC_TAG:-spectre-suite} --keep-hourly 24 --keep-daily 30 --keep-weekly 12 --keep-monthly 12 --keep-last 1"
+  printf '%s' "--tag ${RESTIC_TAG:-spectre-suite} --keep-hourly ${RESTIC_KEEP_HOURLY:-24} --keep-daily ${RESTIC_KEEP_DAILY:-30} --keep-weekly ${RESTIC_KEEP_WEEKLY:-12} --keep-monthly ${RESTIC_KEEP_MONTHLY:-12} --keep-last ${RESTIC_KEEP_LAST:-1}"
 }
 
 write_marker() {
