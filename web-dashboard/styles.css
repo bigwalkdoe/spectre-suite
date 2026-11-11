@@ -138,8 +138,9 @@ main.content { display: grid; gap: 12px; }
 .kv-value, .health-value, .backup-value, .security-value { color: var(--text); font-weight: 600; font-size: 12px; text-align: right; word-break: break-word; overflow-wrap: anywhere; min-width: 0; }
 
 /* Alerts */
-.alert-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.alerts-list { display: grid; gap: 8px; max-height: 340px; overflow: auto; padding-right: 2px; }
+.alert-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.alerts-list { display: grid; gap: 8px; max-height: 340px; overflow: auto; padding-right: 2px; align-content: start; }
+.alert-filter-note { font-size: 11px; padding: 0 2px 2px; }
 .no-alerts, .empty-state { color: var(--muted); font-size: 12px; padding: 14px 4px; display: flex; align-items: flex-start; gap: 10px; border: 1px dashed var(--border); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .alert-item { border: 1px solid var(--border); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
 .alert-item.critical { border-left-color: var(--crit); }
