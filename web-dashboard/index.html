@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spectre Suite</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css?v=20261111-compact">
+    <link rel="stylesheet" href="styles.css?v=20261111-ux">
     <link rel="stylesheet" href="vendor/fontawesome/all.min.css">
     <script defer src="vendor/chart.umd.min.js" integrity="sha384-DhxhYObIMeMNGyAG7iK11OHzBIKyEIeRL0ad1iFPAOwZB8iirUlTT0O/WJJUk8+o" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
@@ -228,11 +228,11 @@
                             <h2><i class="fas fa-tools" aria-hidden="true"></i> Quick Actions</h2>
                         </div>
                         <div class="card-body">
-                            <div class="quick-actions">
-                                <button class="action-btn" type="button" data-dashboard-action="backup"><i class="fas fa-save" aria-hidden="true"></i><span>Run Backup</span></button>
-                                <button class="action-btn" type="button" data-dashboard-action="maintenance"><i class="fas fa-broom" aria-hidden="true"></i><span>Run Maintenance</span></button>
-                                <button class="action-btn" type="button" data-dashboard-action="security-scan"><i class="fas fa-search" aria-hidden="true"></i><span>Security Scan</span></button>
-                                <button class="action-btn" type="button" data-dashboard-action="logs"><i class="fas fa-file-alt" aria-hidden="true"></i><span>View Logs</span></button>
+                            <div class="quick-actions" role="group" aria-label="Quick actions">
+                                <button class="action-btn" type="button" data-dashboard-action="backup" title="Request a backup run"><i class="fas fa-save" aria-hidden="true"></i><span class="action-text"><span class="action-label">Run Backup</span><span class="action-hint">Trigger backup job</span></span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="maintenance" title="Request maintenance tasks"><i class="fas fa-broom" aria-hidden="true"></i><span class="action-text"><span class="action-label">Run Maintenance</span><span class="action-hint">Routine upkeep</span></span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="security-scan" title="Request a security scan"><i class="fas fa-search" aria-hidden="true"></i><span class="action-text"><span class="action-label">Security Scan</span><span class="action-hint">Check for findings</span></span></button>
+                                <button class="action-btn" type="button" data-dashboard-action="logs" title="Open logs in Grafana"><i class="fas fa-file-alt" aria-hidden="true"></i><span class="action-text"><span class="action-label">View Logs</span><span class="action-hint">Open Grafana logs</span></span></button>
                             </div>
                         </div>
                     </section>
