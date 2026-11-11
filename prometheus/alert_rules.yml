@@ -531,6 +531,15 @@ groups:
           summary: "Restic health check failed or degraded"
           description: "The last restic backup run reported a failed or degraded health verdict."
 
+      - alert: ResticHealthMissing
+        expr: restic_last_success_timestamp > 0 and restic_health_timestamp == 0
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restic health verdict has not been reported"
+          description: "Local restic backups have succeeded but no restic health verdict timestamp has been recorded."
+
       - alert: ResticVerifyFailed
         expr: restic_verify_timestamp > 0 and restic_verify_ok == 0
         for: 30m
@@ -539,6 +548,15 @@ groups:
         annotations:
           summary: "Restic repository verification failed"
           description: "restic verify reported a failure; check repository integrity before relying on backups."
+
+      - alert: ResticVerifyMissing
+        expr: restic_last_success_timestamp > 0 and restic_verify_timestamp == 0
+        for: 48h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restic repository verification has not run"
+          description: "Local restic backups have succeeded but no restic verification has been recorded."
 
       - alert: ResticVerifyStale
         expr: restic_verify_timestamp > 0 and time() - restic_verify_timestamp > 691200
