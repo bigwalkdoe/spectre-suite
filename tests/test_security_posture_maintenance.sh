@@ -129,7 +129,7 @@ test_dry_run_no_side_effects() {
 # 3) Safe remediation creates expected state dirs and removes only stale temp files
 #    in managed posture temp area (not arbitrary files) when applicable.
 test_safe_remediation() {
-    local out rc managed_tmp stale recent outside outside_stale marker_before marker_after
+    local out rc managed_tmp stale recent outside outside_stale
     new_env
     managed_tmp="$STATE_DIR/tmp"
     mkdir -p "$managed_tmp"
