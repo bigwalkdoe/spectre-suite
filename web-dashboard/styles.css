@@ -292,12 +292,13 @@ main.content { display: grid; gap: 12px; }
 }
 
 /* Container grouping (presentational; data/status semantics unchanged) */
-#containersGrid.containers-grid { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: stretch; }
-.container-group { border: 1px solid var(--line-soft); border-radius: 8px; background: color-mix(in srgb, var(--surface-2) 55%, var(--card-bg)); overflow: hidden; }
+#containersGrid.containers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; align-items: start; max-height: 340px; overflow: auto; padding-right: 2px; }
+.dashboard-page--focused #containersGrid.containers-grid { max-height: min(70vh, 720px); grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.container-group { border: 1px solid var(--line-soft); border-radius: 8px; background: color-mix(in srgb, var(--surface-2) 55%, var(--card-bg)); overflow: hidden; height: 100%; }
 .container-group-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); }
 .container-group-name { font: 700 12px/1 var(--sans); color: var(--text); text-transform: lowercase; letter-spacing: .01em; }
 .container-group-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font: 700 11px/1 var(--mono); color: var(--muted); background: var(--card-bg); border: 1px solid var(--border); }
-.container-group-items.containers-grid { padding: 8px; margin: 0; gap: 8px; }
+.container-group-items.containers-grid { padding: 8px; margin: 0; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: none; overflow: visible; padding-right: 0; }
 .container-filter { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); }
 .container-filter:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
 .container-filter-input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; padding: 0; outline: none; }
