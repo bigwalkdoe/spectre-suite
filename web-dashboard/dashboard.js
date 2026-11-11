@@ -547,6 +547,8 @@ async function fetchAllMetrics(opts = {}) {
                 queryPrometheus('backup_repo_fs_free_bytes'),
                 queryPrometheus('restic_last_success_timestamp'),
                 queryPrometheus('restic_last_offsite_success_timestamp'),
+                queryPrometheus('restic_health_ok'),
+                queryPrometheus('restic_health_timestamp'),
                 queryPrometheus('restic_verify_ok'),
                 queryPrometheus('restic_verify_timestamp'),
                 queryPrometheus('spectre_agent_up'),
@@ -569,7 +571,7 @@ async function fetchAllMetrics(opts = {}) {
             ]).then((slowResults) => {
                 const [
                     backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
-                    resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+                    resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs,
                     spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
                     findingsCritical, findingsHigh, findingsMedium, findingsLow,
                     baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
@@ -578,7 +580,7 @@ async function fetchAllMetrics(opts = {}) {
                 ] = slowResults;
                 slowMetricsCache = {
                     backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
-                    resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+                    resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs,
                     spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
                     findingsCritical, findingsHigh, findingsMedium, findingsLow,
                     baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
@@ -620,7 +622,7 @@ async function fetchAllMetrics(opts = {}) {
         const slowFetched = !slowIsCached;
         const {
             backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree,
-            resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs,
+            resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs,
             spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved,
             findingsCritical, findingsHigh, findingsMedium, findingsLow,
             baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale,
@@ -632,20 +634,20 @@ async function fetchAllMetrics(opts = {}) {
             opaOk: baselineOpaOk, drift: baselineDrift, trivyFsOk: baselineTrivyFsOk, gitleaksOk: baselineGitleaksOk
         };
 
-        const slowValues = [backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs, spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale, baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk];
-        const executed = coreResults.length + (slowFetched ? 26 : 0);
+        const slowValues = [backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs, spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, baselineExporterUp, baselineNeverRun, baselineLastRun, baselineStale, baselineOpaOk, baselineDrift, baselineTrivyFsOk, baselineGitleaksOk];
+        const executed = coreResults.length + (slowFetched ? 28 : 0);
         const executedValues = slowFetched ? [...coreResults, ...slowValues] : coreResults;
         const succeeded = executedValues.filter(v => v !== null).length + (slowFetched && agentReasonResult ? 1 : 0);
         lastQueryStats = { total: executed, succeeded, failed: executed - succeeded };
         lastExporterStatus = {
-            backup: [backupLastSuccess, backupHealthOk, resticLastSuccess].some(v => v !== null),
+            backup: [backupLastSuccess, backupHealthOk, resticLastSuccess, resticHealthOk, resticHealthTs].some(v => v !== null),
             agent: spectreUp !== null,
             baseline: baselineExporterUp === 1,
             security: spectreUp !== null || baselineExporterUp === 1
         };
 
         const agentReason = agentReasonResult?.metric?.reason || null;
-        updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs);
+        updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs);
         updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason, baseline);
         ['backupCard', 'securityCard'].forEach(id => setCardLoading(id, false));
         await Promise.allSettled([alertsPromise, containersPromise, chartPromise]);
@@ -802,20 +804,21 @@ function formatUptime(seconds) {
 }
 
 // Update Backup Status
-function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes, repoFree, resticLastSuccess, resticOffsite, resticVerifyOk, resticVerifyTs) {
+function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes, repoFree, resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs) {
     const statusEl = document.getElementById('backupStatus');
     const lastEl = document.getElementById('lastBackup');
     const healthEl = document.getElementById('backupHealth');
+    const resticHealthEl = document.getElementById('resticHealth');
     const sizeEl = document.getElementById('backupSize');
     const offsiteEl = document.getElementById('resticOffsite');
     const verifyEl = document.getElementById('resticVerify');
 
     const effectiveLast = (lastSuccess && lastSuccess > 0) ? lastSuccess : (resticLastSuccess && resticLastSuccess > 0 ? resticLastSuccess : null);
-    const hasData = effectiveLast !== null || healthOk !== null || repoBytes !== null || resticVerifyOk !== null || resticOffsite !== null;
+    const hasData = effectiveLast !== null || healthOk !== null || repoBytes !== null || resticHealthOk !== null || resticVerifyOk !== null || resticOffsite !== null;
 
     if (!hasData) {
         if (statusEl) { statusEl.textContent = 'No data'; statusEl.className = 'badge'; }
-        [lastEl, healthEl, sizeEl, offsiteEl, verifyEl].forEach(el => { if (el) el.textContent = 'No data'; });
+        [lastEl, healthEl, resticHealthEl, sizeEl, offsiteEl, verifyEl].forEach(el => { if (el) el.textContent = 'No data'; });
         setCardError('backupCard', 'Backup metrics unavailable (exporter may not be running)');
         return;
     }
@@ -834,6 +837,19 @@ function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes, repoFree
             healthEl.textContent = 'No data';
         }
         if (healthTs) healthEl.title = new Date(healthTs * 1000).toLocaleString();
+    }
+
+    if (resticHealthEl) {
+        if (resticHealthOk === 1) {
+            resticHealthEl.textContent = `OK${resticHealthTs ? ` (${formatRelativeTime(resticHealthTs)})` : ''}`;
+        } else if (resticHealthOk === 0 && resticHealthTs) {
+            resticHealthEl.textContent = `Degraded (${formatRelativeTime(resticHealthTs)})`;
+        } else if (resticHealthTs) {
+            resticHealthEl.textContent = formatRelativeTime(resticHealthTs);
+        } else {
+            resticHealthEl.textContent = 'No data';
+        }
+        if (resticHealthTs) resticHealthEl.title = new Date(resticHealthTs * 1000).toLocaleString();
     }
 
     if (sizeEl) {
@@ -864,10 +880,12 @@ function updateBackupStatus(lastSuccess, healthOk, healthTs, repoBytes, repoFree
         const isHealthy = healthOk === 1;
         const isStale = effectiveLast && (Date.now() / 1000 - effectiveLast) > 86400 * 2;
         const verifyBad = resticVerifyOk === 0;
-        if (isHealthy && !isStale && !verifyBad) {
+        const resticHealthBad = resticHealthOk === 0 && !!resticHealthTs;
+        const lowFreeSpace = repoFree !== null && repoFree < 20 * 1024 * 1024 * 1024;
+        if (isHealthy && !isStale && !verifyBad && !resticHealthBad && !lowFreeSpace) {
             statusEl.textContent = 'OK';
             statusEl.className = 'badge badge-success';
-        } else if (healthOk === 0 || isStale || verifyBad) {
+        } else if (healthOk === 0 || isStale || verifyBad || resticHealthBad || lowFreeSpace) {
             statusEl.textContent = 'Attention';
             statusEl.className = 'badge badge-warning';
         } else {
@@ -1466,6 +1484,7 @@ async function exportSnapshot() {
             status: document.getElementById('backupStatus')?.textContent,
             lastBackup: document.getElementById('lastBackup')?.textContent,
             health: document.getElementById('backupHealth')?.textContent,
+            resticHealth: document.getElementById('resticHealth')?.textContent,
             sizeFree: document.getElementById('backupSize')?.textContent,
             resticOffsite: document.getElementById('resticOffsite')?.textContent,
             resticVerify: document.getElementById('resticVerify')?.textContent

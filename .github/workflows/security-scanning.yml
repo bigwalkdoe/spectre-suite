@@ -69,6 +69,9 @@ jobs:
             opa check "$file"
           done
 
+      - name: Run OPA policy tests
+        run: opa test spectre/policies
+
             # The previous version asserted every control as `true` and evaluated the
       # policies against those constants. Worse, each policy file declared its
       # own hardcoded `= true` constant, so `data.security` reported full
