@@ -1085,8 +1085,14 @@ async function updateContainerStatus() {
         lastRenderedContainerKey = null;
         renderContainers();
 
-        containerStatus.textContent = hasData ? `${containerNames.length} Running` : (hasUnlabeledRecent ? 'Labels missing' : 'No data');
-        containerStatus.className = hasData ? 'badge badge-success' : (hasUnlabeledRecent ? 'badge badge-warning' : 'badge');
+        if (hasData) {
+            const groupCount = new Set(containerNames.map(n => (n || '').split(/[-_]/)[0] || n || 'other')).size;
+            containerStatus.textContent = `${containerNames.length} running · ${groupCount} group${groupCount === 1 ? '' : 's'}`;
+            containerStatus.className = 'badge badge-success';
+        } else {
+            containerStatus.textContent = hasUnlabeledRecent ? 'Labels missing' : 'No data';
+            containerStatus.className = hasUnlabeledRecent ? 'badge badge-warning' : 'badge';
+        }
         clearCardError('containersCard');
         setCardUpdated('containersCard');
     } catch (error) {
@@ -1140,11 +1146,13 @@ function renderAlerts() {
         return;
     }
     if (filtered.length === 0) {
-        alertsList.innerHTML = `<div class="empty-state"><i class="fas fa-filter" aria-hidden="true"></i><span>No <strong>${activeAlertFilter}</strong> alerts match the current filter.</span></div>`;
+        alertsList.innerHTML = `<div class="empty-state"><i class="fas fa-filter" aria-hidden="true"></i><span>No <strong>${escapeHtml(activeAlertFilter)}</strong> alerts match the current filter (${currentAlerts.length} total).</span></div>`;
         return;
     }
 
-    alertsList.innerHTML = filtered.map(alert => {
+    const filterNote = activeAlertFilter !== 'all' ? `<div class="alert-filter-note muted" aria-live="polite">Showing ${filtered.length} of ${currentAlerts.length} active alerts</div>` : '';
+
+    alertsList.innerHTML = filterNote + filtered.map(alert => {
         const rawSeverity = String(alert.labels?.severity || 'info').toLowerCase();
         const severity = ['critical', 'warning', 'info'].includes(rawSeverity) ? rawSeverity : 'info';
         const name = alert.labels?.alertname || 'Unnamed alert';
