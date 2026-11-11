@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
-Free LLM provider abstraction for the ML fix engine.
+LLM provider abstraction for the ML fix engine.
 
 Uses locally hosted, free/open-weight models via Ollama by default. An
 OpenAI-compatible provider is included so any free endpoint (local
 llama.cpp server, or a free cloud tier) can be used without code changes.
+An OpenCode provider is included to generate remediation plans via the local
+`opencode` CLI.
 """
 
 import os
 import json
 import logging
+import shutil
+import subprocess
 import urllib.request
 import urllib.error
 
@@ -126,9 +130,69 @@ class OpenAICompatibleProvider(LLMProvider):
         return result["choices"][0]["message"]["content"]
 
 
+class OpenCodeProvider(LLMProvider):
+    """Local OpenCode CLI (`opencode run`) as a remediation-plan provider."""
+
+    def __init__(self, model=None, binary=None):
+        self.model = model or os.environ.get("OPENCODE_MODEL") or os.environ.get("ML_FIX_MODEL")
+        self.binary = binary or os.environ.get("OPENCODE_BIN") or shutil.which("opencode") or "opencode"
+        self.timeout = int(os.environ.get("OPENCODE_TIMEOUT", "180"))
+
+    def is_available(self):
+        try:
+            result = subprocess.run(
+                [self.binary, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return result.returncode == 0
+        except Exception as e:
+            logger.debug(f"OpenCode CLI unavailable: {e}")
+            return False
+
+    def generate(self, prompt, expect_json=False):
+        if expect_json:
+            prompt = (
+                "Return STRICT JSON only with no surrounding prose or markdown fences.\n\n"
+                + prompt
+            )
+
+        cmd = [self.binary, "run", "--format", "default", "--archived"]
+        if self.model:
+            cmd.extend(["--model", self.model])
+
+        extra = os.environ.get("OPENCODE_EXTRA_ARGS", "").strip()
+        if extra:
+            cmd.extend(extra.split())
+
+        cmd.append(prompt)
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout,
+        )
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            detail = stderr or stdout or f"exit code {result.returncode}"
+            raise RuntimeError(f"OpenCode run failed: {detail}")
+
+        return (result.stdout or "").strip()
+
+
 def get_provider():
-    """Return the best available free provider (Ollama preferred)."""
+    """Return the configured provider, with Ollama fallback when appropriate."""
     provider_name = os.environ.get("ML_FIX_PROVIDER", "ollama").lower()
+
+    if provider_name == "opencode":
+        provider = OpenCodeProvider()
+        if provider.is_available():
+            return provider
+        logger.error("Configured OpenCode provider unavailable")
+        return None
 
     if provider_name == "openai-compatible":
         provider = OpenAICompatibleProvider()
