@@ -1,0 +1,13 @@
+[Unit]
+Description=Spectre Suite security posture maintenance
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/spectre-suite
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/local/bin/spectre run security/security-posture-maintenance
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
