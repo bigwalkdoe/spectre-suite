@@ -786,5 +786,14 @@
     "replaces": [
       "crontab:*/5 * * * *"
     ]
+  },
+  {
+    "name": "security/security-posture-maintenance",
+    "action": "security/security-posture-maintenance.sh",
+    "group": "security",
+    "summary": "Run lightweight security posture maintenance (15-min scan, safe idempotent remediation)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*/15 * * * *"
   }
 ]

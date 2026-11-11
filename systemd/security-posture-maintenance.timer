@@ -1,0 +1,11 @@
+[Unit]
+Description=Spectre Suite security posture maintenance timer
+
+[Timer]
+OnCalendar=*-*-* *:0/15:00
+Persistent=true
+RandomizedDelaySec=2m
+Unit=security-posture-maintenance.service
+
+[Install]
+WantedBy=timers.target
