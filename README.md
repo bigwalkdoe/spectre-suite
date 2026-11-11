@@ -63,7 +63,7 @@ Instead of calling legacy scripts directly, scheduled and manual jobs run throug
 | **Backups** | Database, Docker volume, config, and project backups; replication, encryption/verification helpers; missed-backup catch-up; adopted **restic** engine with tag-scoped retention and degraded-offsite behavior. |
 | **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter, business/security textfile exporters, restic marker metrics, dashboards/provisioning. |
 | **Security** | IDS/IPS helpers (Suricata/OSSEC via `security/install-ids-ips`), Docker/API/network hardening actions, dependency/image scan helpers, Trivy image scan and SBOM/file-integrity baseline actions, OPA policies (including compatibility/version/admission reports), Spectre agent security metrics with port/identity collision detection. |
-| **Maintenance** | Cache/temp/download/resource cleanup, disk/performance checks, DB vacuum, system health, compliance/audit helpers. |
+| **Maintenance** | Cache/temp/download/resource cleanup, disk/performance checks, DB vacuum, system health, compliance/audit helpers, and safe automated self-maintenance (scheduled backup trimming/prune, 15-minute posture maintenance). |
 | **Network & performance** | VPN/network hardening/monitoring and optimization/right-sizing actions where implemented (review `sudo`/`mutates`). |
 | **ML (optional)** | ML anomaly pipeline/actions where dependencies/config are present. |
 
@@ -262,9 +262,11 @@ export RESTIC_CONFIG="$HOME/.secrets/spectre-suite-backups.env"
 
 spectre run backups/restic/backup
 spectre run backups/restic/verify
+# Space reclamation (tag-scoped prune; preview with -- --dry-run)
+spectre run backups/restic/prune
 ```
 
-Optional user timers: `spectre/actions/systemd/install-restic-timer.sh`, `spectre/actions/systemd/install-restic-verify-timer.sh`. **Never commit passwords/keys/backend credentials.** See `docs/migration/2026-11-06-absorb-spectre-backup.md`.
+Retention is configurable in `$RESTIC_CONFIG` (`RESTIC_KEEP_HOURLY=24`, `RESTIC_KEEP_DAILY=30`, `RESTIC_KEEP_WEEKLY=12`, `RESTIC_KEEP_MONTHLY=12`, `RESTIC_KEEP_LAST=1`, defaults preserved) while forget/prune remains tag-scoped. Optional user timers: `spectre/actions/systemd/install-restic-timer.sh`, `spectre/actions/systemd/install-restic-verify-timer.sh`, `spectre/actions/systemd/install-restic-prune-timer.sh` (daily prune), `spectre/actions/systemd/install-backup-trim-timer.sh` (daily conservative local backup artifact trimming via `spectre run backups/trim-backup-artifacts -- --dry-run`). **Never commit passwords/keys/backend credentials.** See `docs/migration/2026-11-06-absorb-spectre-backup.md`.
 
 ---
 
@@ -279,6 +281,8 @@ opa check spectre/policies/
 ```
 
 `spectre run prometheus/security-metrics-exporter` (scheduled) publishes Spectre agent findings as node-exporter textfile metrics. Key signals include `spectre_agent_up` / `spectre_agent_up_reason`; finding counts are omitted (not zeroed) when agent state is unknown/untrusted. The agent API is fail-closed (`X-API-Key` required). Configure via `SPECTRE_AGENT_URL`, `SPECTRE_API_KEY_FILE` (default `<repo>/.spectre-api-key`, mode `0600`), `SPECTRE_TIMEOUT`.
+
+`security/security-posture-maintenance` runs as a lightweight 15-minute self-maintenance cycle (user timer: `spectre/actions/systemd/install-security-posture-maintenance-timer.sh`) to refresh posture/status signals and apply only safe, idempotent fixes (state/export refresh, managed stale-temp cleanup). Use `-- --dry-run` or `-- --check-only` to preview; no service restarts or risky config/network changes by default.
 
 ---
 
