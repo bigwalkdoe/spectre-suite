@@ -164,6 +164,22 @@ spectre/actions/backups/restic/restore.sh --latest --target /tmp/restore-test --
 
 Markers/alerts: state markers in `~/.local/state/spectre-suite/backups/` feed `restic_*` exporter gauges (`restic_last_success_timestamp`, `restic_last_verify_timestamp`, etc.); alert group `restic_backup_alerts` in `prometheus/alert_rules.yml`. `spectre-backup-catchup` remains the suite artifact catch-up (unchanged).
 
+**Automated backup self-maintenance (space reclamation):**
+```bash
+# Restic prune (tag-scoped; reclaims unreferenced data) - daily timer (default 05:30:00, Persistent=true)
+systemctl --user list-timers | grep spectre-restic-prune
+systemctl --user status spectre-restic-prune.timer spectre-restic-prune.service
+spectre run backups/restic/prune -- --dry-run    # preview; never unscoped
+spectre/actions/systemd/install-restic-prune-timer.sh [--print|--uninstall]
+
+# Local backup artifact trimming (conservative, Spectre-owned paths/patterns only) - daily timer (default 05:45:00)
+systemctl --user list-timers | grep backup-trim
+spectre run backups/trim-backup-artifacts -- --dry-run
+spectre/actions/systemd/install-backup-trim-timer.sh [--print|--uninstall]
+```
+- **Retention (restic):** configurable via `RESTIC_KEEP_HOURLY` (24), `RESTIC_KEEP_DAILY` (30), `RESTIC_KEEP_WEEKLY` (12), `RESTIC_KEEP_MONTHLY` (12), `RESTIC_KEEP_LAST` (1) in `$RESTIC_CONFIG` (defaults preserved); forget/prune remains tag-scoped (`${RESTIC_TAG:-spectre-suite}`).
+- **Local trim defaults/safety:** age-based trimming of Spectre-owned timestamped artifacts (default `BACKUP_ARTIFACT_RETENTION_DAYS=30`) in configured dirs (defaults `/backups/databases`, `/backups/docker-volumes`), structural hollow/unusable detection (not size-only), stale dump-temp cleanup, and no deletion outside owned/configured paths or restic repo internals. Use `--dry-run` to preview. Disable automation by uninstalling/stopping the relevant timer.
+
 ---
 
 ### Runbook 5: SSL Certificate Expiry
@@ -365,6 +381,41 @@ ansible-playbook -i inventory/production.yml playbook.yml --tags config
 # Re-run installation script
 sudo spectre-suite/install.sh
 ```
+
+---
+
+### Runbook 11: Security posture maintenance (15-minute)
+
+**Purpose:** Keep posture/baseline signals fresh and apply only safe, idempotent self-maintenance every 15 minutes.
+
+**Check/status:**
+```bash
+systemctl --user list-timers | grep security-posture-maintenance
+systemctl --user status security-posture-maintenance.timer security-posture-maintenance.service
+journalctl --user -u security-posture-maintenance.service --since "1 hour ago"
+ls -la "${XDG_STATE_HOME:-$HOME/.local/state}/spectre-suite/security-posture"
+```
+
+**Manual run / validation:**
+```bash
+# Lightweight scan/refresh (writes status summary/markers)
+spectre run security/security-posture-maintenance
+
+# Preview or check-only (no remediation side effects / no filesystem cleanup)
+spectre run security/security-posture-maintenance -- --dry-run
+spectre run security/security-posture-maintenance -- --check-only
+```
+
+**Automation install/disable:**
+```bash
+spectre/actions/systemd/install-security-posture-maintenance-timer.sh --print
+spectre/actions/systemd/install-security-posture-maintenance-timer.sh           # install+enable user timer
+spectre/actions/systemd/install-security-posture-maintenance-timer.sh --uninstall
+```
+
+**Safe remediation boundaries (default):** ensures required state/log/metrics dirs exist, removes only known-stale temporary artifacts in managed posture state/temp areas older than threshold, and refreshes idempotent local exports/status markers when available. **Not performed by default:** restarting services/containers, changing firewall/SELinux/AppArmor/network settings, modifying security policy configs, installing/removing packages, killing processes, or deleting user/data backups. Heavy scans remain on their existing schedules.
+
+**Failures:** non-zero exit/logged errors indicate the maintenance cycle could not complete or refresh signals; investigate journal/output and rerun with `--dry-run` or `--check-only` as needed.
 
 ---
 
