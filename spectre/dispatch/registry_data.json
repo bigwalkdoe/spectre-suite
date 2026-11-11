@@ -795,5 +795,14 @@
     "mutates": true,
     "concurrency": "forbid",
     "schedule_hint": "*/15 * * * *"
+  },
+  {
+    "name": "security/run-agent-security-audit",
+    "action": "security/run-agent-security-audit.sh",
+    "group": "security",
+    "summary": "Run Spectre agent security audit and refresh security metrics (records agent scan timestamp)",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "*-*-* 06:30:00"
   }
 ]

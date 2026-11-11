@@ -1,0 +1,13 @@
+[Unit]
+Description=Spectre Suite agent security audit
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/spectre-suite
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/local/bin/spectre run security/run-agent-security-audit
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
