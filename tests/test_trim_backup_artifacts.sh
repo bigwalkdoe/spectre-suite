@@ -40,7 +40,7 @@ make_good_rdb() {
 }
 
 make_good_tar() {
-    local path="$1" tmpdir payload
+    local path="$1" tmpdir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/tar-fixture.XXXXXX")
     printf 'data\n' > "$tmpdir/payload.txt"
     tar -czf "$path" -C "$tmpdir" payload.txt
