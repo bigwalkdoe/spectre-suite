@@ -1,0 +1,11 @@
+[Unit]
+Description=Spectre Suite daily tag-scoped restic prune timer
+
+[Timer]
+OnCalendar=*-*-* 05:30:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=spectre-restic-prune.service
+
+[Install]
+WantedBy=timers.target

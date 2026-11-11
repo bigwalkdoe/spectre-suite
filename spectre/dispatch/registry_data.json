@@ -570,7 +570,7 @@
     "summary": "Tag-scoped restic forget/prune (reclaims unreferenced data; dry-run supported)",
     "mutates": true,
     "concurrency": "forbid",
-    "schedule_hint": null
+    "schedule_hint": "*-*-* 05:30:00"
   },
   {
     "name": "backups/restic/restore",
