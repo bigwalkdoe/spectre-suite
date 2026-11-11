@@ -1,0 +1,11 @@
+[Unit]
+Description=Spectre Suite agent security audit timer
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=agent-security-audit.service
+
+[Install]
+WantedBy=timers.target
