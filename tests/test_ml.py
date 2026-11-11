@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import unittest
+from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ML_DIR = os.path.join(REPO_ROOT, "spectre", "actions", "ml-anomaly")
@@ -19,6 +20,7 @@ sys.path.insert(0, ML_DIR)
 
 import ml_fix_engine  # noqa: E402
 import anomaly_detector  # noqa: E402
+import providers  # noqa: E402
 
 
 class TestValidatePlan(unittest.TestCase):
@@ -101,6 +103,57 @@ class TestParseLLMResponse(unittest.TestCase):
 
     def test_invalid(self):
         self.assertIsNone(ml_fix_engine.parse_llm_response("not json at all"))
+
+
+class TestProviders(unittest.TestCase):
+    def test_get_provider_opencode_selected_and_available(self):
+        fake = mock.Mock()
+        fake.is_available.return_value = True
+        with mock.patch.dict(os.environ, {"ML_FIX_PROVIDER": "opencode"}, clear=False):
+            with mock.patch.object(providers, "OpenCodeProvider", return_value=fake) as ctor:
+                with mock.patch.object(providers, "OllamaProvider") as ollama_ctor:
+                    p = providers.get_provider()
+        self.assertIs(p, fake)
+        ctor.assert_called_once_with()
+        ollama_ctor.assert_not_called()
+
+    def test_get_provider_opencode_unavailable_returns_none(self):
+        fake = mock.Mock()
+        fake.is_available.return_value = False
+        with mock.patch.dict(os.environ, {"ML_FIX_PROVIDER": "opencode"}, clear=False):
+            with mock.patch.object(providers, "OpenCodeProvider", return_value=fake):
+                p = providers.get_provider()
+        self.assertIsNone(p)
+
+    def test_opencode_provider_is_available(self):
+        ok = mock.Mock(returncode=0)
+        with mock.patch("providers.subprocess.run", return_value=ok) as run:
+            self.assertTrue(providers.OpenCodeProvider(binary="opencode").is_available())
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][:2], ["opencode", "--version"])
+
+    def test_opencode_provider_generate_builds_cli_and_returns_stdout(self):
+        res = mock.Mock(returncode=0, stdout='{"ok": true}\n', stderr="")
+        env = {"OPENCODE_MODEL": "test/model", "OPENCODE_EXTRA_ARGS": "--agent build"}
+        with mock.patch.dict(os.environ, env, clear=False):
+            with mock.patch("providers.subprocess.run", return_value=res) as run:
+                out = providers.OpenCodeProvider(binary="opencode").generate("PROMPT", expect_json=True)
+        self.assertEqual(out, '{"ok": true}')
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd[0:4], ["opencode", "run", "--format", "default"])
+        self.assertIn("--archived", cmd)
+        self.assertIn("--model", cmd)
+        self.assertIn("test/model", cmd)
+        self.assertIn("--agent", cmd)
+        self.assertIn("build", cmd)
+        self.assertIn("PROMPT", cmd[-1])
+        self.assertIn("STRICT JSON only", cmd[-1])
+
+    def test_opencode_provider_generate_raises_on_failure(self):
+        res = mock.Mock(returncode=1, stdout="", stderr="boom")
+        with mock.patch("providers.subprocess.run", return_value=res):
+            with self.assertRaises(RuntimeError):
+                providers.OpenCodeProvider(binary="opencode").generate("PROMPT")
 
 
 if __name__ == "__main__":
