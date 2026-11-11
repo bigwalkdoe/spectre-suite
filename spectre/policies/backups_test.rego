@@ -21,6 +21,18 @@ test_backups_deny_offsite_missing if {
 	"backups: off-site replication is not enabled" in backups.deny with input as {"backup_offsite_enabled": false}
 }
 
+test_backups_deny_verification_missing if {
+	"backups: restore verification is not enabled" in backups.deny with input as {"backup_verification_enabled": false}
+}
+
+test_backups_deny_database_backups_missing if {
+	"backups: databases are not included" in backups.deny with input as {"database_backups_enabled": false}
+}
+
+test_backups_deny_docker_volume_backups_missing if {
+	"backups: docker volumes are not included" in backups.deny with input as {"docker_volume_backups_enabled": false}
+}
+
 test_backups_allow_mapped_controls_when_set if {
 	# Mapped controls satisfied; unmapped suite-only controls remain fail-closed (3).
 	msgs := backups.deny with input as {
