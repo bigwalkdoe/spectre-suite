@@ -9,7 +9,7 @@ import pytest
 
 from spectre.api.main import app
 
-TEST_API_KEY = "test-api-key-not-a-real-secret"
+TEST_API_KEY = "test-api-key-12345"
 
 
 @pytest.fixture(autouse=True)
