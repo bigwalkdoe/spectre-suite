@@ -4,7 +4,6 @@
 # `security_last_scan_timestamp` (agent-recorded) stays current.
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SPECTRE_BIN="${SPECTRE_BIN:-$(command -v spectre 2>/dev/null || echo spectre)}"
 
 log() { echo "[agent-security-audit] $*"; }
