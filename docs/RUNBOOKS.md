@@ -417,6 +417,8 @@ spectre/actions/systemd/install-security-posture-maintenance-timer.sh --uninstal
 
 **Failures:** non-zero exit/logged errors indicate the maintenance cycle could not complete or refresh signals; investigate journal/output and rerun with `--dry-run` or `--check-only` as needed.
 
+**Agent security audit findings:** `spectre security --audit` records agent scan time. Known findings to remediate with root: wildcard listeners and `PermitRootLogin`. See [`docs/runbooks/security-audit-remediation.md`](runbooks/security-audit-remediation.md).
+
 ---
 
 ## Monitoring Stack / Prometheus & Grafana Connectivity
