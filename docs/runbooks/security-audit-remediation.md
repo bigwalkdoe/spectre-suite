@@ -61,3 +61,35 @@ sshd -t && systemctl reload sshd
 ```
 
 Test in a separate SSH session before closing the current one.
+
+## 3) Per-service hardening checklist (deeper)
+
+For each wildcard listener found here, apply the service-specific hardening that
+matches this host’s deployment:
+
+| Port / service | Risk | Remediation checklist |
+|---|---|---|
+| 22/tcp SSH | Remote admin on wildcard | Firewall allow from trusted sources only; key-based auth only; `PermitRootLogin no`; fail2ban/brute-force monitoring. |
+| 80/tcp nginx | Public HTTP | Bind `127.0.0.1:80` (or TLS + reverse proxy); keep firewall allow for intended clients; rate limit; HSTS. |
+| 5355/tcp systemd-resolved / LLMNR | Internal name resolution responder | Set `LLMNR=no` in `/etc/systemd/resolved.conf`; restart `systemd-resolved`. |
+| 5432/tcp PostgreSQL | DB exposed | `listen_addresses = 'localhost'`; `pg_hba.conf` restrict host access to trusted sources + scram auth + TLS if remote needed; reload. |
+| 6379/tcp Redis | Cache/queue exposed | `bind 127.0.0.1`; enable `requirepass`; keep `protected-mode yes`; disable unauthenticated admin commands (FLUSHALL/FLUSHDB). |
+| 15435/tcp docker->5432 | Postgres via container publish | Change compose publish to `127.0.0.1:15435:5432`; recreate container. |
+| 19601/tcp docker->3000 | App via container publish | Change compose publish to `127.0.0.1:19601:3000`; recreate container. |
+| 27500/tcp (unmapped) | Unknown | Identify service (`docker ps` / `ss -ltnp`), then apply intent-based firewall/authorization. |
+
+The agent helper `SecurityAgent.ports-fix` (`spectre security --fix` path via the
+`ports-fix` action) maps known ports to these hardening targets and reports anything
+outside the map for manual review. It is read-only (no automatic daemon rebinds) by design;
+the privileged daemon/config changes above are operator-applied.
+
+## 4) How the audit works / reading results
+
+- Actions: `selinux-audit`, `firewall-audit`, `ports-audit`, `secrets-scan`, `ssh-audit`, plus `ports-fix`.
+- `ports-audit` reports `0.0.0.0:*` wildcard listeners and writes a `WILDCARD_PORTS` security
+  incident; `ports-fix` summarizes known-bind remediations and flags unmapped ports.
+- `secrets-scan` scans configured root (default repo root) for private keys / generic secrets,
+  ignoring VCS, venv, cache, and installed-package trees plus `tests/` (after false-positive fix).
+- `ssh-audit` reads `/etc/ssh/sshd_config` + includes and reports effective `PermitRootLogin`.
+- `selinux-audit` / `firewall-audit` check enforcement/activity; `firewall-audit` fix can start firewalld.
+- `--fix` applies only safe, agent-known remediations and always reports manual steps for risky ones.

@@ -33,7 +33,14 @@ class SecurityAgent(BaseAgent):
 
     def plan(self) -> list[str]:
         """Formulate security audit checklist."""
-        plan_steps = ["selinux-audit", "firewall-audit", "ports-audit", "secrets-scan", "ssh-audit"]
+        plan_steps = [
+            "selinux-audit",
+            "firewall-audit",
+            "ports-audit",
+            "secrets-scan",
+            "ssh-audit",
+            "ports-fix",
+        ]
         return plan_steps
 
     def execute(self, plan: list[str]) -> dict[str, Any]:
@@ -55,6 +62,10 @@ class SecurityAgent(BaseAgent):
                     log_output = self._scan_secrets()
                 elif action == "ssh-audit":
                     log_output = self._audit_ssh()
+                elif action == "ports-fix":
+                    log_output = self._fix_wildcard_ports(
+                        results.get("ports-audit", {}).get("log_output", "")
+                    )
                 else:
                     log_output = f"Unknown action: {action}"
                     status = "failed"
@@ -201,6 +212,46 @@ class SecurityAgent(BaseAgent):
             return f"No open public wildcard ports. Active local listeners: {', '.join(listening)}."
         except Exception as e:
             return f"Ports audit failed: {e}"
+
+    # Known local services that are safe to rebind to localhost-only when
+    # they are not required to be reachable off-host. Used by the ports fix
+    # helper so a wildcard listener can be narrowed without guessing at every
+    # daemon on the box.
+    WILDCARD_BIND_FIXES = {
+        5432: ("postgresql", "listen_addresses = 'localhost'"),
+        6379: ("redis", "bind 127.0.0.1"),
+        80: ("nginx", "listen 127.0.0.1:80 default_server;"),
+        5355: ("systemd-resolved", "LLMNR=no"),
+    }
+
+    def _fix_wildcard_ports(self, output: str) -> str:
+        """Narrow known wildcard listeners to localhost-only where safe.
+
+        Only touches services in WILDCARD_BIND_FIXES. Returns a human-readable
+        summary of what was attempted; anything not in the map is left alone
+        and reported for manual review.
+        """
+        if not output:
+            output = self._audit_ports()
+        ports = []
+        for token in output.replace(",", " ").split():
+            token = token.strip().rstrip(".,;:")
+            if token.startswith("0.0.0.0:") or token.startswith("*:") or token.startswith("[::]:"):
+                ports.append(token.split(":", 1)[-1].strip("[]:"))
+        ports = sorted(set(p for p in ports if p.isdigit()), key=int)
+
+        if not ports:
+            return "No wildcard ports to fix."
+
+        results = []
+        for port in ports:
+            spec = self.WILDCARD_BIND_FIXES.get(int(port))
+            if not spec:
+                results.append(f"port {port}: not in known-bind map; manual review required")
+                continue
+            service, directive = spec
+            results.append(f"port {port} ({service}): manual rebind -> {directive}")
+        return "Wildcards to review: " + "; ".join(results)
 
     # Suffixes worth scanning for credentials.
     SCAN_SUFFIXES = (".py", ".toml", ".json", ".yaml", ".yml", ".ini", ".cfg", ".conf", ".sh", ".env")

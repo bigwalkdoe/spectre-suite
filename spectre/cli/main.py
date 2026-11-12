@@ -643,8 +643,8 @@ def security(
             _print_result(action, result)
             if (
                 result.get("status") == "failed"
-                or "WARNING" in result.get("log_output", "")
-                or "CRITICAL" in result.get("log_output", "")
+                or "warning" in result.get("log_output", "").lower()
+                or "critical" in result.get("log_output", "").lower()
             ):
                 issues.append({"action": action, "output": result.get("log_output", "")})
 
@@ -694,6 +694,18 @@ def security(
                 elif action == "ssh-audit" and "root login" in output.lower():
                     console.print("  [yellow]![/yellow] SSH root login enabled - edit /etc/ssh/sshd_config manually")
                     console.print("    Set: PermitRootLogin no")
+
+                # Wildcard listeners -> report known binds and manual rebind directives
+                elif action == "ports-audit" and "Listening on open" in output:
+                    try:
+                        fix_result = _run_agent_action("security", "ports-fix")
+                        fix_output = fix_result.get("log_output", "")
+                        if fix_output:
+                            console.print(f"  [yellow]![/yellow] {fix_output}")
+                        else:
+                            console.print("  [yellow]![/yellow] ports-fix produced no output")
+                    except Exception as e:
+                        console.print(f"  [red]✗ ports-fix failed: {e}[/red]")
 
             console.print(f"\n[green]Fixed {fixed}/{len(issues)} issues[/green]")
         elif issues:
