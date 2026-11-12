@@ -581,6 +581,30 @@ def test_security_agent_audit_ssh() -> None:
     assert isinstance(output, str)
 
 
+def test_security_agent_ports_fix_maps_known_wildcards() -> None:
+    agent = SecurityAgent()
+    agent.initialize()
+    ports_output = "Audit complete. Warning: Listening on open network addresses: 0.0.0.0:5432, 0.0.0.0:6379, 0.0.0.0:80, 0.0.0.0:22."
+    out = agent._fix_wildcard_ports(ports_output)
+    assert "5432" in out and "postgresql" in out
+    assert "6379" in out and "redis" in out
+    assert "80" in out and "nginx" in out
+    assert "22" in out and "manual review required" in out
+
+
+def test_security_agent_ports_fix_no_wildcards() -> None:
+    agent = SecurityAgent()
+    agent.initialize()
+    out = agent._fix_wildcard_ports("No open public wildcard ports.")
+    assert "No wildcard ports to fix" in out
+
+
+def test_security_agent_plan_includes_ports_fix() -> None:
+    agent = SecurityAgent()
+    agent.initialize()
+    assert "ports-fix" in agent.plan()
+
+
 def _sshd_fixture(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, main: str, includes: dict[str, str]
 ) -> SecurityAgent:
