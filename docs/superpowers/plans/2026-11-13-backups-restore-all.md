@@ -98,9 +98,13 @@ New entry:
 
 - [ ] **Step 1: Insert entry** (preserve alphabetical order).
 - [ ] **Step 2: Validate registry loads** (`python3 -c "from spectre.dispatch.registry import get_job('backups/restore-all')"`).
-- [ ] **Step 3: Commit**.
+- [x] **Step 3: Commit**.
 
-### Task 3: Add systemd service and timer for the new job
+### Task 2: Complete.
+
+**Files:**
+
+**Files:**
 
 **Files:**
 - Create: `spectre/systemd/backups-restore-all.service`
@@ -128,9 +132,9 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-- [ ] **Step 1: Write `backups-restore-all.service`**.
-- [ ] **Step 2: Write `backups-restore-all.timer`** with `OnCalendar=*-*-* 04:00:00 Persistent=true`.
-- [ ] **Step 3: Install into systemd** (`cp` files to `/etc/systemd/system/` and enable timer: `systemctl enable --now backups-restore-all.timer`).
+- [x] **Step 1: Write `backups-restore-all.service`**.
+- [x] **Step 2: Write `backups-restore-all.timer`** with `OnCalendar=*-*-* 04:00:00 Persistent=true`.
+- [ ] **Step 3: Install into systemd** (`sudo cp ... /etc/systemd/system/`, `systemctl enable --now backups-restore-all.timer`).
 - [ ] **Step 4: Verify** (`systemctl list-timers | grep restore-all`).
 
 ### Task 4: Wire cron entry (optional, via registry `replaces`)
