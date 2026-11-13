@@ -14,4 +14,6 @@ paths = [
   '''(^|/)(__pycache__|\.pytest_cache|\.mypy_cache)/''',
   '''\.pyc$''',
   '''(^|/)tests/agent/test_agents\.py$''',
+  '''(^|/)tests/agent/test_api\.py$''',
+  '''(^|/)tests/agent/test_control_plane_api\.py$''',
 ]
