@@ -43,6 +43,7 @@ Minimal, **allowlisted**, token-protected trigger service for the web dashboard 
 ## Operational notes
 
 - Trigger files: `dashboard-actions/triggers/*.json` → moved to `processed/` or `failed/` by the host handler. Runtime contents are gitignored.
+- The container makes `/triggers` sticky world-writable (`1777`, `/tmp` model) at startup so the unprivileged server user can create trigger files while the host handler (directory owner) can move them. This is required because the bind mount is owned by the host operator. Do not mount `/triggers` over a directory that must stay mode 755.
 - Scripts may require root/sudo, docker access, or host paths (`/backups`). Review/adjust the allowlisted scripts and the handler's execution context for your host.
 - The dashboard itself remains unauthenticated and localhost-bound by default; treat the action token as sensitive.
 - To disable actions in the UI: open with `?actionsBase=off`.
