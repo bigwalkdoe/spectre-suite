@@ -12,7 +12,7 @@ set -euo pipefail
 export HOME="${HOME:-/root}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUITE_ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../../../.." && pwd)}"
+SUITE_ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../../.." && pwd)}"
 ACTIONS_SECURITY="$SUITE_ROOT/spectre/actions/security"
 POLICY_DIR="${SPECTRE_POLICY_DIR:-$SUITE_ROOT/spectre/policies}"
 SPECTRE_SECURITY_ROOT="${SPECTRE_SECURITY_ROOT:-~//dev/github/spectre-security}"
@@ -105,7 +105,7 @@ fi
 log "Phase 3: Trivy filesystem scan"
 SCAN_DIR="${SECURITY_SCAN_DIR:-$SUITE_ROOT}"
 if have trivy; then
-  if timeout "${SECURITY_TRIVY_TIMEOUT:-300}" trivy fs "$SCAN_DIR" --quiet 2>&1 | tee "$LOG_DIR/trivy-fs.log"; then
+  if timeout --kill-after=5 "${SECURITY_TRIVY_TIMEOUT:-300}" trivy fs "$SCAN_DIR" --quiet > "$LOG_DIR/trivy-fs.log" 2>&1; then
     log "Trivy FS: COMPLETED"
   else
     TRIVY_FS_EXIT=$?; warn "Trivy FS: issues/failed (exit $TRIVY_FS_EXIT)"
