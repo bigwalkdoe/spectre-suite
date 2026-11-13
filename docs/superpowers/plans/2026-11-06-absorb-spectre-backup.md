@@ -82,7 +82,7 @@ The spec implies inputs no task tests by default that are most likely to bite. E
 - Consumes: existing `backup-configurations.sh` behavior (`BACKUP_DIR`, `DATE`, `sudo` copies/tars).
 - Produces: copied artifacts (`sshd_config_*`, `fail2ban_jail_*`, `dnf-automatic_*`) owned by the invoking user with mode `0640` (or `0600` owner-readable is acceptable if group unset; the requirement is *readable by the restic user when run as that user in the backup flow* — prefer `0640` + invoking user/group, but do not require root group changes; simplest: `install -m 0640 -o "$(id -u)" -g "$(id -g)"` via `sudo install`). Directories/tarballs keep existing behavior. Root-only sources are still read via `sudo`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_backup_configurations_permissions.sh` that runs in a temp tree: override `BACKUP_DIR`, stub `sudo` to copy from fixture files in `$TMP/etc/...` (or run the copy logic against a temp source by setting a test hook if you add one — prefer the smallest seam: make the script accept `SUDO_CMD=${SUDO_CMD:-sudo}` and test with `SUDO_CMD=` against readable fixtures), run the script for the `sshd_config`, `fail2ban_jail.local`, `dnf5-automatic.conf` copy lines' observable effect, and assert the copied files are readable by the current user (`test -r`) and not world-writable.
 
@@ -93,21 +93,21 @@ out="$BACKUP_DIR/sshd_config_$DATE"
 stat -c '%a' "$out" | grep -Eq '^(600|640)$' || fail "copied sshd_config mode too open/odd: $(stat -c '%a' "$out")"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bash tests/test_backup_configurations_permissions.sh`
 Expected: FAIL because current script uses `sudo cp` and leaves root-owned/0600 artifacts unreadable in the real case (or fails the seam assertion).
 
-- [ ] **Step 3: Implement the minimal fix in `scripts/backups/backup-configurations.sh`**
+- [x] **Step 3: Implement the minimal fix in `scripts/backups/backup-configurations.sh`**
 
 Replace the three `sudo cp <src> <dest>` lines with `sudo install -m 0640 -o "$(id -u)" -g "$(id -g)" <src> <dest>` (guarded as today). Keep `sudo tar ...` and firewall redirect behavior unchanged. The artifact content is configuration, not a secret key; `0640` is readable by the backup flow's user and not world-readable. If `id -g` is undesirable, `-g "$(id -gn)"` is fine; do not chown to root.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bash tests/test_backup_configurations_permissions.sh`
 Expected: PASS.
 
-- [ ] **Step 5: Wire and commit**
+- [x] **Step 5: Wire and commit**
 
 Add `test_backup_configurations_permissions.sh` to `tests/run_tests.sh` (its shell-test list/runner convention). Run: `bash tests/run_tests.sh` filtered to the new test if the runner supports it, else run the new test directly and a quick sanity of the runner.
 
@@ -132,15 +132,15 @@ git commit -m "fix(backups): make copied config artifacts readable by restic use
 - Consumes: spec §7.2/§7.3 exact scope and the deployed spectre-backup values (`~/.config/spectre-backup/.env`, include/exclude/include-remote) as the truth for preserved settings.
 - Produces: templates that, when deployed, produce the scope in spec §7.3. `env.example` documents `RESTIC_CONFIG` deployment target `~/.secrets/spectre-suite-backups.env` and password `~/.secrets/spectre-restic-password`; it must **not** contain the real password.
 
-- [ ] **Step 1: Write the env template**
+- [x] **Step 1: Write the env template**
 
 `config/backups/restic/env.example` preserves: `RESTIC_REPOSITORY=rclone:spectre-backup:`, `RESTIC_REPOSITORY_LOCAL=/backups/spectre-backup`, `RESTIC_PASSWORD_FILE=$HOME/.secrets/spectre-restic-password`, `LOG_DIR=$HOME/.local/state/spectre-suite/backups`, `PG_ENABLED=true`, `PG_HOST=/var/run/postgresql`, `PG_PORT=5432`, `PG_USER=deon`, `CONTAINERS_ENABLED=true`, `NOTIFY_ENABLED=true`, `NOTIFY_DESKTOP=true`, Drive pacing (`RCLONE_TPSLIMIT=20`, `RCLONE_TPSLIMIT_BURST=40`, `RCLONE_DRIVE_CHUNK_SIZE=64M`, `RCLONE_RETRIES=10`, `RCLONE_LOW_LEVEL_RETRIES=15`), `RESTIC_TAG=spectre-suite`, `RESTIC_HOST=$(hostname -s)` (or resolved at runtime; document). Add `# Copy to ~/.secrets/spectre-suite-backups.env (chmod 600). Never commit real credentials.`
 
-- [ ] **Step 2: Write `include.conf` (local, real paths only)**
+- [x] **Step 2: Write `include.conf` (local, real paths only)**
 
 Start from `spectre-backup/config/defaults/include.conf` semantics, then apply spec §7.3: keep dotfiles/ssh/gnupg/config/local-share/git-mirror; **remove** `~/archives`, `~/resources`, `~/downloads`, `~/Screenshots`; **add** `~/dev`, `~/docs`, `~/.secrets`, `~/archive/old-projects`, `~/archive/installers`, `~/archive/README.md`. Use `$HOME`-style or `~` consistently with the parser you adopt (Task 3) — pick one and stick to it; the adopted `build_targets` expands `~`. Comment the `~/code`/`~/documents`/`~/archives` symlink rationale.
 
-- [ ] **Step 3: Write `exclude.conf`**
+- [x] **Step 3: Write `exclude.conf`**
 
 Superset per spec: keep the proven excludes (`node_modules`, `.venv`, caches, VMs, `baloo`, `OptGuideOnDeviceModel`, VS Code cache, opencode state, `core.[0-9]*`, container storage) and add the suite-specific key/symlink guards:
 
@@ -154,7 +154,7 @@ $HOME/archives
 
 (`$HOME/archives` excludes the symlink entry; real archive content included is only the three explicit paths.)
 
-- [ ] **Step 4: Write `include-remote.conf` and `include-artifacts.conf`**
+- [x] **Step 4: Write `include-remote.conf` and `include-artifacts.conf`**
 
 `include-remote.conf`: keep the small offsite set (ssh, gnupg, shell/git, systemd/nvim/Code User) and add `~/docs`. Do **not** add `~/.config/spectre-backup` or broad `~/.secrets`. Comment quota and deliberate omissions.
 
@@ -170,7 +170,7 @@ $HOME/archives
 
 Never `/backups` alone.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add config/backups/restic
@@ -206,7 +206,7 @@ read_marker_field <file> <n>  # prints field n or empty (used for snapshot id)
 
 Exact names may differ if the adopted code keeps its style, but Task 4–8 must use the same names; pin them when you write `common.sh` and update this interface block in the plan only if you must — prefer to keep these names.
 
-- [ ] **Step 1: Write the failing unit tests**
+- [x] **Step 1: Write the failing unit tests**
 
 `tests/test_restic_adopted.sh` (shell, temp dirs, no real restic repo). Source `scripts/backups/restic/common.sh` with `RESTIC_REPOSITORY_LOCAL=/backups/spectre-backup`, `RESTIC_TAG=spectre-suite`, temp `CONFIG_DIR/STATE_DIR`. Assert:
 
@@ -234,12 +234,12 @@ echo "garbage" > "$tmp/bad"; [ "$(read_marker_epoch "$tmp/bad")" = "0" ] || fail
 [ "$(read_marker_epoch "$tmp/missing")" = "0" ] || fail
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bash tests/test_restic_adopted.sh`
 Expected: FAIL (`common.sh` missing / functions undefined).
 
-- [ ] **Step 3: Implement `common.sh`**
+- [x] **Step 3: Implement `common.sh`**
 
 Copy `spectre-backup/lib/spectre-backup-common.sh` as the base and adapt:
 - config/state defaults to `~/.config/spectre-suite/backups` and `~/.local/state/spectre-suite/backups` (overrideable by env / test); env file default `~/.secrets/spectre-suite-backups.env`; `MARKER_DIR=$STATE_DIR` (markers live in state root per spec).
@@ -249,16 +249,16 @@ Copy `spectre-backup/lib/spectre-backup-common.sh` as the base and adapt:
 - marker helpers: `write_marker name epoch [id]` atomic-ish (`tmp && mv`), `read_marker_epoch` => first numeric token else `0`, `read_marker_field` by awk field number.
 - keep distro/logging helpers used by the engine; remove or isolate installer-only code not needed at runtime.
 
-- [ ] **Step 4: Adopt `git-mirror.sh`**
+- [x] **Step 4: Adopt `git-mirror.sh`**
 
 Copy `spectre-backup/scripts/git-mirror.sh` to `scripts/backups/restic/git-mirror.sh`, `chmod +x`. Keep behavior (mirror history, not worktrees; safe repeated runs). Only adjust `--help`/version text to reference the suite path if present; do not change semantics. It must run before local backup and be local-only in effect (it writes under `~/.git-mirror`, which is in the local include).
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `bash tests/test_restic_adopted.sh`
 Expected: PASS.
 
-- [ ] **Step 6: Wire and commit**
+- [x] **Step 6: Wire and commit**
 
 Add `test_restic_adopted.sh` to `tests/run_tests.sh`. Run it.
 
@@ -280,7 +280,7 @@ git commit -m "feat(backups): adopt restic library, markers, and git mirror"
 - Consumes: `common.sh`, `git-mirror.sh`, config files, `restic`, `rclone`, `pg_dumpall`/`psql` (optional), Podman/Docker config collection logic from spectre-backup.
 - Produces: a `backup.sh` entrypoint with the spectre-backup flag surface needed by the suite (`--help`, `--version`/equivalent if present, `--health` passthrough or delegated behavior, quiet/debug flags the adopted engine supports) **and** suite defaults. It writes markers: `last-attempt` at start; `last-success` `<ts> <id>` after local success; `last-offsite-success` after offsite success; `last-health` `<0|1> <ts>` on completed run (degraded => 0 per spec's ok=1-only metric? follow spec: "restic_health_ok is 1 only for exit 0; it is 0 for exit 1 (failed) or 2 (degraded)"). Offsite failure: log + notify if configured, keep local success, exit 0 (healthy local) or 2 (degraded) — choose one and make the marker/metric rule consistent; spec says degraded => `health_ok 0` and `ResticHealthFailed` warns: so exit 2, `last-health` records failure-grade for the ok metric, but `last-success` remains. Document the choice in a comment.
 
-- [ ] **Step 1: Write the failing integration test (skips without restic)**
+- [x] **Step 1: Write the failing integration test (skips without restic)**
 
 `tests/test_restic_integration.sh`: if `! command -v restic`; then `echo "SKIP: restic not installed"; exit 0`; fi. Create a temp repo, password file, state/config dirs, fixture home+artifact tree, and a minimal include/exclude. Run `backup.sh` in a mode that targets only the temp local repo and skips offsite/pg/containers/git-mirror as supported by env/flags (add env overrides: `RESTIC_SKIP_OFFSITE=1`, `RESTIC_SKIP_PG=1`, `RESTIC_SKIP_CONTAINERS=1`, `RESTIC_SKIP_GIT_MIRROR=1`, `INCLUDE_FILE=...` — implement in step 3). Assert local snapshot exists with tag `spectre-suite`, `last-attempt` and `last-success` exist, `read_marker_epoch last-success > 0`.
 
@@ -292,12 +292,12 @@ RCLONE_CMD=false RESTIC_SKIP_OFFSITE=0 ... bash "$BACKUP" && status=0 || status=
 [ ! -f "$STATE/last-offsite-success" ] || [ "$(read_marker_epoch "$STATE/last-offsite-success")" = "0" ] || fail "offsite should not succeed"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bash tests/test_restic_integration.sh`
 Expected: FAIL (missing `backup.sh`) or SKIP if restic absent — confirm it runs.
 
-- [ ] **Step 3: Implement `backup.sh`**
+- [x] **Step 3: Implement `backup.sh`**
 
 Copy `spectre-backup/scripts/spectre-backup.sh` and adapt to suite contracts:
 - source `common.sh` from `scripts/backups/restic/`; set suite config/state defaults; load `~/.secrets/spectre-suite-backups.env`.
@@ -312,12 +312,12 @@ Copy `spectre-backup/scripts/spectre-backup.sh` and adapt to suite contracts:
 - step 8: `write_marker last-attempt` at start; on local success write `last-success <ts> <snapshot-id>` (obtain id via `restic snapshots -r <repo> --latest 1 --json`/`--tag spectre-suite --host` and `jq -r '.[0].short_id // .[0].id'`); write `last-offsite-success` only on offsite success; run/write health verdict. Exit 0 if local ok and not degraded, 2 if local ok but offsite degraded (or per your consistent contract), 1 if local failed.
 - add `RCLONE_CMD=${RCLONE_CMD:-rclone}` / command hooks only where needed for tests; no behavior change in production.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bash tests/test_restic_integration.sh` (and `bash tests/test_restic_adopted.sh`)
 Expected: PASS or SKIP(restic absent) for integration; PASS for unit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/backups/restic/backup.sh tests/test_restic_integration.sh tests/run_tests.sh
@@ -342,25 +342,25 @@ git commit -m "feat(backups): adopt restic backup flow with tag scoping and degr
   - `verify.sh [--full]` runs quick check by default, `restic check --read-data-subset`/full equivalent per adopted behavior; on completion writes `last-verify <0|1> <ts>` (1 = ok, 0 = failed). The first real write is the cutover rehearsal — that is fine.
   - `restore.sh --list | --snapshot <id> [--dry-run] [--target <dir>] [--local]` preserves the adopted interface (spec §7.7). Defaults to local repo.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Extend unit tests: invoking the wrappers with a stubbed `restic` (a temp executable earlier in PATH that records args) proves `forget` always receives `--tag spectre-suite` and never runs without it; `restore --list/--snapshot/--dry-run/--target/--local` parses. Extend integration: after the tagged backup, `verify.sh` exits 0 and writes `last-verify`; `restore.sh --snapshot <id> --dry-run` exits 0.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `bash tests/test_restic_adopted.sh && bash tests/test_restic_integration.sh`
 Expected: FAIL for new wrapper cases.
 
-- [ ] **Step 3: Implement wrappers**
+- [x] **Step 3: Implement wrappers**
 
 Copy/adapt from `spectre-backup/scripts/spectre-backup-{prune,verify,restore}.sh`. Repoint config/state/markers to `common.sh`. Ensure `prune.sh` cannot forget untagged snapshots. Ensure `verify.sh` records `last-verify`. Keep `restore.sh` safe defaults (explicit target for real restores; dry-run support).
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `bash tests/test_restic_adopted.sh && bash tests/test_restic_integration.sh`
 Expected: PASS/SKIP as appropriate.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/backups/restic/prune.sh scripts/backups/restic/verify.sh scripts/backups/restic/restore.sh tests/test_restic_adopted.sh tests/test_restic_integration.sh
@@ -395,7 +395,7 @@ Missing/empty/unparseable => `0` (log parse failure to stderr, do not break the 
 
 Alert names/expr/for/labels exactly as spec §7.6: `ResticBackupMissing`, `ResticBackupStale`, `ResticOffsiteMissing`, `ResticOffsiteStale`, `ResticHealthFailed`, `ResticVerifyFailed`, `ResticVerifyStale`. Keep `BackupStale` and `BackupHealthCheckFailed`.
 
-- [ ] **Step 1: Write the failing exporter test**
+- [x] **Step 1: Write the failing exporter test**
 
 `tests/test_restic_exporter.sh`: create temp marker dir with `last-success="1730000000 deadbeef"`, missing `last-offsite-success`, `last-health="0 1730000100"`, `last-verify="garbage"`; run the exporter pointed at the temp dir and output file (`BACKUP_REPO_DIR` can point to a temp dir that exists to avoid side effects); grep the output:
 
@@ -406,25 +406,25 @@ grep -qx 'restic_health_ok 0' "$out"
 grep -qx 'restic_verify_timestamp 0' "$out"
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `bash tests/test_restic_exporter.sh`
 Expected: FAIL (metrics absent).
 
-- [ ] **Step 3: Implement exporter + alerts**
+- [x] **Step 3: Implement exporter + alerts**
 
 In `business-metrics-exporter.sh`, add a `read_marker_epoch`-equivalent (or reuse its existing numeric parsing style) for the restic marker dir and emit the seven gauges with `# HELP`/`# TYPE`. Use `RESTIC_MARKER_DIR` env override for tests; default to the user's state dir as the script resolves it (the exporter runs in cron/user context on this host — check existing style; do not hardcode `/root`).
 
 In `alert_rules.yml`, append the restic rules under the backup group (or a clearly named group consistent with the file). Copy the expressions from the spec verbatim where possible.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `bash tests/test_restic_exporter.sh`
 Run: `bash tests/test_security_metrics.sh` or the repo's promtool/metrics tests if they validate alert syntax (use whatever `tests/run_tests.sh`/CI uses); if `promtool` is unavailable, `python -c "import yaml,sys; yaml.safe_load(open('prometheus/alert_rules.yml'))"` is a minimum.
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add prometheus/business-metrics-exporter.sh prometheus/alert_rules.yml tests/test_restic_exporter.sh tests/run_tests.sh
@@ -449,26 +449,26 @@ git commit -m "feat(monitoring): export restic markers and add restic alerts"
   - `install-restic-verify-timer.sh [--print|--uninstall]`: weekly `spectre-restic-verify.service/timer` (pick a stable calendar, e.g. `Sun *-*-* 05:30:00`, after the 05:00 catch-up; `Persistent=true`), runs `verify.sh` (quick). Never touches `spectre-backup-catchup`.
   - `install.sh` installs `scripts/backups/restic/*.sh` with mode 0755 to a deliberate location (same `/usr/local/bin` convention only if the scripts are safe to run flat; `backup.sh` sources `common.sh` by relative path, so flat install breaks — therefore **do not** flat-copy the restic subdir. Install the directory or invoke from repo/user path; update the installer/test accordingly and document). Pick the least surprising option: keep restic engine repo-relative/user-installed and ensure the timer `ExecStart` points at the absolute script path (the current pattern already does this).
 
-- [ ] **Step 1: Write/adjust failing tests**
+- [x] **Step 1: Write/adjust failing tests**
 
 Update `test_install_units.sh` / `test_schedule_ownership.sh` to assert: backup timer is 04:10 and runs `scripts/backups/restic/backup.sh`; verify timer runs `verify.sh`; `spectre-backup-catchup` is still referenced/owned by the suite and not removed (Review Focus adjacency — protect the catch-up). Remove assertions for deleted `restic-maintenance` units. Run to confirm failure.
 
-- [ ] **Step 2: Implement installers and update install.sh**
+- [x] **Step 2: Implement installers and update install.sh**
 
 Rewrite `install-restic-timer.sh` (replace the old stub that pointed at `restic-backup.sh`). Add `install-restic-verify-timer.sh`. In `install.sh`, replace any blind restic assumptions: do not copy `scripts/backups/restic/*.sh` flat unless you also install the library adjacency; the safe change is to leave the engine in place and let the user timer reference absolute paths (and/or document). Keep non-restic backup script installs working.
 
-- [ ] **Step 3: Delete retired files**
+- [x] **Step 3: Delete retired files**
 
 `git rm` the five retired files listed above. Confirm no remaining references except the migration doc/plan/spec history:
 
 Run: `grep -rn 'restic-backup\.sh\|restic-maintenance\.sh\|restic-forget-prune\.sh\|install-restic-maintenance-timer\|restic\.env\.example' scripts tests install.sh README.md docs .github 2>/dev/null` (allow hits in `docs/superpowers/specs/*` and this plan and the migration doc).
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `bash tests/test_install_units.sh && bash tests/test_schedule_ownership.sh && bash tests/test_restic_adopted.sh`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/systemd/install-restic-timer.sh scripts/systemd/install-restic-verify-timer.sh install.sh tests/test_install_units.sh tests/test_schedule_ownership.sh tests/run_tests.sh
@@ -489,19 +489,19 @@ git commit -m "feat(backups): install adopted restic timers and retire suite res
 - Consumes: the spec, the implemented command/marker/timer names, and the real cutover steps (Task 9 executes them; this task writes the checklist to follow).
 - Produces: operator-facing docs with one command surface, one schedule, two restore paths clearly separated (restic snapshot restore vs artifact restore), the legacy `/backups/spectre-backup` name, grandfathered snapshots, and the §8.1 parity checklist + archive gate.
 
-- [ ] **Step 1: Write the migration doc**
+- [x] **Step 1: Write the migration doc**
 
 `docs/migration/2026-11-06-absorb-spectre-backup.md` must include: baseline commands, the exact cutover sequence from spec §8.3, verification evidence template (snapshot id, `verify` output, restored files compared, `restic ls <id>` showing no password), rollback, retired units/paths, command mapping (old `~/.local/bin/spectre-backup*.sh` / suite `restic-*.sh` -> `scripts/backups/restic/*.sh`), §8.1 checklist, home-backup retirement, catch-up timer kept, and the conditional GitHub archive (do not archive if any machine still needs the server role).
 
-- [ ] **Step 2: Update README and runbook**
+- [x] **Step 2: Update README and runbook**
 
 README backup section: daily 04:10 restic snapshot (home+artifacts+host dump+container configs) to local `/backups/spectre-backup` + Drive offsite, tag-scoped retention, weekly verify, 05:00 artifact catch-up unchanged. Document `scripts/backups/restic/{backup,verify,restore,prune}.sh` and the user timer installers. Runbook 4: split "restore an artifact" vs "restore from a restic snapshot"; include `--list`, `--dry-run`, `--target /tmp/restore-test`, and the marker/alert names.
 
-- [ ] **Step 3: Verify references**
+- [x] **Step 3: Verify references**
 
 Run: `bash scripts/check-docs-references.sh` if present and cheap; otherwise `grep -n 'restic-backup\.sh\|scripts/backups/restic-backup\.sh' README.md docs/RUNBOOKS.md` returns no stale command references (migration doc may mention old names in the mapping table — that is fine).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md docs/RUNBOOKS.md docs/migration/2026-11-06-absorb-spectre-backup.md
@@ -521,35 +521,35 @@ git commit -m "docs(backups): document adopted restic engine, cutover, and resto
 
 **This task touches live timers and the real backup config. Do each mutating step deliberately and record output. Stop on any failure.**
 
-- [ ] **Step 1: Baseline**
+- [x] **Step 1: Baseline**
 
 Record `restic snapshots --repo /backups/spectre-backup` (and offsite), `systemctl --user list-timers --all | grep -E 'backup|restic|spectre'`, checksums of `~/.config/spectre-backup/*` and the relevant unit files, and free space. Append to the migration doc evidence section.
 
-- [ ] **Step 2: Install canonical config and password copy (no production switch yet)**
+- [x] **Step 2: Install canonical config and password copy (no production switch yet)**
 
 Create `~/.config/spectre-suite/backups/` and `~/.local/state/spectre-suite/backups/`. Deploy templates, then overlay the preserved live values (or copy from `~/.config/spectre-backup/.env` with the new paths/names). `install -m 600` the env file. Copy the key: `install -m 600 ~/.config/spectre-backup/password ~/.secrets/spectre-restic-password`. Prove: `RESTIC_PASSWORD_FILE=~/.secrets/spectre-restic-password restic -r /backups/spectre-backup snapshots --compact`. Keep the old password copy.
 
-- [ ] **Step 3: Disable `spectre-backup.timer` only (preserve rollback)**
+- [x] **Step 3: Disable `spectre-backup.timer` only (preserve rollback)**
 
 `systemctl --user disable --now spectre-backup.timer` (do not delete units). Leave `spectre-backup-catchup.timer` running. Record state.
 
-- [ ] **Step 4: Run the first adopted backup manually**
+- [x] **Step 4: Run the first adopted backup manually**
 
 Run `scripts/backups/restic/backup.sh` (foreground, log captured). Confirm exit status, `last-success`/`last-offsite-success`/`last-health` markers, and `restic snapshots --latest 1 --json` shows tags `spectre-suite,workstation`. Confirm `restic ls <id>` contains `home/deon/dev`, `home/deon/docs`, `home/deon/.secrets` (allowed files), `home/deon/archive/old-projects`, the dump dir, and artifact paths, and does **not** contain `spectre-restic-password`, `restic-repo-password`, or `.config/spectre-backup/password`.
 
-- [ ] **Step 5: Verify and rehearse restore**
+- [x] **Step 5: Verify and rehearse restore**
 
 Run `verify.sh`. Then `restore.sh --snapshot <id> --dry-run`. Restore to `/tmp/spectre-restore-rehearsal/<ts>/`: one file from `~/dev`, one from `~/docs`, one non-key file from `~/.secrets`, one artifact, one host dump. `diff`/`cmp`/`sha256sum` against originals. Record all commands and results.
 
-- [ ] **Step 6: Retire home-backup timer (files kept)**
+- [x] **Step 6: Retire home-backup timer (files kept)**
 
 Only if Step 5 passed: `systemctl --user disable --now home-backup.timer`. Do not delete `~/.local/bin/backup-home` or `~/archive/backups` yet.
 
-- [ ] **Step 7: Enable the new timers and confirm metrics**
+- [x] **Step 7: Enable the new timers and confirm metrics**
 
 Run the suite's `install-restic-timer.sh` and `install-restic-verify-timer.sh`. Confirm `systemctl --user list-timers`. Run the exporter (or wait for cron) and confirm the `restic_*` metrics and repo size/free metrics render; confirm alert rules load.
 
-- [ ] **Step 8: Record evidence and stop**
+- [x] **Step 8: Record evidence and stop**
 
 Append the snapshot id, marker contents, restore diffs, timer state, and metric sample to the migration doc. Do **not** archive the spectre-backup repo, do **not** delete old configs/units/scripts, and do **not** delete `~/archive/backups` — those wait for §8.1 + seven consecutive green days and, for the archive, confirmation that no machine needs the server role.
 
