@@ -252,6 +252,7 @@ main() {
     run_test_suite "$SCRIPT_DIR/test_backup_health.sh" "Backup Health Check Tests"
     run_test_suite "$SCRIPT_DIR/test_backup_catchup.sh" "Backup Catch-up Timer Tests"
     run_test_suite "$SCRIPT_DIR/test_backup_configurations_permissions.sh" "Backup Configurations Permissions Tests"
+    run_test_suite "$SCRIPT_DIR/test_append_runbook.sh" "Append-Runbook Tests"
     run_test_suite "$SCRIPT_DIR/test_restic_adopted.sh" "Adopted Restic Unit Tests"
     run_test_suite "$SCRIPT_DIR/test_restic_integration.sh" "Adopted Restic Integration Tests"
     run_test_suite "$SCRIPT_DIR/test_restic_exporter.sh" "Restic Exporter Metrics Tests"
