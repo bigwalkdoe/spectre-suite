@@ -319,3 +319,30 @@ main.content { display: grid; gap: 12px; }
 .dashboard-page--focused .quick-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1200px) { .dashboard-page--focused .quick-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .dashboard-page--focused .quick-stats { grid-template-columns: 1fr; } }
+
+/* Reports page: historical trend tables + export controls. Reuses existing
+   --accent, --muted, --text, --border, --line-soft, --card-bg, --surface-2,
+   --sans variables; no new colors introduced. */
+.report-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.report-controls .btn { font-size: 12px; padding: 4px 10px; }
+.report-chart { height: 260px; position: relative; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); }
+.report-table-wrap { overflow: auto; max-height: 320px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); margin-bottom: 10px; }
+.report-table { width: 100%; border-collapse: collapse; font: 13px/1.4 var(--sans); }
+.report-table th { text-align: left; font: 600 12px/1 var(--sans); color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); white-space: nowrap; }
+.report-table td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
+.report-table tr:last-child td { border-bottom: 0; }
+.report-table tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 40%, transparent); }
+.report-export { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.report-export .btn { font-size: 12px; padding: 4px 10px; }
+.report-export .muted { margin-left: auto; font-size: 12px; color: var(--muted); }
+.report-empty { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 24px; color: var(--muted); font-size: 14px; }
+.report-empty i { font-size: 18px; }
+
+/* Reports on mobile: stack controls and export buttons full-width. */
+@media (max-width: 640px) {
+  .report-controls { flex-direction: column; align-items: stretch; }
+  .report-controls .btn { width: 100%; justify-content: center; }
+  .report-export { flex-direction: column; align-items: stretch; }
+  .report-export .btn { width: 100%; justify-content: center; }
+  .report-export .muted { margin-left: 0; margin-top: 4px; text-align: center; }
+}
