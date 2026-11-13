@@ -126,6 +126,25 @@ else
     fail "malformed verdict parsed as ok (ok=$(metric restore_health_ok) ts=$(metric restore_health_timestamp))"
 fi
 
+# ---------------------------------------------------------------------------
+# 7. A dry-run verdict is a rehearsal, not a completed restore and not a
+#    failure. It keeps its timestamp so the exporter can tell "rehearsed,
+#    never executed" from "never touched at all", but restore_health_ok stays
+#    0 and restore_dryrun is 1 -- so RestoreFailed, which requires
+#    restore_dryrun == 0, does not fire after every dry-run. That would be the
+#    opposite of the alert's purpose: it is meant to catch a restore that ran
+#    and broke, not a plan that was reviewed.
+# ---------------------------------------------------------------------------
+printf 'dryrun %s\n' "$EPOCH" > "$STATE/last-restore-health"
+run_exporter
+if [ "$(metric restore_health_ok)" = "0" ] \
+   && [ "$(metric restore_dryrun)" = "1" ] \
+   && [ "$(metric restore_health_timestamp)" = "$EPOCH" ]; then
+    pass "a dry-run verdict is published as dryrun, not ok and not failed"
+else
+    fail "dry-run verdict mishandled (ok=$(metric restore_health_ok) dryrun=$(metric restore_dryrun) ts=$(metric restore_health_timestamp))"
+fi
+
 rm -rf "$WORK"
 
 echo ""

@@ -95,8 +95,11 @@ RESTORE_LINE=$(cat "$BACKUP_STATE_DIR/last-restore-health" 2>/dev/null || true)
 RESTORE_OK=0
 RESTORE_WHEN=0
 RESTORE_RSYNC=0
-case "$(printf '%s' "$RESTORE_LINE" | awk '{print $1}')" in
+RESTORE_DRYRUN=0
+RESTORE_VERDICT=$(printf '%s' "$RESTORE_LINE" | awk '{print $1}')
+case "$RESTORE_VERDICT" in
     ok) RESTORE_OK=1 ;;
+    dryrun) RESTORE_DRYRUN=1 ;;
     *) RESTORE_OK=0 ;;
 esac
 RESTORE_WHEN=$(printf '%s' "$RESTORE_LINE" | awk '{print $2}')
@@ -107,10 +110,10 @@ esac
 # 1700000000` parses to ok=0 with a valid epoch, which would publish a
 # timestamp for a restore that never happened. A `failed <epoch> ...` verdict
 # is a real restore time and keeps it -- the failure is only useful if it is
-# timestamped.
-RESTORE_VERDICT=$(printf '%s' "$RESTORE_LINE" | awk '{print $1}')
+# timestamped. A `dryrun <epoch>` verdict is a real rehearsal time and keeps
+# it: something ran, it just was not a restore.
 case "$RESTORE_VERDICT" in
-    ok|failed) ;;
+    ok|failed|dryrun) ;;
     *) RESTORE_WHEN=0 ;;
 esac
 printf '%s' "$RESTORE_LINE" | grep -q 'remote=rsync-download-only' && RESTORE_RSYNC=1
@@ -217,6 +220,9 @@ restore_health_timestamp $RESTORE_WHEN
 # HELP restore_rsync_download_only 1 if the last restore's offsite step was an rsync fetch that applied nothing, 0 otherwise
 # TYPE restore_rsync_download_only gauge
 restore_rsync_download_only $RESTORE_RSYNC
+# HELP restore_dryrun 1 if the last backups/restore-all run was a dry-run that changed nothing, 0 otherwise
+# TYPE restore_dryrun gauge
+restore_dryrun $RESTORE_DRYRUN
 # HELP backup_repo_size_bytes Bytes on disk used by the restic repository data directory
 # TYPE backup_repo_size_bytes gauge
 backup_repo_size_bytes $REPO_BYTES
