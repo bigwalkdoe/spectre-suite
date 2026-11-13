@@ -785,6 +785,18 @@ groups:
             Review Trivy FS scan logs/evidence; unknown/skipped (-1)
             does not trigger this alert.
 
+      - alert: SecurityBaselineTrivyImageFailed
+        expr: spectre_security_baseline_trivy_image_ok == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline Trivy image scan failed"
+          description: >-
+            Trivy image scan reported issues (source={{ $labels.source }}).
+            Review Trivy image scan logs/evidence; unknown/skipped (-1)
+            does not trigger this alert.
+
   # Monitoring stack self-checks (route-prefix, Grafana->Prometheus reachability,
   # datasource config/health drift), published by
   # spectre/monitoring/exporters/monitoring-stack-metrics-exporter.sh via
