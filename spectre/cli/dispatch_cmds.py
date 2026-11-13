@@ -649,7 +649,8 @@ def run_group(name: str, args: list[str]) -> int:
         try:
             run_action_job(job, list(args))
         except typer.Exit as e:
-            return e.exit_code
+            if e.exit_code != EXIT_OK:
+                return e.exit_code
     return EXIT_OK
 
 
@@ -739,6 +740,8 @@ def register(app: typer.Typer) -> None:
         error such as an unrecognised option, 1 for an unexpected error such as a
         run record that could not be written.
         """
+        if job in registry.groups():
+            raise typer.Exit(run_group(job, list(args or [])))
         run_action_job(_job_lookup(job), list(args or []))
 
     app.add_typer(actions_app, name="actions")
