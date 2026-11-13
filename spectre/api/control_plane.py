@@ -16,10 +16,13 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Security
+import typer
 
 from spectre.dispatch import registry
-from spectre.dispatch.verify import read_host_inventory, verify
+from spectre.dispatch.lock import JobLock
+from spectre.dispatch.resolve import DispatchError, resolve
+from spectre.memory.db import init_db, save_run
 
 router = APIRouter(prefix="/api/control-plane", tags=["control-plane"])
 
@@ -180,4 +183,43 @@ def register(app, verify_api_key):
             })
         return {"count": len(items), "actions": items}
 
-    app.include_router(router)
+    @app.post("/api/control-plane/actions/{job}/run")
+    async def run_job(job: str, _: bool = Depends(verify_api_key)):
+        """Run one registered job and record the run."""
+        if job == "__any_job__":
+            raise HTTPException(status_code=404, detail="Not found")
+        job_obj = registry.get_job(job)
+        if job_obj.sudo and os.geteuid() != 0:
+            raise HTTPException(status_code=3, detail=f"{job_obj.name} needs root, and this process is not root.")
+        try:
+            resolved = resolve(job_obj)
+        except DispatchError as e:
+            raise HTTPException(status_code=e.exit_code, detail=str(e)) from None
+        with JobLock(job_obj):
+            outcome = run_action(resolved, [], "cli", timeout=job_obj.timeout)
+        init_db()
+        save_run(outcome.envelope)
+        return {
+            "job": job_obj.name,
+            "status": outcome.status.value,
+            "exit_code": outcome.exit_code,
+            "duration_ms": outcome.duration_ms,
+            "stdout_tail": outcome.stdout_tail,
+            "stderr_tail": outcome.stderr_tail,
+        }
+
+
+    @app.post("/api/control-plane/actions/{job}")
+    async def run_job_no_run(job: str, _: bool = Depends(verify_api_key)):
+        """Alias — records the run via the canonical /run path."""
+        return await run_job(job)
+
+
+    @app.get("/api/control-plane/actions/{job}/envelope")
+    async def get_envelope(job: str, _: bool = Depends(verify_api_key)):
+        """Return the most recent recorded envelope for the given job (read-only)."""
+        # Placeholder read-back; execution is done through POST.
+        return {"job": job, "status": "unknown"}
+
+
+app.include_router(router)

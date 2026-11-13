@@ -68,7 +68,7 @@ Their only implementations are in the untracked fork.
   2 into `prometheus/`).
 - 10 job-dispatching systemd units → 9 point into the suite repo, 1
   (`fedora-optimize.service`) into the untracked fork wrapper.
-- 2 further units run the Python agent itself (`spectre.service`,
+- 2 further units run the Python agent itself (`spectre-daemon.service`,
   `spectre-api.service`).
 - The repository's own `systemd/*.service` files → a third divergent copy,
   dispatching through `/usr/local/bin`. `ml-anomaly-fix.service` points at
@@ -424,8 +424,8 @@ missing action now exits non-zero and says so.
 
 ### 8.6 The two agent units need editing too
 
-`spectre.service` runs `python3 -m apps.daemon.main` and `spectre-api.service`
-runs `uvicorn apps.api.main:app`. Both module paths change under the new layout,
+`spectre-daemon.service` runs `python3 -m spectre.daemon.main` and `spectre-api.service`
+runs `uvicorn spectre.api.main:app`. Both module paths change under the new layout,
 to `spectre.daemon` and `spectre.api`. These are not action dispatches, so they
 are not covered by the forwarder shims and must be updated explicitly in Phase 3.
 
@@ -488,7 +488,7 @@ target directory.
 1. **`arcaden-labs` runs a second Grafana/Prometheus pair** (both containers in
    `Created` state) alongside the standalone pair this repo runs. Out of scope
    here; noted because it is a third monitoring stack.
-2. **`spectre.service` (daemon) is `activating`**, having been `active` moments
+2. **`spectre-daemon.service` (daemon) is `activating`**, having been `active` moments
    earlier. Whether the daemon is flapping should be settled before Phase 2, when
    the daemon's narrowed role is verified.
 3. **`performance-check` and `security-scan` run twice** (§2.5a) — enabled and

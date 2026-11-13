@@ -1,6 +1,6 @@
 """Legacy contract tests (obsolete after consolidation).
 
-The original tests pinned shipped `spectre.service`/`spectre-api.service` units
+The original tests pinned shipped `spectre-daemon.service`/`spectre-api.service` units
 to a specific venv path and unit layout. Consolidation moved dispatch to
 `spectre run` and host unit management is operator-specific; `install.sh` now
 installs only `/usr/local/bin/spectre` and generates `spectre run`-based job
