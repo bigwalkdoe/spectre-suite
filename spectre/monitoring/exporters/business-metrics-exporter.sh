@@ -79,6 +79,42 @@ case "$HEALTH_WHEN" in
     ''|*[!0-9]*) HEALTH_WHEN=0 ;;
 esac
 
+# Restore verdict of spectre/actions/backups/restore-all.sh
+# (`spectre run backups/restore-all --execute --yes ...`). It writes
+# `$BACKUP_STATE_DIR/last-restore-health` as `ok <epoch>` or
+# `failed <epoch> <detail>`, and appends `remote=rsync-download-only` when the
+# offsite step was an rsync fetch that applied nothing. Nothing read this
+# marker before: a restore that had failed or never run was invisible in
+# Prometheus, and an operator finishing a disaster recovery had no signal at
+# all -- the same class of silence that let 81 hollow backup archives ship.
+#
+# The rsync case exits 0, so it reads as healthy: it did what it was asked.
+# `restore_rsync_download_only` is the separate signal that nothing was
+# applied; `restore_health_ok` stays 1 so it does not trip a false failure.
+RESTORE_LINE=$(cat "$BACKUP_STATE_DIR/last-restore-health" 2>/dev/null || true)
+RESTORE_OK=0
+RESTORE_WHEN=0
+RESTORE_RSYNC=0
+case "$(printf '%s' "$RESTORE_LINE" | awk '{print $1}')" in
+    ok) RESTORE_OK=1 ;;
+    *) RESTORE_OK=0 ;;
+esac
+RESTORE_WHEN=$(printf '%s' "$RESTORE_LINE" | awk '{print $2}')
+case "$RESTORE_WHEN" in
+    ''|*[!0-9]*) RESTORE_WHEN=0 ;;
+esac
+# A timestamp from a malformed verdict is not a real restore time. `maybe
+# 1700000000` parses to ok=0 with a valid epoch, which would publish a
+# timestamp for a restore that never happened. A `failed <epoch> ...` verdict
+# is a real restore time and keeps it -- the failure is only useful if it is
+# timestamped.
+RESTORE_VERDICT=$(printf '%s' "$RESTORE_LINE" | awk '{print $1}')
+case "$RESTORE_VERDICT" in
+    ok|failed) ;;
+    *) RESTORE_WHEN=0 ;;
+esac
+printf '%s' "$RESTORE_LINE" | grep -q 'remote=rsync-download-only' && RESTORE_RSYNC=1
+
 # Restic snapshot markers (spectre-suite adopted engine). Missing/unparseable => 0.
 read_marker_num() {
     local f="$1" n="${2:-1}" v=""
@@ -172,6 +208,15 @@ backup_health_check_ok $HEALTH_OK
 # HELP backup_health_check_timestamp Unix timestamp of the last backup health check
 # TYPE backup_health_check_timestamp gauge
 backup_health_check_timestamp $HEALTH_WHEN
+# HELP restore_health_ok 1 if the last backups/restore-all run completed, 0 if it failed or has never run
+# TYPE restore_health_ok gauge
+restore_health_ok $RESTORE_OK
+# HELP restore_health_timestamp Unix timestamp of the last backups/restore-all run, 0 if none
+# TYPE restore_health_timestamp gauge
+restore_health_timestamp $RESTORE_WHEN
+# HELP restore_rsync_download_only 1 if the last restore's offsite step was an rsync fetch that applied nothing, 0 otherwise
+# TYPE restore_rsync_download_only gauge
+restore_rsync_download_only $RESTORE_RSYNC
 # HELP backup_repo_size_bytes Bytes on disk used by the restic repository data directory
 # TYPE backup_repo_size_bytes gauge
 backup_repo_size_bytes $REPO_BYTES

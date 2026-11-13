@@ -370,6 +370,48 @@ groups:
             and only then is a keep-* policy change (or excluding re-cloneable
             paths) the right lever.
 
+  # Restore verdict from spectre/actions/backups/restore-all.sh, published by
+  # spectre/monitoring/exporters/business-metrics-exporter.sh from
+  # $BACKUP_STATE_DIR/last-restore-health.
+  #
+  # A restore is a deliberate disaster-recovery action, not a scheduled job, so
+  # nobody runs it on a cadence and a failure would otherwise sit unread in a
+  # state file until the next operator looks. This alert fires when the last
+  # recorded restore failed, and on a restore that has never run -- `time() -
+  # value > threshold` is true when the timestamp is 0, which is the same rule
+  # the backup health metrics use, and the reason 81 hollow archives survived.
+  # An rsync download-only restore is not a failure: it exits 0 and is flagged
+  # separately by restore_rsync_download_only.
+  - name: restore_health_alerts
+    interval: 60s
+    rules:
+      - alert: RestoreFailed
+        expr: restore_health_ok == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The last backups/restore-all run failed"
+          description: >-
+            `spectre run backups/restore-all --execute --yes ...` last reported
+            failure. A restore is operator-only and unscheduled, so this is a
+            signal that a disaster-recovery attempt ended in partial failure and
+            the verdict in $BACKUP_STATE_DIR/last-restore-health needs reading.
+            Re-run with `--dry-run` to see the plan first:
+            `spectre run backups/restore-all -- --dry-run`
+
+      - alert: RestoreNeverRun
+        expr: restore_health_timestamp == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "backups/restore-all has never completed a run"
+          description: >-
+            No restore verdict exists yet, so no disaster recovery has been
+            rehearsed on this host. Run one in dry mode to confirm the plan is
+            sane before an incident: `spectre run backups/restore-all -- --dry-run`.
+
   # Security findings from the Spectre agent, published by
   # spectre/monitoring/exporters/security-metrics-exporter.sh from GET /api/security/summary.
   #
