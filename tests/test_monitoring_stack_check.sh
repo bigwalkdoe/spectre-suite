@@ -56,7 +56,18 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.HTTPServer(('127.0.0.1',port), H).serve_forever()
 PY
 SRV_PID=$!
-sleep 0.4
+
+# Wait for the mock to bind rather than assuming a fixed sleep. The old
+# `sleep 0.4` was a guess: the interpreter and HTTPServer startup take variable
+# time, and on a loaded runner the port was still closed when the check ran, so
+# every host check returned 000000 and the suite failed intermittently --
+# passing standalone, failing inside run_tests.sh. Poll until it answers.
+for _ in $(seq 1 50); do
+    if curl -sf --max-time 1 "http://127.0.0.1:$PORT/-/healthy" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.1
+done
 
 set +e
 OUT=$(PROMETHEUS_HOST_URL="http://127.0.0.1:$PORT" PROMETHEUS_ROUTE_PREFIX=/prometheus \
