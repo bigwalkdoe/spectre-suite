@@ -263,6 +263,7 @@ main() {
     run_test_suite "$SCRIPT_DIR/test_ml.sh" "ML Anomaly + Fix Engine Tests"
     run_test_suite "$SCRIPT_DIR/test_restore.sh" "Backup Restore Drill"
     run_test_suite "$SCRIPT_DIR/test_restore_all.sh" "Restore-All Orchestrator Tests"
+        run_test_suite "$SCRIPT_DIR/test_restore_exporter.sh" "Restore Verdict Exporter Tests"
     
     # Print summary
     echo "=========================================="
