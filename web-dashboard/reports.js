@@ -54,9 +54,7 @@ function labelsFor(reportType) {
 function buildReportQueries(reportType, range) {
     const seconds = RANGE_SECONDS[range] || RANGE_SECONDS["7d"];
     return {
-        queries: queriesFor(reportType).map(
-            (q) => `${q}&start=${Math.floor(Date.now() / 1000) - seconds}&end=${Math.floor(Date.now() / 1000)}&step=${rangeStep(seconds)}`
-        ),
+        queries: queriesFor(reportType),
         label: labelsFor(reportType),
         seconds,
     };
@@ -153,7 +151,7 @@ async function generateReport(reportType, range) {
         const results = await Promise.all(
             queries.map((q) =>
                 fetchWithTimeout(
-                    `${PROMETHEUS_URL}/api/v1/query_range?${q}`,
+                    `${PROMETHEUS_URL}/api/v1/query_range?query=${encodeURIComponent(q)}&start=${start}&end=${now}&step=${rangeStep(seconds)}`,
                     {},
                     20000
                 )
