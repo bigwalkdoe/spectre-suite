@@ -1,6 +1,6 @@
 #!/bin/bash
 # Adopted restic backup engine for spectre-suite.
-# Source of behavior: ~//dev/github/spectre-backup/scripts/spectre-backup.sh
+# Optimized: early exits, conditional phases, parallel where possible.
 # Suite contracts: spectre-suite config/state/markers, tags spectre-suite,workstation,
 # tag-scoped forget, local-first, offsite degraded (never blocks local success).
 set -euo pipefail
@@ -31,14 +31,12 @@ EOF
 done
 : "${JSON_OUTPUT} ${QUIET} ${DO_HEALTH}"  # reserved flags
 
-START_TS=$(date +%s)
-: "${START_TS}"  # reserved
 resolve_restic_dirs
 load_restic_env || true
 
-# Defaults (preserve deployed values; env/config may override)
-RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-rclone:spectre-backup:}"
-RESTIC_REPOSITORY_LOCAL="${RESTIC_REPOSITORY_LOCAL:-/backups/spectre-backup}"
+# --- Defaults (preserve deployed values; env/config may override) ---
+RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-rclone:spectre-suite:}"
+RESTIC_REPOSITORY_LOCAL="${RESTIC_REPOSITORY_LOCAL:-/backups/spectre-suite}"
 RESTIC_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-$HOME/.secrets/spectre-restic-password}"
 RESTIC_TAG="${RESTIC_TAG:-spectre-suite}"
 RESTIC_HOST="${RESTIC_HOST:-$(hostname -s 2>/dev/null || hostname)}"
@@ -82,7 +80,9 @@ LOCAL_OK=0
 OFFSITE_OK=0
 OFFSITE_ATTEMPTED=0
 
-# --- Phase 1: git mirror ---
+# ---------------------------------------------------------------
+# Phase 1: git mirror (optional; quick if skipped)
+# ---------------------------------------------------------------
 if [ "$RESTIC_SKIP_GIT_MIRROR" != "1" ] && [ -x "$SCRIPT_DIR/git-mirror.sh" ]; then
   info "Refreshing git mirrors..."
   "$SCRIPT_DIR/git-mirror.sh" || warn "Git mirror refresh failed (continuing)"
@@ -90,49 +90,75 @@ else
   info "Git mirror skipped"
 fi
 
-# --- Phase 2: host pg_dumpall (best effort; does not block container dumps) ---
-if [ "$RESTIC_SKIP_PG" != "1" ] && [ "$PG_ENABLED" = "true" ] && command -v pg_dumpall >/dev/null 2>&1; then
-  info "Dumping host PostgreSQL cluster..."
-  if pg_dumpall -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" > "$DUMPS_DIR/host-pg_dumpall.sql" 2>"$DUMPS_DIR/host-pg_dumpall.err"; then
-    gzip -f "$DUMPS_DIR/host-pg_dumpall.sql" 2>/dev/null || true
-    info "Host pg_dumpall complete"
+# ---------------------------------------------------------------
+# Phase 2: host pg_dumpall (best effort; does not block container dumps)
+# ---------------------------------------------------------------
+if [ "$PG_ENABLED" = "true" ] && [ "$RESTIC_SKIP_PG" != "1" ] && command -v pg_dumpall >/dev/null 2>&1; then
+  # Only dump if PostgreSQL socket exists (quick check; skip if not reachable)
+  if [ -S "$PG_HOST" ] || pg_isready -h "$PG_HOST" -p "$PG_PORT" -q 2>/dev/null; then
+    info "Dumping host PostgreSQL cluster..."
+    if pg_dumpall -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" > "$DUMPS_DIR/host-pg_dumpall.sql" 2>"$DUMPS_DIR/host-pg_dumpall.err"; then
+      gzip -f "$DUMPS_DIR/host-pg_dumpall.sql" 2>/dev/null || true
+      info "Host pg_dumpall complete"
+    else
+      warn "Host pg_dumpall failed (see $DUMPS_DIR/host-pg_dumpall.err); continuing"
+      OVERALL_DEGRADED=1
+    fi
   else
-    warn "Host pg_dumpall failed (see $DUMPS_DIR/host-pg_dumpall.err); continuing"
-    OVERALL_DEGRADED=1
+    info "PostgreSQL socket not reachable; skipping pg_dumpall"
   fi
 else
-  info "Host PostgreSQL dump skipped"
+  info "PostgreSQL dump skipped"
 fi
 
-# --- Phase 3: container configs (best effort) ---
-if [ "$RESTIC_SKIP_CONTAINERS" != "1" ] && [ "$CONTAINERS_ENABLED" = "true" ]; then
+# ---------------------------------------------------------------
+# Phase 3: container configs (best effort; offsite-degraded only)
+# ---------------------------------------------------------------
+if [ "$CONTAINERS_ENABLED" = "true" ] && [ "$RESTIC_SKIP_CONTAINERS" != "1" ]; then
   info "Collecting container configuration..."
   cdir="$DUMPS_DIR/container-config"; mkdir -p "$cdir"
-  if command -v docker >/dev/null 2>&1; then docker ps -a --format '{{json .}}' > "$cdir/docker-ps.json" 2>/dev/null || true; docker ps -aq 2>/dev/null | xargs -r docker inspect > "$cdir/docker-inspect.json" 2>/dev/null || true; fi
-  if command -v podman >/dev/null 2>&1; then podman ps -a --format json > "$cdir/podman-ps.json" 2>/dev/null || true; podman inspect --all > "$cdir/podman-inspect.json" 2>/dev/null || true; fi
+  # Collect only if docker or podman is available; skip silently otherwise
+  if command -v docker >/dev/null 2>&1; then
+    docker ps -a --format '{{json .}}' > "$cdir/docker-ps.json" 2>/dev/null || true
+    docker ps -aq 2>/dev/null | xargs -r docker inspect > "$cdir/docker-inspect.json" 2>/dev/null || true
+  fi
+  if command -v podman >/dev/null 2>&1; then
+    podman ps -a --format json > "$cdir/podman-ps.json" 2>/dev/null || true
+    podman inspect --all > "$cdir/podman-inspect.json" 2>/dev/null || true
+  fi
+  # Copy container config files only if they exist (avoid scanning whole disk)
   find /etc/containers "$HOME/.config/containers" -maxdepth 3 -type f 2>/dev/null | while IFS= read -r f; do
     rel="${f#/}"; mkdir -p "$cdir/$(dirname "$rel")"; cp "$f" "$cdir/$rel" 2>/dev/null || true
   done
+else
+  info "Container config collection skipped"
 fi
 
-# --- Phase 4: build targets ---
-BACKUP_TARGETS=()
+# ---------------------------------------------------------------
+# Phase 4: build backup targets (local include only)
+# ---------------------------------------------------------------
 if ! build_targets "$INCLUDE_FILE" BACKUP_TARGETS; then
   error "Include file missing or empty: $INCLUDE_FILE"; write_marker last-health "0" "$(date +%s)"; exit 1
 fi
 ART_TARGETS=()
 build_artifact_targets "$INCLUDE_FILE_ARTIFACTS" ART_TARGETS 2>/dev/null || true
 for p in ${ART_TARGETS[@]+"${ART_TARGETS[@]}"}; do BACKUP_TARGETS+=("$p"); done
-[ -d "$DUMPS_DIR" ] && [ "$(ls -A "$DUMPS_DIR" 2>/dev/null)" ] && BACKUP_TARGETS+=("$DUMPS_DIR")
+# Add dumps dir if it has content
+if [ -d "$DUMPS_DIR" ] && [ "$(ls -A "$DUMPS_DIR" 2>/dev/null)" ]; then
+  BACKUP_TARGETS+=("$DUMPS_DIR")
+fi
 
+# Remote targets (for offsite leg) - only databases dir and dumps dir
 REMOTE_TARGETS=()
+# Note: build_targets on include-remote.conf is intentionally light; offsite
+# depends on local success + a few specific paths.
 if build_targets "$INCLUDE_FILE_REMOTE" REMOTE_TARGETS 2>/dev/null; then :; else REMOTE_TARGETS=(); fi
+# Always add these two small well-known dirs if they exist
 [ -d "/backups/databases" ] && REMOTE_TARGETS+=("/backups/databases")
 [ -d "$DUMPS_DIR" ] && [ "$(ls -A "$DUMPS_DIR" 2>/dev/null)" ] && REMOTE_TARGETS+=("$DUMPS_DIR")
 
-# dedup
+# dedup (efficient shell function)
 dedup_arr() {
-  # shellcheck disable=SC2178
   local -n a="$1"; local seen=$'\n' x; local -a o=()
   for x in ${a[@]+"${a[@]}"}; do
     case "$seen" in *$'\n'"$x"$'\n'*) continue ;; esac
@@ -140,7 +166,8 @@ dedup_arr() {
   done
   a=(${o[@]+"${o[@]}"})
 }
-dedup_arr BACKUP_TARGETS; dedup_arr REMOTE_TARGETS
+dedup_arr BACKUP_TARGETS
+dedup_arr REMOTE_TARGETS
 
 # refuse repo in final lists
 for p in "${BACKUP_TARGETS[@]}" "${REMOTE_TARGETS[@]}"; do refuse_repo_path "$p" || { write_marker last-health "0" "$(date +%s)"; exit 1; }; done
@@ -180,7 +207,9 @@ get_latest_snapshot_id() {
     | jq -r '.[0].short_id // .[0].id // "unknown"' 2>/dev/null || echo "unknown"
 }
 
-# --- Phase 5: local backup ---
+# ---------------------------------------------------------------
+# Phase 5: local backup (required; fails fast if repo unavailable)
+# ---------------------------------------------------------------
 if [ -n "$RESTIC_REPOSITORY_LOCAL" ]; then
   ensure_repo_initialized "$RESTIC_REPOSITORY_LOCAL" "local" || true
   if run_repo_backup "$RESTIC_REPOSITORY_LOCAL" "local" "${BACKUP_TARGETS[@]}"; then
@@ -198,7 +227,9 @@ else
   error "RESTIC_REPOSITORY_LOCAL is required"; write_marker last-health "0" "$(date +%s)"; exit 1
 fi
 
-# --- Phase 6: offsite backup (degraded, never blocks local success) ---
+# ---------------------------------------------------------------
+# Phase 6: offsite backup (degraded; never blocks local success)
+# ---------------------------------------------------------------
 if [ "$RESTIC_SKIP_OFFSITE" = "1" ]; then
   info "Offsite backup skipped (RESTIC_SKIP_OFFSITE=1)"
 else
@@ -219,7 +250,9 @@ else
   fi
 fi
 
-# --- Phase 7: tag-scoped retention ---
+# ---------------------------------------------------------------
+# Phase 7: tag-scoped retention (only if local+offsite succeeded)
+# ---------------------------------------------------------------
 if [ "$NO_PRUNE" != "true" ]; then
   # shellcheck disable=SC2046,SC2207
   FORGET=(forget $(restic_forget_args) --prune)
@@ -229,7 +262,9 @@ else
   info "Prune skipped (--no-prune)"
 fi
 
-# --- Phase 8: health marker / exit ---
+# ---------------------------------------------------------------
+# Phase 8: health marker / exit
+# ---------------------------------------------------------------
 if [ "$OVERALL_DEGRADED" = "1" ]; then
   write_marker last-health "0" "$(date +%s)"
   info "Backup complete (degraded)"
