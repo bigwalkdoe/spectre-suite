@@ -606,12 +606,13 @@
     "name": "backups/restore-all",
     "action": "backups/restore-all.sh",
     "group": "backups",
-    "summary": "Full restore of all backup artifacts: databases, Docker volumes, configs, projects, remote, off-site",
+    "summary": "Disaster-recovery restore of all backup artifacts (databases, Docker volumes, restic snapshot); operator-only, dry-run by default, never scheduled",
     "mutates": true,
     "concurrency": "forbid",
-    "schedule_hint": "0 4 * * *",
+    "schedule_hint": null,
     "replaces": [
-      "crontab:0 4 * * *"
+      "unit:backups-restore-all.service",
+      "unit:backups-restore-all.timer"
     ]
   },
   {
