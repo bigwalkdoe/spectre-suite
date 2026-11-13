@@ -725,6 +725,18 @@ groups:
             opa-compat-report.log/baseline evidence; this is not an indication
             of policy denials and is distinct from opa_check_ok/opa_tests_ok.
 
+      - alert: SecurityBaselineAideCheckFailed
+        expr: spectre_security_baseline_aide_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline AIDE check failed"
+          description: >-
+            AIDE file integrity check reported differences or issues
+            (source={{ $labels.source }}). Review AIDE logs/evidence; unknown/
+            skipped (-1) does not trigger this alert.
+
       - alert: SecurityBaselineHardeningFailed
         expr: spectre_security_baseline_hardening_ok == 0
         for: 15m
