@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -130,6 +131,20 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     TRIGGERS_DIR.mkdir(parents=True, exist_ok=True)
+    # /triggers is a bind mount owned by the host operator (e.g. uid 1000). The
+    # HTTP server drops to the unprivileged 'nobody' user below, so make the
+    # queue directory sticky world-writable so 'nobody' can create trigger
+    # files while the host handler can still move them to processed/ or failed/.
+    # This mirrors the /tmp model: sticky bit lets the directory owner remove
+    # any file, while 'nobody' can create and remove its own files.
+    TRIGGERS_DIR.chmod(0o1777)
+    # Drop privileges to the unprivileged 'nobody' user before serving, keeping
+    # the runtime hardened (no script execution in container, read-only repo
+    # mount, only /triggers writable). Must run as root initially for the
+    # chmod above, hence USER nobody is not set in the Dockerfile.
+    nobody = pwd.getpwnam("nobody")
+    os.setgid(nobody.pw_gid)
+    os.setuid(nobody.pw_uid)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"dashboard-actions listening on :{PORT}, triggers={TRIGGERS_DIR}, allowlist={sorted(ALLOWLIST)}", file=sys.stderr)
     if not TOKEN:
