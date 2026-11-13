@@ -257,7 +257,8 @@ fi
 
 reset_calls
 run_restore --execute --yes --databases
-if [ "$RC" -eq 0 ] && grep -q "^databases latest " "$CALLS" ]; then
+db_line='^databases latest '
+if [ "$RC" -eq 0 ] && grep -q "$db_line" "$CALLS"; then
     pass "the database stub still succeeds after a failed case"
 else
     fail "a forced failure in an earlier case leaked (rc=$RC, calls=$(cat "$CALLS" 2>/dev/null)): $OUT"
