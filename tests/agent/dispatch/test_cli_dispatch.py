@@ -515,37 +515,70 @@ def test_run_records_provenance(actions: Path) -> None:
 COLLIDING_NAMES = sorted(set(registry.groups()) & {job.name for job in registry.JOBS})
 
 
-def test_run_a_group_name_exits_2_saying_it_is_a_group(actions: Path) -> None:
-    """A group is a real thing in the registry that `spectre run` cannot dispatch.
+def test_run_a_group_runs_all_jobs_in_order(actions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`spectre run <group>` runs every job in the group, in registry order.
 
-    Calling it "unknown" tells the operator their mental model of the CLI is wrong,
-    when what is actually true is that a feature they saw in the design spec is
-    missing. So the message names the group, says group running is not implemented,
-    and points at the listing — and still exits 2, because nothing was dispatched.
+    Every job in the "network" group is given a script that leaves a marker, so
+    "all jobs ran" is checked rather than assumed. Runs as root so the sudo jobs
+    in the group (harden-network-security, optimize-network-config, setup-vpn)
+    can execute.
 
-    Every job in the group is given a script that would leave a marker, so "nothing
-    ran" is checked rather than assumed: a partial group run is exactly the blast
-    radius the deferral exists to avoid.
+    The network group has 4 jobs sorted alphabetically: harden-network-security,
+    monitor-network, optimize-network-config, setup-vpn.
     """
-    markers = []
+    markers = {}
     for job in registry.jobs_in_group("network"):
         marker = actions / f"ran-{job.name.replace('/', '-')}"
         _write(actions, job.action, f"#!/bin/bash\ntouch {marker}\n")
-        markers.append(marker)
+        markers[job.name] = marker
+
+    monkeypatch.setattr(dispatch_cmds.os, "geteuid", lambda: 0)
 
     result = runner.invoke(app, ["run", "network"])
 
-    assert result.exit_code == 2
-    assert "'network' is a group of 4 jobs" in result.stdout
-    assert "Running a whole group is not implemented" in result.stdout
-    assert "spectre actions list" in result.stdout
-    assert not [m for m in markers if m.exists()]
+    assert result.exit_code == 0
+    assert all(m.exists() for m in markers.values()), [m for m in markers.values() if not m.exists()]
 
 
-def test_run_a_group_name_records_nothing(actions: Path) -> None:
+def test_run_a_group_stops_on_first_failure(actions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`spectre run <group>` stops after the first failing job.
+
+    The network group's first job alphabetically is `network/harden-network-security`.
+    Its script leaves a marker then exits non-zero, so the remaining three jobs
+    must not run.
+    """
+    _write(actions, "network/harden-network-security.sh",
+           f"#!/bin/bash\ntouch {actions / 'ran-harden-network-security'}\nexit 3\n")
+    _write(actions, "network/monitor-network.sh", "#!/bin/bash\nexit 0\n")
+    _write(actions, "network/optimize-network-config.sh", "#!/bin/bash\nexit 0\n")
+    _write(actions, "network/setup-vpn.sh", "#!/bin/bash\nexit 0\n")
+
+    monkeypatch.setattr(dispatch_cmds.os, "geteuid", lambda: 0)
+
+    result = runner.invoke(app, ["run", "network"])
+
+    # run_action_job converts any non-zero exit to EXIT_FAILED (5); the group
+    # stops on the first failure and returns that code.
+    assert result.exit_code == EXIT_FAILED
+    assert (actions / "ran-harden-network-security").exists()
+    assert not (actions / "ran-monitor-network").exists()
+    assert not (actions / "ran-optimize-network-config").exists()
+    assert not (actions / "ran-setup-vpn").exists()
+
+
+def test_run_a_group_records_a_provenance_record_per_job(actions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`spectre run <group>` writes one run record per job in the group."""
+    for job in registry.jobs_in_group("network"):
+        _write(actions, job.action, "#!/bin/bash\nexit 0\n")
+
+    monkeypatch.setattr(dispatch_cmds.os, "geteuid", lambda: 0)
+
     before = {job.name: _rows(job.name) for job in registry.jobs_in_group("network")}
-    assert runner.invoke(app, ["run", "network"]).exit_code == 2
-    assert {job.name: _rows(job.name) for job in registry.jobs_in_group("network")} == before
+    runner.invoke(app, ["run", "network"])
+    after = {job.name: _rows(job.name) for job in registry.jobs_in_group("network")}
+
+    for job_name in after:
+        assert len(after[job_name]) == len(before[job_name]) + 1, job_name
 
 
 def test_actions_show_a_group_name_exits_2_saying_it_is_a_group(actions: Path) -> None:
@@ -557,13 +590,13 @@ def test_actions_show_a_group_name_exits_2_saying_it_is_a_group(actions: Path) -
     assert "not implemented" in result.stdout
 
 
-def test_run_a_colliding_name_runs_the_job_and_says_so(actions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The job wins — it is the more specific reading — but the CLI says so.
+def test_run_a_colliding_name_runs_its_group(actions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`spectre run <colliding-name>` runs the group, not just the job.
 
-    Silence here would be the worst available answer: `deploy-monitoring` is a job
-    *and* a group, so an operator who meant the group would watch one job run, see
-    its output, and have no hint that a group of the same name existed. With 45 of
-    61 jobs mutating, that is a surprise with consequences.
+    `deploy-monitoring` is both a job and a group (the group has one job:
+    `deploy-monitoring` itself). Running the group runs that one job — the
+    observable result is the same as running the job directly, but no collision
+    notice is printed because the group, not the job, is what executed.
     """
     _write(actions, "deploy-monitoring.sh", "#!/bin/bash\necho deploying the stack\n")
     monkeypatch.setattr(dispatch_cmds.os, "geteuid", lambda: 0)
@@ -571,31 +604,29 @@ def test_run_a_colliding_name_runs_the_job_and_says_so(actions: Path, monkeypatc
     result = runner.invoke(app, ["run", "deploy-monitoring"])
 
     assert result.exit_code == 0
-    assert "'deploy-monitoring' is both a registered job and a group name" in result.stdout
-    assert "running the job" in result.stdout
     assert "deploying the stack" in result.stdout
-    # The record proves which reading was taken, so the notice is not just a claim.
+    assert "is both a registered job and a group name" not in result.stdout
     assert recent_runs(job="deploy-monitoring", limit=1)[0].status == "success"
 
 
 @pytest.mark.parametrize("name", COLLIDING_NAMES)
-def test_every_colliding_name_is_announced_by_the_cli(
+def test_every_colliding_name_runs_its_group(
     name: str, actions: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Checked against the CLI rather than against the registry, so a job that
-    resolved quietly — the original defect — fails here even though the registry
-    facts still hold.
+    """`spectre run <colliding-name>` runs the group, not just the job.
 
-    The action is absent from this fixture's root, so each of these runs ends at
-    exit 3; the notice is printed before anything is resolved, and that ordering is
-    part of what is pinned.
+    Each colliding name is a group whose only member is the job with the same name,
+    so running the group runs that one job. No collision notice is printed because
+    the group, not the job, is what executed.
     """
+    _write(actions, f"{name}.sh", "#!/bin/bash\nexit 0\n")
     monkeypatch.setattr(dispatch_cmds.os, "geteuid", lambda: 0)
 
     result = runner.invoke(app, ["run", name])
 
-    assert f"'{name}' is both a registered job and a group name" in result.stdout
-    assert result.exit_code == 3
+    assert result.exit_code == 0
+    assert "is both a registered job and a group name" not in result.stdout
+    assert recent_runs(job=name, limit=1)[0].status == "success"
 
 
 def test_the_colliding_names_are_really_colliding() -> None:

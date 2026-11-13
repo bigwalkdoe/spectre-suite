@@ -14,19 +14,34 @@ while [ $# -gt 0 ]; do
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
-echo "== security-scan timer/service =="
-systemctl list-timers --all --no-pager 2>&1 | grep -E 'security-scan|NEXT' || true
-echo; systemctl status security-scan.service --no-pager -l 2>&1 || true
-echo "== journal $SINCE .. $UNTIL =="
-journalctl -u security-scan.service --since "$SINCE" --until "$UNTIL" --no-pager 2>&1 || true
-echo "== actions verify =="
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." 2>/dev/null && pwd)}"
-if [ ! -d "$ROOT/spectre/dispatch" ]; then
-  ROOT="~//dev/github/spectre-suite"
-fi
-(cd "$ROOT" && python3 -m spectre.cli.main actions verify) 2>&1 | tail -12 || true
+
+# Capture all output so it can be printed to stdout and, when --append-runbook
+# is given, appended to the runbook file with a timestamped header.
+CAPTURE="$(mktemp)"
+trap 'rm -f "$CAPTURE"' EXIT
+
+{
+  echo "== security-scan timer/service =="
+  systemctl list-timers --all --no-pager 2>&1 | grep -E 'security-scan|NEXT' || true
+  echo; systemctl status security-scan.service --no-pager -l 2>&1 || true
+  echo "== journal $SINCE .. $UNTIL =="
+  journalctl -u security-scan.service --since "$SINCE" --until "$UNTIL" --no-pager 2>&1 || true
+  echo "== actions verify =="
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." 2>/dev/null && pwd)}"
+  if [ ! -d "$ROOT/spectre/dispatch" ]; then
+    ROOT="~//dev/github/spectre-suite"
+  fi
+  (cd "$ROOT" && python3 -m spectre.cli.main actions verify) 2>&1 | tail -12 || true
+} > "$CAPTURE"
+
+cat "$CAPTURE"
+
 if [ -n "$APPEND" ]; then
-  echo "append not implemented without explicit confirmation; review output above and edit $APPEND manually." >&2
-  exit 3
+  {
+    echo
+    echo "## security-scan outcome $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo
+    cat "$CAPTURE"
+  } >> "$APPEND"
 fi
