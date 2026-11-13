@@ -293,6 +293,41 @@ else
     fail "the dry-run plan names a specific archive (rc=$RC): $OUT"
 fi
 
+# 19) A dry-run changes nothing and is a legitimate outcome, so it records a
+# verdict. Without one the exporter cannot tell "rehearsed, never executed"
+# from "never touched at all": RestoreNeverRun fired on every host,
+# including ones that had rehearsed their disaster recovery many times.
+# A dry-run is NOT a completed restore, so it writes `dryrun`, not `ok`.
+reset_calls
+run_restore --databases
+if [ "$RC" -eq 0 ] && grep -q '^dryrun ' <<<"$(marker)"; then
+    pass "a dry-run with a selected component writes a dryrun verdict"
+else
+    fail "a dry-run wrote no verdict (rc=$RC, marker=$(marker)): $OUT"
+fi
+
+# 20) A dry-run with nothing selected is not a rehearsal of anything, so it
+# writes no verdict -- the same as never having run.
+reset_calls
+run_restore
+if [ "$RC" -eq 0 ] && [ ! -f "$STATE/last-restore-health" ]; then
+    pass "a dry-run with no component selected writes no verdict"
+else
+    fail "an empty dry-run wrote a verdict (marker=$(marker)): $OUT"
+fi
+
+# 21) A dry-run must not be mistaken for a completed restore. It changes
+# nothing, which is true, but no restore was performed -- reporting it as
+# `ok` would make RestoreNeverRun go quiet on hosts that have only ever
+# rehearsed.
+reset_calls
+run_restore --databases
+if [ "$RC" -eq 0 ] && ! grep -q '^ok ' <<<"$(marker)"; then
+    pass "a dry-run is not recorded as a completed restore"
+else
+    fail "a dry-run was recorded as a completed restore (marker=$(marker)): $OUT"
+fi
+
 cleanup_fixture
 
 echo "restore-all tests: $PASSED passed, $FAILED failed"

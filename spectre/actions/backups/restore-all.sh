@@ -306,6 +306,16 @@ if [[ "$SELECT_REMOTE" -eq 1 ]]; then require_script "$REMOTE_SCRIPT" remote || 
 
 if [[ "$EXECUTE" -ne 1 ]]; then
     print_plan
+    # A dry-run is a legitimate outcome, not a skipped one. Without a verdict
+    # the exporter cannot tell "rehearsed, never executed" from "never
+    # touched at all", so RestoreNeverRun fired on every host -- including
+    # ones that had rehearsed their disaster recovery many times. It is NOT a
+    # completed restore: `ok` would make that signal go quiet, so it records
+    # `dryrun` instead. An empty dry-run is not a rehearsal of anything and
+    # writes nothing, the same as never having run.
+    if [[ "$SELECT_DB" -eq 1 || "$SELECT_VOLUMES" -eq 1 || "$SELECT_RESTIC" -eq 1 || "$SELECT_REMOTE" -eq 1 ]]; then
+        write_verdict dryrun
+    fi
     exit 0
 fi
 

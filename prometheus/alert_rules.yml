@@ -390,8 +390,12 @@ groups:
       # them, and a critical alert that fires on a healthy never-touched host
       # trains operators to ignore it. Never-run is the warning for that
       # case; this one is only for a restore that ran and failed.
+      # restore_dryrun == 0: a dry-run is not a failed restore, it is a rehearsal
+      # that changed nothing. Without this term RestoreFailed would fire after
+      # every dry-run, which is the opposite of its purpose -- it is meant to
+      # catch a restore that ran and broke, not a plan that was reviewed.
       - alert: RestoreFailed
-        expr: restore_health_ok == 0 and restore_health_timestamp > 0
+        expr: restore_health_ok == 0 and restore_dryrun == 0 and restore_health_timestamp > 0
         for: 15m
         labels:
           severity: critical
