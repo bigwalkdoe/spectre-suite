@@ -40,7 +40,7 @@ These input classes/failure modes are implied by the spec but not all pinned by 
 - Consumes: none (pure test setup)
 - Produces: a test module that imports `spectre.cli.dispatch_cmds` and `spectre.dispatch.registry`, asserts `run_group` behavior.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_run_group_runs_all_jobs_stops_on_failure():
@@ -54,12 +54,12 @@ def test_run_group_runs_all_jobs_stops_on_failure():
 
 Expected: FAIL — `run_group` does not exist yet.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/agent/dispatch/test_group_run.py -v`
 Expected: ImportError / AttributeError for `run_group`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/agent/dispatch/test_group_run.py
@@ -77,7 +77,7 @@ git commit -m "test(dispatch): add failing group-run tests"
 - Consumes: `registry.jobs_in_group(name) -> list[Job]`, existing `run_action_job(job, args)`.
 - Produces: `run_group(name: str) -> int` — runs jobs sequentially, stops on first failure, returns non-zero exit code if any job failed, 0 otherwise.
 
-- [ ] **Step 1: Implement `run_group` in dispatch_cmds.py**
+- [x] **Step 1: Implement `run_group` in dispatch_cmds.py**
 
 Add after `run_action_job`:
 
@@ -116,12 +116,12 @@ def run_group(name: str, args: list[str]) -> int:
     return EXIT_OK
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `python3 -m pytest tests/agent/dispatch/test_group_run.py -v`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add spectre/cli/dispatch_cmds.py
@@ -139,7 +139,7 @@ git commit -m "feat(dispatch): implement spectre run <group> sequential executio
 - Consumes: `run_group(name, args)` from Task 2.
 - Produces: the `run` command calls `run_group` when `_job_lookup` determines `name` is a group.
 
-- [ ] **Step 1: Modify the `run` command to route groups to `run_group`**
+- [x] **Step 1: Modify the `run` command to route groups to `run_group`**
 
 In the `run` command body (around line 723), replace:
 
@@ -155,12 +155,12 @@ if job in registry.groups():
 run_action_job(_job_lookup(job), list(args or []))
 ```
 
-- [ ] **Step 2: Run group tests + existing dispatch tests**
+- [x] **Step 2: Run group tests + existing dispatch tests**
 
 Run: `python3 -m pytest tests/agent/dispatch/ -v`
 Expected: all dispatch tests pass, including group-run tests.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add spectre/cli/dispatch_cmds.py
@@ -182,7 +182,7 @@ git commit -m "feat(dispatch): wire spectre run <group> into the run command"
   - The file contains the three section headers (`== security-scan timer/service ==`, `== journal ... ==`, `== actions verify ==`)
   - Exit code is 0
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```bash
 #!/bin/bash
@@ -197,12 +197,12 @@ grep -q "## security-scan outcome" "$out" || fail "missing outcome header"
 
 Expected: FAIL — script exits 3 with "append not implemented".
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bash tests/test_append_runbook.sh`
 Expected: FAIL (exit 3).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_append_runbook.sh
@@ -220,7 +220,7 @@ git commit -m "test(dashboard-actions): add failing append-runbook test"
 - Consumes: `$APPEND` path, `$SINCE`, `$UNTIL` (already set).
 - Produces: appends timestamped markdown section to `$APPEND`, exits 0.
 
-- [ ] **Step 1: Implement capture and append in check-security-scan-outcome.sh**
+- [x] **Step 1: Implement capture and append in check-security-scan-outcome.sh**
 
 Restructure the script so the three output blocks are captured into a variable, printed to stdout, and (when `$APPEND` is set) appended to `$APPEND`:
 
@@ -261,12 +261,12 @@ if [ -n "$APPEND" ]; then
 fi
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `bash tests/test_append_runbook.sh`
 Expected: PASS (exit 0, file contains header + sections).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add spectre/actions/maintenance/check-security-scan-outcome.sh
@@ -284,7 +284,7 @@ git commit -m "feat(dashboard-actions): implement --append-runbook output"
 - Consumes: both new test files.
 - Produces: `run_tests.sh` includes the new tests; full suite passes.
 
-- [ ] **Step 1: Add new tests to run_tests.sh**
+- [x] **Step 1: Add new tests to run_tests.sh**
 
 Add:
 ```bash
@@ -293,12 +293,12 @@ run_test_suite "$SCRIPT_DIR/test_append_runbook.sh" "Append-Runbook Tests"
 
 And add the pytest dispatch tests — they're already discovered by pytest via `testpaths = ["tests/agent"]`, so no shell change needed for them.
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run: `bash tests/run_tests.sh` and `bash tests/test_append_runbook.sh`
 Expected: all pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/run_tests.sh
@@ -314,27 +314,27 @@ git commit -m "test(dashboard-actions): wire append-runbook test into run_tests.
 
 **Interfaces:** none
 
-- [ ] **Step 1: Run the full shell test suite**
+- [x] **Step 1: Run the full shell test suite**
 
 Run: `bash tests/run_tests.sh`
 Expected: all 23+ pass.
 
-- [ ] **Step 2: Run the agent/dispatch pytest suite**
+- [x] **Step 2: Run the agent/dispatch pytest suite**
 
 Run: `python3 -m pytest tests/agent/dispatch/ -v`
 Expected: all pass including group-run tests.
 
-- [ ] **Step 3: Run `spectre actions verify`**
+- [x] **Step 3: Run `spectre actions verify`**
 
 Run: `python3 -m spectre.cli.main actions verify`
 Expected: 90 jobs, 0 findings.
 
-- [ ] **Step 4: Manual smoke test of both features**
+- [x] **Step 4: Manual smoke test of both features**
 
 Run: `python3 -m spectre.cli.main run backups` (a real group) — should execute all backup jobs sequentially and report results.
 Run: `bash spectre/actions/maintenance/check-security-scan-outcome.sh --append-runbook /tmp/rb.md` — should exit 0 and write to /tmp/rb.md.
 
-- [ ] **Step 5: Commit final state**
+- [x] **Step 5: Commit final state**
 
 ```bash
 git add spectre/cli/dispatch_cmds.py spectre/actions/maintenance/check-security-scan-outcome.sh tests/
