@@ -57,7 +57,7 @@ All notable changes to the spectre-suite project will be documented in this file
 - Contributing guidelines
 - Installation script for automated setup
 
-## [Unreleased]
+## [1.0.1] - 2026-11-13
 
 ### Added
 - Persistent systemd user timer that runs at 05:00 and catches up backups
@@ -97,6 +97,9 @@ documented in their own areas rather than re-listed:
 - Cloud deployment support — `cloud-deployment/`
 - Multi-server management — `docs/MULTI_DISTRIBUTION_SUPPORT.md`
 - Machine learning for anomaly detection — `spectre/ml/`
+
+## [Unreleased]
+
 
 No items remain in this block.
 
