@@ -39,7 +39,9 @@ write_stub() {
     local path="$1" name="$2" rcvar="$3"
     cat > "$path" <<EOF
 #!/bin/bash
-echo "$name \$*" >> "\${CALLS:?}"
+# LOG_FILE is exported by the orchestrator; record whether the component saw
+# it, so the test can tell an exported var from an unexported one.
+echo "$name \$* LOG_FILE=\${LOG_FILE:-<unset>}" >> "\${CALLS:?}"
 exit "\${$rcvar:-0}"
 EOF
     chmod +x "$path"
@@ -102,8 +104,8 @@ fi
 reset_calls
 run_restore --execute --yes --databases --volumes
 if [ "$RC" -eq 0 ] \
-    && grep -qx "databases latest" "$CALLS" \
-    && grep -qx "volumes latest" "$CALLS" \
+    && grep -q "^databases latest " "$CALLS" \
+    && grep -q "^volumes latest " "$CALLS" \
     && grep -q "^ok " <<<"$(marker)"; then
     pass "--execute --yes restores selected components and writes ok verdict"
 else
@@ -114,8 +116,8 @@ fi
 reset_calls
 STUB_DB_RC=1 run_restore --execute --yes --databases --volumes
 if [ "$RC" -eq 1 ] \
-    && grep -qx "databases latest" "$CALLS" \
-    && grep -qx "volumes latest" "$CALLS" \
+    && grep -q "^databases latest " "$CALLS" \
+    && grep -q "^volumes latest " "$CALLS" \
     && grep -q "^failed " <<<"$(marker)"; then
     pass "partial failure continues, exits 1, writes failed verdict"
 else
@@ -146,7 +148,7 @@ fi
 reset_calls
 TARGET="$FIXTURE/restore-target"
 run_restore --execute --yes --restic --snapshot abc123 --restic-target "$TARGET"
-if [ "$RC" -eq 0 ] && grep -qx "restic --snapshot abc123 --target $TARGET" "$CALLS"; then
+if [ "$RC" -eq 0 ] && grep -q "restic --snapshot abc123 --target $TARGET" "$CALLS"; then
     pass "restic restore passes snapshot and target"
 else
     fail "restic args wrong (rc=$RC, calls=$(cat "$CALLS" 2>/dev/null)): $OUT"
@@ -203,12 +205,91 @@ fi
 reset_calls
 run_restore --execute --yes --remote --remote-source rsync --remote-location srv --remote-type databases
 if [ "$RC" -eq 0 ] \
-    && grep -qx "remote rsync databases srv" "$CALLS" \
+    && grep -q "^remote rsync databases srv " "$CALLS" \
     && grep -qi "fetched only" <<<"$OUT" \
     && grep -q "rsync" "$STATE/last-restore-health"; then
     pass "rsync execute reports a fetch, not a completed restore"
 else
     fail "rsync execute misreports success (rc=$RC, marker=$(marker)): $OUT"
+fi
+
+# 14) `--flag=value` must be refused the same way as the spaced form. The
+# `=` branch strips the value but never checks it, so `--snapshot=` passes an
+# empty snapshot id straight through to restic.
+reset_calls
+run_restore --execute --yes --restic --snapshot= --restic-target "$FIXTURE/restore-target"
+if [ "$RC" -eq 2 ] && [ ! -f "$CALLS" ]; then
+    pass "--snapshot= with an empty value is refused"
+else
+    fail "--snapshot= was not refused (rc=$RC, calls=$(cat "$CALLS" 2>/dev/null)): $OUT"
+fi
+
+reset_calls
+run_restore --execute --yes --remote --remote-source= --remote-location srv
+if [ "$RC" -eq 2 ] && [ ! -f "$CALLS" ]; then
+    pass "--remote-source= with an empty value is refused"
+else
+    fail "--remote-source= was not refused (rc=$RC, calls=$(cat "$CALLS" 2>/dev/null)): $OUT"
+fi
+
+# 15) LOG_FILE must be exported, not merely assigned: the summary advertises
+# it as the log that holds the detail, so a component that writes its own
+# lines must be able to find it. The stub records the value it sees.
+reset_calls
+run_restore --execute --yes --databases
+seen=$(grep '^databases .* LOG_FILE=' "$CALLS" 2>/dev/null | sed 's/^databases .* LOG_FILE=//')
+if [ -n "$seen" ]; then
+    pass "LOG_FILE is exported so components can write to the advertised log"
+else
+    fail "LOG_FILE was not exported to the component (saw: $(cat "$CALLS" 2>/dev/null))"
+fi
+
+# 16) A test that forces a stub to fail must not leak that failure into later
+# cases. Case 5 runs `STUB_DB_RC=1 run_restore ...`; that assignment is scoped
+# to the command and must not persist in this shell, or every later database
+# run would fail too -- harmless today only because no later case runs the
+# database stub. Assert the scope directly rather than inferring it.
+if [ -z "${STUB_DB_RC:-}" ]; then
+    pass "a per-command failure assignment does not leak into this shell"
+else
+    fail "STUB_DB_RC leaked into this shell: $STUB_DB_RC"
+fi
+
+reset_calls
+run_restore --execute --yes --databases
+if [ "$RC" -eq 0 ] && grep -q "^databases latest " "$CALLS" ]; then
+    pass "the database stub still succeeds after a failed case"
+else
+    fail "a forced failure in an earlier case leaked (rc=$RC, calls=$(cat "$CALLS" 2>/dev/null)): $OUT"
+fi
+
+# 17) An execute that aborts on a missing component must not leave a stale
+# verdict behind. If a previous run wrote `ok` and this one dies before
+# reaching write_verdict, the marker still says ok -- which would report a
+# failed restore as successful.
+rm -f "$ACTIONS/restore-docker-volumes.sh"
+printf 'ok %s\n' "$(date +%s)" > "$STATE/last-restore-health"
+reset_calls
+run_restore --execute --yes --volumes
+if [ "$RC" -ne 0 ] && grep -q "$ACTIONS/restore-docker-volumes.sh" <<<"$OUT" \
+   && grep -q "^failed " <<<"$(marker)"; then
+    pass "a missing-component abort writes a failed verdict, not a stale ok"
+else
+    fail "missing-component abort left a stale verdict (rc=$RC, marker=$(marker)): $OUT"
+fi
+write_stub "$ACTIONS/restore-docker-volumes.sh" "volumes" "STUB_VOL_RC"
+
+# 18) The dry-run plan must not name a specific archive, because the component
+# script picks its own and the two can disagree. A plan that promises
+# `postgres_20261113.sql.gz` while the script restores a different file is
+# worse than no name at all: it invites the operator to verify the wrong
+# artifact.
+reset_calls
+run_restore --databases
+if [ "$RC" -eq 0 ] && ! grep -qE '\.sql\.gz' <<<"$OUT"; then
+    pass "the dry-run plan does not name a specific archive"
+else
+    fail "the dry-run plan names a specific archive (rc=$RC): $OUT"
 fi
 
 cleanup_fixture
