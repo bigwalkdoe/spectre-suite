@@ -609,6 +609,7 @@
     "summary": "Disaster-recovery restore of all backup artifacts (databases, Docker volumes, restic snapshot); operator-only, dry-run by default, never scheduled",
     "mutates": true,
     "concurrency": "forbid",
+    "timeout": 21600,
     "schedule_hint": null,
     "replaces": [
       "unit:backups-restore-all.service",

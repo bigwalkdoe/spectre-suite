@@ -60,7 +60,10 @@ Default: --dry-run. It prints the restore plan and changes nothing.
   --snapshot ID         Restic snapshot id (default: latest).
   --restic-target DIR   Restore destination; required, so restic never writes
                         back over the original paths by accident.
-  --remote              Fetch from off-site first; requires a source and location.
+  --remote              Fetch from off-site; requires a source and location.
+                        s3/b2 restore in place. rsync downloads to /tmp only,
+                        so nothing is applied -- restore again from the
+                        downloaded files.
   --remote-source SRC   rsync, s3, or b2.
   --remote-type TYPE    databases, docker-volumes, or configurations.
   --remote-location LOC Remote server or bucket name.
@@ -236,7 +239,11 @@ print_plan() {
     fi
 
     if [[ "$SELECT_REMOTE" -eq 1 ]]; then
-        echo "  remote: fetch $REMOTE_TYPE from $REMOTE_SOURCE:$REMOTE_LOCATION"
+        if [[ "$REMOTE_SOURCE" == "rsync" ]]; then
+            echo "  remote: download $REMOTE_TYPE from rsync:$REMOTE_LOCATION (downloads only; nothing applied)"
+        else
+            echo "  remote: restore $REMOTE_TYPE from $REMOTE_SOURCE:$REMOTE_LOCATION"
+        fi
         selected=1
     fi
 
@@ -309,7 +316,11 @@ echo "Restore summary"
 echo "  databases:      $([[ "$DB_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($DB_STATUS)")"
 echo "  docker volumes: $([[ "$VOLUME_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($VOLUME_STATUS)")"
 echo "  restic:         $([[ "$RESTIC_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($RESTIC_STATUS)")"
-echo "  remote:         $([[ "$REMOTE_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($REMOTE_STATUS)")"
+if [[ "$SELECT_REMOTE" -eq 1 && "$REMOTE_SOURCE" == "rsync" && "$REMOTE_STATUS" -eq 0 ]]; then
+    echo "  remote:         FETCHED ONLY (rsync downloads to /tmp; nothing applied)"
+else
+    echo "  remote:         $([[ "$REMOTE_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($REMOTE_STATUS)")"
+fi
 echo "  log:            $LOG_FILE"
 echo "=========================================="
 
@@ -327,9 +338,21 @@ if [[ -n "$DETAIL" ]]; then
     exit 1
 fi
 
-write_verdict ok
-logger -p user.info "restore-all completed successfully" 2>/dev/null || true
-if [[ -n "${DISPLAY:-}" ]]; then
-    notify-send "Restore Complete" "All selected restores completed successfully" || true
+NOTE=""
+if [[ "$SELECT_REMOTE" -eq 1 && "$REMOTE_SOURCE" == "rsync" ]]; then
+    NOTE="remote=rsync-download-only"
+fi
+
+write_verdict ok "$NOTE"
+if [[ -n "$NOTE" ]]; then
+    logger -p user.warning "restore-all: rsync downloaded artifacts to /tmp only; nothing was applied" 2>/dev/null || true
+    if [[ -n "${DISPLAY:-}" ]]; then
+        notify-send "Restore Fetch Complete" "rsync downloaded the artifacts; nothing was applied" -u normal || true
+    fi
+else
+    logger -p user.info "restore-all completed successfully" 2>/dev/null || true
+    if [[ -n "${DISPLAY:-}" ]]; then
+        notify-send "Restore Complete" "All selected restores completed successfully" || true
+    fi
 fi
 exit 0

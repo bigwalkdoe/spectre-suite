@@ -179,6 +179,38 @@ else
     fail "unknown flag not refused (rc=$RC): $OUT"
 fi
 
+# 12) The dispatcher's default 30-minute deadline would SIGKILL a real restore
+# part-way through, leaving a half-restored host and no verdict. The registry
+# entry must carry a deadline sized for a full disaster recovery.
+timeout=$(cd "$PROJECT_ROOT" && python3 -c \
+    "from spectre.dispatch.registry import get_job; print(get_job('backups/restore-all').timeout)" 2>/dev/null)
+if [ "${timeout:-0}" -ge 14400 ] 2>/dev/null; then
+    pass "registry timeout (${timeout}s) leaves room for a full restore"
+else
+    fail "registry timeout is ${timeout:-missing}; the 1800s default kills a real restore mid-run"
+fi
+
+# 13) rsync only downloads artifacts to /tmp; it does not apply them. An
+# operator finishing a disaster recovery must not read "SUCCESS" and stop.
+reset_calls
+run_restore --remote --remote-source rsync --remote-location srv --remote-type databases
+if [ "$RC" -eq 0 ] && grep -qi "downloads only" <<<"$OUT"; then
+    pass "rsync plan says it downloads only"
+else
+    fail "rsync plan does not distinguish download from restore (rc=$RC): $OUT"
+fi
+
+reset_calls
+run_restore --execute --yes --remote --remote-source rsync --remote-location srv --remote-type databases
+if [ "$RC" -eq 0 ] \
+    && grep -qx "remote rsync databases srv" "$CALLS" \
+    && grep -qi "fetched only" <<<"$OUT" \
+    && grep -q "rsync" "$STATE/last-restore-health"; then
+    pass "rsync execute reports a fetch, not a completed restore"
+else
+    fail "rsync execute misreports success (rc=$RC, marker=$(marker)): $OUT"
+fi
+
 cleanup_fixture
 
 echo "restore-all tests: $PASSED passed, $FAILED failed"
