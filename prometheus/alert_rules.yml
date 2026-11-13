@@ -673,6 +673,18 @@ groups:
             configured freshness window. Stale evidence must not be treated as a
             current pass/fail; refresh the baseline pipeline.
 
+      - alert: SecurityBaselineEvidenceAging
+        expr: spectre_security_baseline_evidence_age_seconds > 172800
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline evidence aging"
+          description: >-
+            Baseline evidence is aging (source={{ $labels.source }}).
+            Evidence age is {{ $value }} seconds, approaching the staleness
+            threshold. Refresh the baseline pipeline before evidence goes stale.
+
       - alert: SecurityBaselineDriftDetected
         expr: spectre_security_baseline_drift_detected == 1
         for: 15m
