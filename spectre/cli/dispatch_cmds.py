@@ -634,6 +634,26 @@ def run_action_job(job: Job, args: list[str]) -> None:
     raise typer.Exit(EXIT_OK)
 
 
+def run_group(name: str, args: list[str]) -> int:
+    """Run every job in `name` sequentially, stop on first failure.
+
+    Returns 0 if all jobs succeeded, non-zero exit code of the first failed job
+    otherwise. One provenance record is written per job via run_action_job.
+    """
+    members = registry.jobs_in_group(name)
+    if not members:
+        typer.echo(f"'{name}' is an empty group — nothing to run.")
+        return EXIT_OK
+    for job in members:
+        typer.echo(f"== {job.name} ==")
+        try:
+            run_action_job(job, list(args))
+        except typer.Exit as e:
+            if e.exit_code != EXIT_OK:
+                return e.exit_code
+    return EXIT_OK
+
+
 class _RunCommand(TyperCommand):
     """`spectre run`'s parser: refuse an unknown option, and say how to forward it.
 
@@ -720,6 +740,8 @@ def register(app: typer.Typer) -> None:
         error such as an unrecognised option, 1 for an unexpected error such as a
         run record that could not be written.
         """
+        if job in registry.groups():
+            raise typer.Exit(run_group(job, list(args or [])))
         run_action_job(_job_lookup(job), list(args or []))
 
     app.add_typer(actions_app, name="actions")
