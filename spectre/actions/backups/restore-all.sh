@@ -106,6 +106,7 @@ while [[ $# -gt 0 ]]; do
             require_value "--database" "${2:-}"
             DATABASE="$2"; shift ;;
         --database=*)
+            require_value "--database" "${1#*=}"
             DATABASE="${1#*=}" ;;
         --volumes) SELECT_VOLUMES=1 ;;
         --restic) SELECT_RESTIC=1 ;;
@@ -113,27 +114,32 @@ while [[ $# -gt 0 ]]; do
             require_value "--snapshot" "${2:-}"
             SNAPSHOT="$2"; shift ;;
         --snapshot=*)
+            require_value "--snapshot" "${1#*=}"
             SNAPSHOT="${1#*=}" ;;
         --restic-target)
             require_value "--restic-target" "${2:-}"
             RESTIC_TARGET="$2"; shift ;;
         --restic-target=*)
+            require_value "--restic-target" "${1#*=}"
             RESTIC_TARGET="${1#*=}" ;;
         --remote) SELECT_REMOTE=1 ;;
         --remote-source)
             require_value "--remote-source" "${2:-}"
             REMOTE_SOURCE="$2"; shift ;;
         --remote-source=*)
+            require_value "--remote-source" "${1#*=}"
             REMOTE_SOURCE="${1#*=}" ;;
         --remote-type)
             require_value "--remote-type" "${2:-}"
             REMOTE_TYPE="$2"; shift ;;
         --remote-type=*)
+            require_value "--remote-type" "${1#*=}"
             REMOTE_TYPE="${1#*=}" ;;
         --remote-location)
             require_value "--remote-location" "${2:-}"
             REMOTE_LOCATION="$2"; shift ;;
         --remote-location=*)
+            require_value "--remote-location" "${1#*=}"
             REMOTE_LOCATION="${1#*=}" ;;
         -h|--help)
             usage
@@ -219,9 +225,12 @@ print_plan() {
     echo "Plan:"
 
     if [[ "$SELECT_DB" -eq 1 ]]; then
-        local archive
-        archive=$(latest_archive "$BACKUP_DIR" 'postgres_*.sql.gz')
-        echo "  databases: restore ${archive:-no archive found} from $BACKUP_DIR"
+        # Deliberately does not name the archive. The component script picks its
+        # own, and the two can disagree -- a plan that promises
+        # `postgres_20261113.sql.gz` while the script restores a different file
+        # is worse than no name at all, because it invites the operator to
+        # verify the wrong artifact. Say what is being restored, not a filename.
+        echo "  databases: restore the latest PostgreSQL dump from $BACKUP_DIR"
         if [[ -n "$DATABASE" ]]; then
             echo "             into database $DATABASE"
         fi
@@ -275,11 +284,25 @@ write_verdict() {
     fi
 }
 
+# A missing component script aborts before any restore runs. It must write a
+# failed verdict: otherwise the marker keeps the previous run's value, and a
+# restore that died before touching anything would report the stale `ok` from
+# the last successful run -- reporting a failed disaster recovery as
+# successful.
+abort_missing() {
+    local component="$1" path="$2"
+    error "$component restore script not found: $path"
+    write_verdict failed "missing-script $component"
+    exit 1
+}
+
+# Declared before the component checks so `set -u` does not trip on the first
+# `DETAIL=...` reference below. It is empty until a component fails.
 DETAIL=""
-if [[ "$SELECT_DB" -eq 1 ]]; then require_script "$DB_SCRIPT" databases || exit 1; fi
-if [[ "$SELECT_VOLUMES" -eq 1 ]]; then require_script "$VOLUME_SCRIPT" "docker volume" || exit 1; fi
-if [[ "$SELECT_RESTIC" -eq 1 ]]; then require_script "$RESTIC_SCRIPT" restic || exit 1; fi
-if [[ "$SELECT_REMOTE" -eq 1 ]]; then require_script "$REMOTE_SCRIPT" remote || exit 1; fi
+if [[ "$SELECT_DB" -eq 1 ]]; then require_script "$DB_SCRIPT" databases || abort_missing databases "$DB_SCRIPT"; fi
+if [[ "$SELECT_VOLUMES" -eq 1 ]]; then require_script "$VOLUME_SCRIPT" "docker volume" || abort_missing "docker volume" "$VOLUME_SCRIPT"; fi
+if [[ "$SELECT_RESTIC" -eq 1 ]]; then require_script "$RESTIC_SCRIPT" restic || abort_missing restic "$RESTIC_SCRIPT"; fi
+if [[ "$SELECT_REMOTE" -eq 1 ]]; then require_script "$REMOTE_SCRIPT" remote || abort_missing remote "$REMOTE_SCRIPT"; fi
 
 if [[ "$EXECUTE" -ne 1 ]]; then
     print_plan
