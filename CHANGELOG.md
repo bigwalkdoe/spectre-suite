@@ -86,14 +86,19 @@ All notable changes to the spectre-suite project will be documented in this file
   use the new name. Existing deployments must move their configuration, logs,
   and backup archives to the new paths and prefixes before upgrading.
 
-### Planned
-- Web dashboard for system monitoring
-- Support for additional Linux distributions
-- Integration with additional monitoring tools
-- Advanced security features (IDS/IPS)
-- Cloud deployment support
-- Multi-server management
-- Machine learning for anomaly detection
+### Delivered (previously listed as Planned)
+These were tracked here as future work but have since shipped; they are
+documented in their own areas rather than re-listed:
+
+- Web dashboard for system monitoring — `web-dashboard/`
+- Support for additional Linux distributions — `cloud-deployment/`
+- Integration with additional monitoring tools — Prometheus/Grafana/Alertmanager stack
+- Advanced security features (IDS/IPS) — `docs/ADVANCED_SECURITY_FEATURES.md`
+- Cloud deployment support — `cloud-deployment/`
+- Multi-server management — `docs/MULTI_DISTRIBUTION_SUPPORT.md`
+- Machine learning for anomaly detection — `spectre/ml/`
+
+No items remain in this block.
 
 ---
 
