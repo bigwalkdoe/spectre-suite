@@ -727,7 +727,7 @@ def test_ordinary_unit_words_are_not_read_as_unresolvable_script_paths(
             ("dbus.service", "ExecStart=/usr/bin/dbus-daemon --system --nofork $DBUS_ARGS"),
             ("gateway.service", "ExecStart=/usr/bin/hermes gateway run"),
             ("wg-quick@.service", "ExecStart=/usr/bin/wg-quick %i up"),
-            ("api.service", "ExecStart=/usr/bin/python3 -m uvicorn spectre.api.main:app --port 8106"),
+            ("spectre-api.service", "ExecStart=/usr/bin/python3 -m uvicorn spectre.api.main:app --port 8106"),
         ],
     )
 
