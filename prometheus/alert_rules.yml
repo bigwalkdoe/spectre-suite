@@ -809,6 +809,19 @@ groups:
             Review Trivy image scan logs/evidence; unknown/skipped (-1)
             does not trigger this alert.
 
+      - alert: SecurityBaselineUnknownState
+        expr: spectre_security_baseline_unknown == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline state unknown"
+          description: >-
+            Baseline state cannot be determined from evidence
+            (source={{ $labels.source }}). Review baseline pipeline logs;
+            unknown state is not actionable as pass/fail until evidence is
+            collected.
+
       - alert: SecurityBaselineWazuhDown
         expr: spectre_security_baseline_wazuh_ok == 0
         for: 30m
