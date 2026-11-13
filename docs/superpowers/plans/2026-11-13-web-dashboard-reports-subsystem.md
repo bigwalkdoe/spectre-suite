@@ -55,7 +55,7 @@ These are input classes/failure modes the spec implies but individual task tests
 - Consumes: none
 - Produces: Reports `<a class="nav-item" data-page="reports">` under Operations group; `<div id="page-reports" class="page-anchor">`; reports card markup with `#reportType`, `#reportRange`, `#reportGenerate`, `#reportChart`, `#reportTable`, `#reportExportJson`, `#reportExportCsv`; `<script src="reports.js?v=...">` after `dashboard.js`.
 
-- [ ] **Step 1: Add Reports nav item and page anchor to index.html**
+- [x] **Step 1: Add Reports nav item and page anchor to index.html**
 
 ```html
 <!-- In the Operations nav-group, after the Backup item: -->
@@ -67,19 +67,19 @@ These are input classes/failure modes the spec implies but individual task tests
 
 Check: `grep -c 'data-page="reports"' web-dashboard/index.html` → 1; `grep -c 'id="page-reports"' web-dashboard/index.html` → 1.
 
-- [ ] **Step 2: Add reports card markup inside `#page-reports`**
+- [x] **Step 2: Add reports card markup inside `#page-reports`**
 
 Card contains: report-type select (Backup & Restic Health, Security Findings, Alert History, System Health), time-range select (24h/7d/30d/90d), Generate button, chart canvas `#reportChart`, data table `#reportTable`, export buttons `#reportExportJson`/`#reportExportCsv`, loading/error/empty regions.
 
 Check: `grep -c 'id="reportGenerate"' web-dashboard/index.html` → 1; `grep -c 'id="reportChart"' web-dashboard/index.html` → 1.
 
-- [ ] **Step 3: Load reports.js after dashboard.js in index.html**
+- [x] **Step 3: Load reports.js after dashboard.js in index.html**
 
 Add `<script src="reports.js?v=20261113-reports1"></script>` immediately after the `dashboard.js` script tag.
 
 Check: `grep -c 'reports.js' web-dashboard/index.html` → 1 and it appears after `dashboard.js`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web-dashboard/index.html
@@ -97,21 +97,21 @@ git commit -m "feat(dashboard): add Reports page skeleton (nav + markup)"
 - Consumes: none
 - Produces: `.report-controls`, `.report-table`, `.report-table th/td`, `.report-export`, `.report-empty`, `.report-chart` styles; reuse existing `.btn`, `.card--loading`, `.card--error`, `.skeleton` classes; no new colors outside existing palette.
 
-- [ ] **Step 1: Write failing test (structural)**
+- [x] **Step 1: Write failing test (structural)**
 
 Check: `grep -c '\.report-table' web-dashboard/styles.css` → 0 (fails, as expected before implementation).
 
-- [ ] **Step 2: Implement report styles in styles.css**
+- [x] **Step 2: Implement report styles in styles.css**
 
 Add `.report-controls` (flex pickers + generate), `.report-table` (striped, scrollable), `.report-export` (button group), `.report-empty` (centered muted state), `.report-chart` (canvas wrapper).
 
 Check: `grep -c '\.report-table' web-dashboard/styles.css` → 1.
 
-- [ ] **Step 3: Verify CSS parses**
+- [x] **Step 3: Verify CSS parses**
 
 Run: `python3 -c "import cssutils; ..."` if available, else confirm no obvious syntax via `grep -n '{' web-dashboard/styles.css | tail -5`. Simple check: file ends with a closing brace and contains `.report-table`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web-dashboard/styles.css
@@ -130,7 +130,7 @@ git commit -m "style(dashboard): add Reports page table, export, and empty-state
 - Consumes: none (pure functions, no DOM/fetch)
 - Produces: `buildReportQueries(reportType, range) => {queries: string[], label: string}`, `formatReportValue(value, metric) => string`, `buildCSV(labels, series) => string`, `buildJSON(payload) => string`. These are testable without a browser.
 
-- [ ] **Step 1: Write the failing test (Node assertions on pure functions)**
+- [x] **Step 1: Write the failing test (Node assertions on pure functions)**
 
 ```bash
 # tests/test_reports_js.sh uses node to eval reports.js and assert:
@@ -147,7 +147,7 @@ const fn = new Function('return {' +
 
 Expected: FAIL — `web-dashboard/reports.js` does not exist yet.
 
-- [ ] **Step 2: Implement pure functions in reports.js**
+- [x] **Step 2: Implement pure functions in reports.js**
 
 Define `buildReportQueries(reportType, range)` returning Prometheus `query_range` queries per type:
 - Backup & Restic: `backup_last_success_timestamp`, `restic_last_success_timestamp`, `max(restic_health_ok)`, `max(restic_verify_ok)`
@@ -161,7 +161,7 @@ Define `formatReportValue(value, metric)`, `buildCSV(labels, series)`, `buildJSO
 
 Check: `node -e "require('fs').readFileSync('web-dashboard/reports.js','utf8')"` loads without syntax error; `grep -c 'function buildReportQueries' web-dashboard/reports.js` → 1.
 
-- [ ] **Step 3: Run pure-function tests; verify they pass**
+- [x] **Step 3: Run pure-function tests; verify they pass**
 
 Run: `bash tests/test_reports_js.sh` → all assertions pass.
 
@@ -172,7 +172,7 @@ Expected assertions:
 - `buildCSV(['t0'], [[1,2]])` starts with `timestamp,value`
 - `buildJSON({exportedAt: 'x'})` parses as JSON with `exportedAt === 'x'`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web-dashboard/reports.js tests/test_reports_js.sh
@@ -190,11 +190,11 @@ git commit -m "feat(dashboard): add pure report logic (queries, CSV, JSON, forma
 - Consumes: `buildReportQueries`, `formatReportValue`, `buildCSV`, `buildJSON` (Task 3); dashboard.js globals `PROMETHEUS_URL`, `fetchWithTimeout`, `showToast`, `setCardLoading`, `setCardError`, `clearCardError`.
 - Produces: `initReports()`, `async generateReport(reportType, range)`, `renderReportChart(labels, series, reportType)`, `renderReportTable(labels, series)`, `showReportError(message)`, `showReportEmpty()`. Renders into `#reportChart`/`#reportTable`.
 
-- [ ] **Step 1: Write the failing test (manual)**
+- [x] **Step 1: Write the failing test (manual)**
 
 Open dashboard, navigate to Reports, click Generate with Prometheus running: expect chart + table to populate. (No automated browser test exists in this repo; this is a manual verification step consistent with the existing dashboard UX plan.)
 
-- [ ] **Step 2: Implement browser integration in reports.js**
+- [x] **Step 2: Implement browser integration in reports.js**
 
 `initReports()` runs on `DOMContentLoaded`; finds `#reportGenerate`, `#reportType`, `#reportRange`; wires Generate click → `generateReport(selectedType, selectedRange)`.
 
@@ -210,11 +210,11 @@ Open dashboard, navigate to Reports, click Generate with Prometheus running: exp
 
 `renderReportTable` builds `<table>` rows `timestamp → value` using `formatReportValue`.
 
-- [ ] **Step 3: Run manual verification**
+- [x] **Step 3: Run manual verification**
 
 Navigate to Reports; Generate for each of the 4 report types at 24h range; confirm chart + table render or show empty/error appropriately; confirm no console errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web-dashboard/reports.js
@@ -232,11 +232,11 @@ git commit -m "feat(dashboard): add Reports browser integration (fetch, chart, t
 - Consumes: `buildCSV`, `buildJSON` (Task 3); `generateReport`, `renderReportTable` (Task 4).
 - Produces: wired `#reportGenerate` click, `#reportExportJson`/`#reportExportCsv` clicks, localStorage persistence of last type+range, loading/error toggles around Generate, clipboard-with-download fallback for export.
 
-- [ ] **Step 1: Write the failing test (manual + Node on CSV/JSON export)**
+- [x] **Step 1: Write the failing test (manual + Node on CSV/JSON export)**
 
 Node test: `buildCSV` output parses as CSV; `buildJSON` output parses as JSON. Manual test: click Export JSON → file downloads or toast shows "copied"; click Export CSV → CSV downloads.
 
-- [ ] **Step 2: Implement export + wiring in reports.js**
+- [x] **Step 2: Implement export + wiring in reports.js**
 
 Wire `#reportGenerate` to call `generateReport` with current picker values (default 24h, first report type). Show/hide `card--loading` around the fetch. On success show chart+table; on failure show error + toast.
 
@@ -247,11 +247,11 @@ Wire `#reportGenerate` to call `generateReport` with current picker values (defa
 
 Persist `spectre-report-type` and `spectre-report-range` in localStorage; restore on init.
 
-- [ ] **Step 3: Run manual verification**
+- [x] **Step 3: Run manual verification**
 
 Generate a report; click Export JSON and Export CSV; confirm download/clipboard toast; reload page; confirm last type+range restored; change range to 7d; confirm x-axis shows dates.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web-dashboard/reports.js
@@ -267,19 +267,19 @@ git commit -m "feat(dashboard): add Reports export, Generate wiring, localStorag
 
 **Interfaces:** none
 
-- [ ] **Step 1: Run pure-function test suite**
+- [x] **Step 1: Run pure-function test suite**
 
 Run: `bash tests/test_reports_js.sh` → all pass.
 
-- [ ] **Step 2: Run repo structural tests**
+- [x] **Step 2: Run repo structural tests**
 
 Run: `bash tests/run_tests.sh` → no new failures introduced (pre-existing disk-quota failures in restore tests are unrelated).
 
-- [ ] **Step 3: Manual dashboard review**
+- [x] **Step 3: Manual dashboard review**
 
 Open dashboard; confirm Reports nav item works; each report type generates at 24h/7d/30d/90d; export JSON/CSV works; error state when Prometheus unreachable (block `/api/`); empty state when no data; mobile layout intact; console error-free.
 
-- [ ] **Step 4: Commit final state**
+- [x] **Step 4: Commit final state**
 
 ```bash
 git add web-dashboard/ tests/test_reports_js.sh

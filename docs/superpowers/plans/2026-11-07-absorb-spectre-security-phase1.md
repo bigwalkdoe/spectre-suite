@@ -40,11 +40,11 @@ These input classes/failure modes are implied by the spec but not all pinned by 
 - Consumes: none
 - Produces: `SUITE_ROOT` resolves to the repo root (`~//dev/github/spectre-suite`), so `POLICY_DIR` = `$SUITE_ROOT/spectre/policies` exists and `run-security-hardening.sh` resolves under `$SUITE_ROOT/spectre/actions/security/`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 No new test needed here — the existing test in Task 2 will fail because `SUITE_ROOT` is wrong (POLICY_DIR points to nonexistent dir). Run Task 2's test first to confirm RED.
 
-- [ ] **Step 2: Implement the fix**
+- [x] **Step 2: Implement the fix**
 
 Change line 15 of `baseline-runner.sh`:
 
@@ -60,13 +60,13 @@ SUITE_ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../../.." && pwd)}"
 
 `SCRIPT_DIR` = `.../spectre/actions/security/baseline` (3 levels up from repo root: baseline → security → actions → spectre → repo). `../../../..` from `spectre/actions/security/baseline` reaches the repo root.
 
-- [ ] **Step 3: Verify the fix**
+- [x] **Step 3: Verify the fix**
 
 Run: `SUITE_ROOT=$(cd "$(dirname "$(dirname "$(dirname "$(dirname "$(realpath spectre/actions/security/baseline/baseline-runner.sh")"))" )" )" && pwd) || echo "manual"` — simpler: just run Task 2's test which pins `POLICY_DIR` existence.
 
 Expected: `tests/test_baseline_runner.sh` passes (OPA check runs against `spectre/policies` which exists).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add spectre/actions/security/baseline/baseline-runner.sh
@@ -84,7 +84,7 @@ git commit -m "fix(security-baseline): fix SUITE_ROOT path bug so POLICY_DIR res
 - Consumes: `spectre.dispatch.registry.get_job`, `spectre.dispatch.registry.JOBS`
 - Produces: test functions asserting baseline-runner.sh runs, registry entry metadata correct, OPA check passes.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```bash
 #!/bin/bash
@@ -149,21 +149,21 @@ Expected: FAIL — `SUITE_ROOT` is wrong (`../../../../..` resolves to `~//dev/g
 
 Let me reconsider: baseline-runner.sh warns on missing POLICY_DIR but continues and exits 0. So Test 1 (exit 0) passes even with the bug. Test 3 (POLICY_DIR exists) is the definitive check. Good — the test file has both.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bash tests/test_baseline_runner.sh`
 Expected: FAIL — Test 3 fails because `POLICY_DIR` points to `~//dev/github/spectre/policies` which doesn't exist (SUITE_ROOT resolves to `~//dev/github`).
 
-- [ ] **Step 3: Implement the fix (Task 1)**
+- [x] **Step 3: Implement the fix (Task 1)**
 
 Apply the `SUITE_ROOT` fix from Task 1.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bash tests/test_baseline_runner.sh`
 Expected: PASS — all 4 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_baseline_runner.sh
@@ -181,7 +181,7 @@ git commit -m "test(security-baseline): add baseline-runner tests"
 - Consumes: `tests/test_baseline_runner.sh` (from Task 2)
 - Produces: `run_tests.sh` includes the new test in its suite
 
-- [ ] **Step 1: Add test to run_tests.sh**
+- [x] **Step 1: Add test to run_tests.sh**
 
 Add after the security-related tests:
 
@@ -191,12 +191,12 @@ run_test_suite "$SCRIPT_DIR/test_baseline_runner.sh" "Baseline Runner Tests"
 
 Place it after `test_security_metrics.sh` and before `test_schedule_ownership.sh` (grouping with security tests).
 
-- [ ] **Step 2: Run full suite to verify**
+- [x] **Step 2: Run full suite to verify**
 
 Run: `bash tests/run_tests.sh`
 Expected: all tests pass (24 + 1 = 25, or whatever the new total is).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/run_tests.sh
@@ -212,27 +212,27 @@ git commit -m "test: wire baseline-runner test into run_tests.sh"
 
 **Interfaces:** none
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 Run: `bash tests/run_tests.sh`
 Expected: all pass (25 tests, 0 failed).
 
-- [ ] **Step 2: Run spectre actions verify**
+- [x] **Step 2: Run spectre actions verify**
 
 Run: `python3 -m spectre.cli.main actions verify`
 Expected: 90 jobs, 0 findings (registry unchanged).
 
-- [ ] **Step 3: Run shellcheck on modified script**
+- [x] **Step 3: Run shellcheck on modified script**
 
 Run: `shellcheck spectre/actions/security/baseline/baseline-runner.sh`
 Expected: no new warnings (only pre-existing ones).
 
-- [ ] **Step 4: Manual smoke test of baseline-runner.sh**
+- [x] **Step 4: Manual smoke test of baseline-runner.sh**
 
 Run: `bash spectre/actions/security/baseline/baseline-runner.sh`
 Expected: exits 0, writes `baseline.log`, `opa-check.log` under `LOG_DIR`.
 
-- [ ] **Step 5: Commit final state**
+- [x] **Step 5: Commit final state**
 
 ```bash
 git add spectre/actions/security/baseline/baseline-runner.sh tests/test_baseline_runner.sh tests/run_tests.sh
