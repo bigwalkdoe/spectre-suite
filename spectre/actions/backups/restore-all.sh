@@ -1,83 +1,335 @@
 #!/bin/bash
-# Main orchestrator for the "full restore" job: restores every backup artifact.
-# Runs database, Docker volumes, configuration, project backups, plus remote/off-site and offsite variants.
-# Supports flags: --purge-hollow, --dry-run.
+# backups/restore-all — operator-only disaster-recovery orchestrator.
 #
-# Usage: spectre actions show/run backups/restore-all [--help]
+# Restores every backup artifact: PostgreSQL databases, Docker volumes, and a
+# restic snapshot, optionally fetching from an off-site source first.
+#
+# This is NOT scheduled. The individual restore scripts restore in place: a dump
+# piped into the live database, and a named volume cleared and overwritten. A
+# recurring restore would replace live data with the latest backup on every fire,
+# so the default here is a dry-run and mutation needs --execute --yes.
+#
+# Usage: spectre run backups/restore-all -- [options]
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Test seam: the component scripts normally sit beside this one, but tests point
+# this at stubs so no real database or volume is touched.
+ACTION_DIR="${RESTORE_ACTION_DIR:-$SCRIPT_DIR}"
 
-if [[ -n "${BACKUP_LOG:-}" ]]; then
+BACKUP_DIR="${BACKUP_DIR:-/backups/databases}"
+VOLUME_BACKUP_DIR="${VOLUME_BACKUP_DIR:-/backups/docker-volumes}"
+BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/backups/backup-state}"
+
+DB_SCRIPT="$ACTION_DIR/restore-databases.sh"
+VOLUME_SCRIPT="$ACTION_DIR/restore-docker-volumes.sh"
+RESTIC_SCRIPT="$ACTION_DIR/restic/restore.sh"
+REMOTE_SCRIPT="$ACTION_DIR/restore-from-remote.sh"
+
+if [[ -n "${LOG_FILE:-}" ]]; then
     :
 elif [[ -w /var/log ]]; then
-    BACKUP_LOG="/var/log/backup.log"
+    LOG_FILE="/var/log/restore-all.log"
 else
-    BACKUP_LOG="${TMPDIR:-/tmp}/backup.log"
+    LOG_FILE="${TMPDIR:-/tmp}/restore-all.log"
 fi
-LOGFILE="$BACKUP_LOG"
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+touch "$LOG_FILE" 2>/dev/null || LOG_FILE="${TMPDIR:-/tmp}/restore-all.log"
 
-DATE=$(date +%Y%m%d_%H%M%S)
+DEFAULT_SNAPSHOT="latest"
 
-{
-    echo "=========================================="
-    echo "Starting full restore: $DATE"
-    echo "=========================================="
-} >> "$LOGFILE"
+usage() {
+    cat <<'EOF'
+Usage: restore-all.sh [--dry-run] [--execute --yes] [--all]
+                      [--databases [--database NAME]]
+                      [--volumes]
+                      [--restic [--snapshot ID] [--restic-target DIR]]
+                      [--remote --remote-source rsync|s3|b2
+                                [--remote-type databases|docker-volumes|configurations]
+                                --remote-location SERVER|BUCKET]
 
-chmod +x "$SCRIPT_DIR"/*.sh
+Default: --dry-run. It prints the restore plan and changes nothing.
+
+  --execute             Perform the selected restores. Requires --yes.
+  --yes                 Confirm the in-place restores.
+  --all                 Select databases, volumes, and restic.
+  --databases           Restore the latest PostgreSQL dump.
+  --database NAME       Restore into NAME instead of deriving it from the archive.
+  --volumes             Restore every Docker volume from its latest archive.
+  --restic              Restore a restic snapshot (requires --restic-target).
+  --snapshot ID         Restic snapshot id (default: latest).
+  --restic-target DIR   Restore destination; required, so restic never writes
+                        back over the original paths by accident.
+  --remote              Fetch from off-site first; requires a source and location.
+  --remote-source SRC   rsync, s3, or b2.
+  --remote-type TYPE    databases, docker-volumes, or configurations.
+  --remote-location LOC Remote server or bucket name.
+
+Exit: 0 success, 1 a restore failed, 2 usage error.
+EOF
+}
+
+EXECUTE=0
+CONFIRM=0
+DRY_FLAG=0
+ALL=0
+SELECT_DB=0
+SELECT_VOLUMES=0
+SELECT_RESTIC=0
+SELECT_REMOTE=0
+DATABASE=""
+SNAPSHOT="$DEFAULT_SNAPSHOT"
+RESTIC_TARGET=""
+REMOTE_SOURCE=""
+REMOTE_TYPE="databases"
+REMOTE_LOCATION=""
+
+require_value() {
+    local flag="$1" value="${2:-}"
+    if [[ -z "$value" || "$value" == --* ]]; then
+        echo "missing value for $flag" >&2
+        exit 2
+    fi
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run) DRY_FLAG=1 ;;
+        --execute) EXECUTE=1 ;;
+        --yes) CONFIRM=1 ;;
+        --all) ALL=1 ;;
+        --databases) SELECT_DB=1 ;;
+        --database)
+            require_value "--database" "${2:-}"
+            DATABASE="$2"; shift ;;
+        --database=*)
+            DATABASE="${1#*=}" ;;
+        --volumes) SELECT_VOLUMES=1 ;;
+        --restic) SELECT_RESTIC=1 ;;
+        --snapshot)
+            require_value "--snapshot" "${2:-}"
+            SNAPSHOT="$2"; shift ;;
+        --snapshot=*)
+            SNAPSHOT="${1#*=}" ;;
+        --restic-target)
+            require_value "--restic-target" "${2:-}"
+            RESTIC_TARGET="$2"; shift ;;
+        --restic-target=*)
+            RESTIC_TARGET="${1#*=}" ;;
+        --remote) SELECT_REMOTE=1 ;;
+        --remote-source)
+            require_value "--remote-source" "${2:-}"
+            REMOTE_SOURCE="$2"; shift ;;
+        --remote-source=*)
+            REMOTE_SOURCE="${1#*=}" ;;
+        --remote-type)
+            require_value "--remote-type" "${2:-}"
+            REMOTE_TYPE="$2"; shift ;;
+        --remote-type=*)
+            REMOTE_TYPE="${1#*=}" ;;
+        --remote-location)
+            require_value "--remote-location" "${2:-}"
+            REMOTE_LOCATION="$2"; shift ;;
+        --remote-location=*)
+            REMOTE_LOCATION="${1#*=}" ;;
+        -h|--help)
+            usage
+            exit 0 ;;
+        *)
+            echo "unknown argument: $1" >&2
+            usage >&2
+            exit 2 ;;
+    esac
+    shift
+done
+
+if [[ "$DRY_FLAG" -eq 1 && "$EXECUTE" -eq 1 ]]; then
+    echo "--dry-run and --execute are mutually exclusive" >&2
+    exit 2
+fi
+
+if [[ "$ALL" -eq 1 ]]; then
+    SELECT_DB=1
+    SELECT_VOLUMES=1
+    SELECT_RESTIC=1
+fi
+
+if [[ "$EXECUTE" -eq 1 ]]; then
+    if [[ "$CONFIRM" -ne 1 ]]; then
+        echo "refusing to restore in place without --yes; re-run with --execute --yes" >&2
+        exit 2
+    fi
+    if [[ "$SELECT_DB" -eq 0 && "$SELECT_VOLUMES" -eq 0 && "$SELECT_RESTIC" -eq 0 && "$SELECT_REMOTE" -eq 0 ]]; then
+        echo "--execute needs at least one component (--all, --databases, --volumes, --restic, --remote)" >&2
+        exit 2
+    fi
+fi
+
+if [[ "$SELECT_RESTIC" -eq 1 && "$EXECUTE" -eq 1 && -z "$RESTIC_TARGET" ]]; then
+    echo "--restic with --execute requires --restic-target DIR (no in-place restic restore)" >&2
+    exit 2
+fi
+
+if [[ "$SELECT_REMOTE" -eq 1 ]]; then
+    case "$REMOTE_SOURCE" in
+        rsync|s3|b2) ;;
+        "") echo "--remote requires --remote-source rsync|s3|b2 and --remote-location" >&2; exit 2 ;;
+        *) echo "unknown --remote-source: $REMOTE_SOURCE (expected rsync, s3, or b2)" >&2; exit 2 ;;
+    esac
+    case "$REMOTE_TYPE" in
+        databases|docker-volumes|configurations) ;;
+        *) echo "unknown --remote-type: $REMOTE_TYPE" >&2; exit 2 ;;
+    esac
+    if [[ -z "$REMOTE_LOCATION" ]]; then
+        echo "--remote requires --remote-location SERVER|BUCKET" >&2
+        exit 2
+    fi
+fi
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE" || true
+}
+
+error() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" | tee -a "$LOG_FILE" >&2 || true
+}
+
+require_script() {
+    local path="$1" component="$2"
+    if [[ ! -f "$path" ]]; then
+        error "$component restore script not found: $path"
+        return 1
+    fi
+    return 0
+}
+
+latest_archive() {
+    local dir="$1" pattern="$2"
+    find "$dir" -maxdepth 1 -type f -name "$pattern" -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | cut -d' ' -f2- || true
+}
+
+print_plan() {
+    local selected=0
+
+    echo "DRY RUN: no restores will be performed (use --execute --yes)"
+    echo "Plan:"
+
+    if [[ "$SELECT_DB" -eq 1 ]]; then
+        local archive
+        archive=$(latest_archive "$BACKUP_DIR" 'postgres_*.sql.gz')
+        echo "  databases: restore ${archive:-no archive found} from $BACKUP_DIR"
+        if [[ -n "$DATABASE" ]]; then
+            echo "             into database $DATABASE"
+        fi
+        selected=1
+    fi
+
+    if [[ "$SELECT_VOLUMES" -eq 1 ]]; then
+        echo "  docker volumes: restore the latest archive per volume from $VOLUME_BACKUP_DIR"
+        selected=1
+    fi
+
+    if [[ "$SELECT_RESTIC" -eq 1 ]]; then
+        echo "  restic: apply snapshot $SNAPSHOT to ${RESTIC_TARGET:-<choose --restic-target>}"
+        selected=1
+    fi
+
+    if [[ "$SELECT_REMOTE" -eq 1 ]]; then
+        echo "  remote: fetch $REMOTE_TYPE from $REMOTE_SOURCE:$REMOTE_LOCATION"
+        selected=1
+    fi
+
+    if [[ "$selected" -eq 0 ]]; then
+        echo "  nothing selected; choose --all or name components"
+    fi
+    echo "Nothing was changed."
+}
 
 run_step() {
     local name="$1"
     shift
-    echo "Running $name..." >> "$LOGFILE"
+    log "Restoring $name..."
     set +e
     "$@"
     local status=$?
     set -e
-    echo "$name exit status: $status" >> "$LOGFILE"
-    return $status
+    log "$name exit status: $status"
+    return "$status"
 }
 
-DB_STATUS=0; VOL_STATUS=0; CONFIG_STATUS=0; PROJECT_STATUS=0
+write_verdict() {
+    local verdict="$1" detail="${2:-}"
+    mkdir -p "$BACKUP_STATE_DIR"
+    if [[ -n "$detail" ]]; then
+        printf '%s %s %s\n' "$verdict" "$(date +%s)" "$detail" > "$BACKUP_STATE_DIR/last-restore-health"
+    else
+        printf '%s %s\n' "$verdict" "$(date +%s)" > "$BACKUP_STATE_DIR/last-restore-health"
+    fi
+}
 
-run_step "database backups" "$SCRIPT_DIR/backup-databases.sh" || DB_STATUS=$?
-run_step "docker volume backups" "$SCRIPT_DIR/backup-docker-volumes.sh" || VOL_STATUS=$?
-run_step "configuration backups" "$SCRIPT_DIR/backup-configurations.sh" || CONFIG_STATUS=$?
-run_step "project backups" "$SCRIPT_DIR/backup-projects.sh" || PROJECT_STATUS=$?
+DETAIL=""
+if [[ "$SELECT_DB" -eq 1 ]]; then require_script "$DB_SCRIPT" databases || exit 1; fi
+if [[ "$SELECT_VOLUMES" -eq 1 ]]; then require_script "$VOLUME_SCRIPT" "docker volume" || exit 1; fi
+if [[ "$SELECT_RESTIC" -eq 1 ]]; then require_script "$RESTIC_SCRIPT" restic || exit 1; fi
+if [[ "$SELECT_REMOTE" -eq 1 ]]; then require_script "$REMOTE_SCRIPT" remote || exit 1; fi
 
-DAY_OF_WEEK=$(date +%u)
-if [[ "$DAY_OF_WEEK" == "7" ]]; then  # Sunday
-    run_step "weekly project backups" "$SCRIPT_DIR/backup-projects.sh" || PROJECT_STATUS=$?
-else
-    echo "Skipping project backups (weekly only)" >> "$LOGFILE"
-    PROJECT_STATUS=0
+if [[ "$EXECUTE" -ne 1 ]]; then
+    print_plan
+    exit 0
 fi
 
-{
-    echo "=========================================="
-    echo "Backup Summary - $DATE"
-    echo "Database backups: $([ $DB_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
-    echo "Volume backups: $([ $VOL_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
-    echo "Configuration backups: $([ $CONFIG_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
-    echo "Project backups: $([ $PROJECT_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')"
-    echo "Total disk usage:"
-    du -sh "${BACKUP_DIR:-/backups}" 2>/dev/null || true
-    echo "=========================================="
-} >> "$LOGFILE"
+DB_STATUS=0
+VOLUME_STATUS=0
+RESTIC_STATUS=0
+REMOTE_STATUS=0
 
-if [[ "$DB_STATUS" -ne 0 ]] || [[ "$VOL_STATUS" -ne 0 ]] || [[ "$CONFIG_STATUS" -ne 0 ]] || [[ "$PROJECT_STATUS" -ne 0 ]]; then
-    logger -p user.error "Backup completed with errors - check $LOGFILE" 2>/dev/null || true
-    if [[ -n "${DISPLAY:-}" ]]; then
-        notify-send "Backup Error" "Some backups failed - check logs" -u critical
+if [[ "$SELECT_DB" -eq 1 ]]; then
+    if [[ -n "$DATABASE" ]]; then
+        run_step "databases" bash "$DB_SCRIPT" latest "$DATABASE" || DB_STATUS=$?
+    else
+        run_step "databases" bash "$DB_SCRIPT" latest || DB_STATUS=$?
     fi
-    echo "Backup orchestration completed with failures: $DATE"
+fi
+
+if [[ "$SELECT_VOLUMES" -eq 1 ]]; then
+    run_step "docker volumes" bash "$VOLUME_SCRIPT" latest || VOLUME_STATUS=$?
+fi
+
+if [[ "$SELECT_RESTIC" -eq 1 ]]; then
+    run_step "restic snapshot $SNAPSHOT" bash "$RESTIC_SCRIPT" --snapshot "$SNAPSHOT" --target "$RESTIC_TARGET" || RESTIC_STATUS=$?
+fi
+
+if [[ "$SELECT_REMOTE" -eq 1 ]]; then
+    run_step "remote $REMOTE_TYPE" bash "$REMOTE_SCRIPT" "$REMOTE_SOURCE" "$REMOTE_TYPE" "$REMOTE_LOCATION" || REMOTE_STATUS=$?
+fi
+
+echo "=========================================="
+echo "Restore summary"
+echo "  databases:      $([[ "$DB_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($DB_STATUS)")"
+echo "  docker volumes: $([[ "$VOLUME_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($VOLUME_STATUS)")"
+echo "  restic:         $([[ "$RESTIC_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($RESTIC_STATUS)")"
+echo "  remote:         $([[ "$REMOTE_STATUS" -eq 0 ]] && echo SUCCESS || echo "FAILED ($REMOTE_STATUS)")"
+echo "  log:            $LOG_FILE"
+echo "=========================================="
+
+if [[ "$DB_STATUS" -ne 0 ]]; then DETAIL="$DETAIL databases=$DB_STATUS"; fi
+if [[ "$VOLUME_STATUS" -ne 0 ]]; then DETAIL="$DETAIL volumes=$VOLUME_STATUS"; fi
+if [[ "$RESTIC_STATUS" -ne 0 ]]; then DETAIL="$DETAIL restic=$RESTIC_STATUS"; fi
+if [[ "$REMOTE_STATUS" -ne 0 ]]; then DETAIL="$DETAIL remote=$REMOTE_STATUS"; fi
+
+if [[ -n "$DETAIL" ]]; then
+    write_verdict failed "${DETAIL# }"
+    logger -p user.error "restore-all completed with failures:$DETAIL - check $LOG_FILE" 2>/dev/null || true
+    if [[ -n "${DISPLAY:-}" ]]; then
+        notify-send "Restore Failed" "Some restores failed - check $LOG_FILE" -u critical || true
+    fi
     exit 1
 fi
 
-logger -p user.info "All backups completed successfully" 2>/dev/null || true
+write_verdict ok
+logger -p user.info "restore-all completed successfully" 2>/dev/null || true
 if [[ -n "${DISPLAY:-}" ]]; then
-    notify-send "Backup Complete" "All backups completed successfully"
+    notify-send "Restore Complete" "All selected restores completed successfully" || true
 fi
-
-echo "Backup orchestration completed: $DATE"
 exit 0
