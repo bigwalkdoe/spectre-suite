@@ -1,0 +1,8 @@
+[Unit]
+Description=Backups Restore All Service
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/spectre run backups/restore-all.sh
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
