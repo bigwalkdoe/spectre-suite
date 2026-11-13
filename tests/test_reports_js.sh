@@ -56,6 +56,7 @@ assert("backup includes restic_health_ok", bj.includes("restic_health_ok"), true
 assert("backup includes restic_verify_ok", bj.includes("restic_verify_ok"), true);
 assert("backup label", bq.label, "Backup & Restic Health");
 assert("backup 7d seconds", bq.seconds, 604800);
+assert("backup queries are raw (no start param)", !bj.includes("&start="), true);
 
 const sq = buildReportQueries("security", "24h");
 const sj = sq.queries.join("|");
