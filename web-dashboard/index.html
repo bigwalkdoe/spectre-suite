@@ -33,6 +33,7 @@
                     <a href="#page-trends" class="nav-item" data-page="trends" data-page-title="Resource Trends" data-page-icon="fa-chart-line"><i class="fas fa-chart-line fa-fw" aria-hidden="true"></i><span>Trends</span></a>
                     <a href="#page-security" class="nav-item" data-page="security" data-page-title="Security" data-page-icon="fa-shield-alt"><i class="fas fa-shield-alt fa-fw" aria-hidden="true"></i><span>Security</span></a>
                     <a href="#page-backup" class="nav-item" data-page="backup" data-page-title="Backup" data-page-icon="fa-database"><i class="fas fa-database fa-fw" aria-hidden="true"></i><span>Backup</span></a>
+                    <a href="#page-reports" class="nav-item" data-page="reports" data-page-title="Reports" data-page-icon="fa-chart-bar"><i class="fas fa-chart-bar fa-fw" aria-hidden="true"></i><span>Reports</span></a>
                 </div>
             </nav>
             <div class="sidebar-foot">
@@ -89,6 +90,56 @@
                 <div id="page-trends" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-security" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-backup" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-reports" class="page-anchor" aria-hidden="true">
+                    <section class="card" id="reportsCard" data-show-pages="reports">
+                        <div class="card-header">
+                            <h2><i class="fas fa-chart-bar" aria-hidden="true"></i> Reports</h2>
+                        </div>
+                        <div class="card-body report-controls">
+                            <label for="reportType" class="visually-hidden">Report type</label>
+                            <select id="reportType" class="btn btn-sm report-type-select" aria-label="Report type">
+                                <option value="backup">Backup &amp; Restic Health</option>
+                                <option value="security">Security Findings</option>
+                                <option value="alerts">Alert History</option>
+                                <option value="system">System Health</option>
+                            </select>
+                            <label for="reportRange" class="visually-hidden">Time range</label>
+                            <select id="reportRange" class="btn btn-sm report-range-select" aria-label="Time range">
+                                <option value="24h">24h</option>
+                                <option value="7d" selected>7d</option>
+                                <option value="30d">30d</option>
+                                <option value="90d">90d</option>
+                            </select>
+                            <button id="reportGenerate" class="btn btn-primary" aria-label="Generate report">
+                                <i class="fas fa-sync-alt" aria-hidden="true"></i> Generate
+                            </button>
+                        </div>
+                        <div class="card-body report-chart" id="reportChartBody">
+                            <canvas id="reportChart" role="img" aria-label="Report trend chart"></canvas>
+                        </div>
+                        <div class="card-body report-table-wrap">
+                            <table id="reportTable" class="report-table" aria-label="Report data table">
+                                <thead>
+                                    <tr><th>Timestamp</th><th>Value</th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="reportEmpty" class="report-empty" hidden>
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <span>No data for this range.</span>
+                            </div>
+                        </div>
+                        <div class="card-body report-export">
+                            <button id="reportExportJson" class="btn btn-sm" aria-label="Export report as JSON">
+                                <i class="fas fa-file-export" aria-hidden="true"></i> Export JSON
+                            </button>
+                            <button id="reportExportCsv" class="btn btn-sm" aria-label="Export report as CSV">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i> Export CSV
+                            </button>
+                            <span id="reportExportStatus" class="muted"></span>
+                        </div>
+                    </section>
+                </div>
                 <!-- Quick Stats -->
                 <section class="quick-stats" aria-label="Key metrics" data-show-pages="overview health trends">
                     <div class="stat-card cpu card" id="cpuCard">
@@ -277,5 +328,6 @@
     </div>
 
     <script src="dashboard.js?v=20261111-ux3"></script>
+    <script src="reports.js?v=20261113-reports1"></script>
 </body>
 </html>
