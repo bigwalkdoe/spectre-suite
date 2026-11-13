@@ -603,6 +603,18 @@
     ]
   },
   {
+    "name": "backups/restore-all",
+    "action": "backups/restore-all.sh",
+    "group": "backups",
+    "summary": "Full restore of all backup artifacts: databases, Docker volumes, configs, projects, remote, off-site",
+    "mutates": true,
+    "concurrency": "forbid",
+    "schedule_hint": "0 4 * * *",
+    "replaces": [
+      "crontab:0 4 * * *"
+    ]
+  },
+  {
     "name": "dashboard-actions/process-triggers",
     "action": "dashboard-actions/process-triggers.sh",
     "group": "maintenance",
