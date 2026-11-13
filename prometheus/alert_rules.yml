@@ -761,6 +761,18 @@ groups:
             Evidence/SBOM completeness may be degraded; unknown/skipped (-1)
             does not trigger this alert.
 
+      - alert: SecurityBaselineTrivyFsFailed
+        expr: spectre_security_baseline_trivy_fs_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Security baseline Trivy FS scan failed"
+          description: >-
+            Trivy filesystem scan reported issues (source={{ $labels.source }}).
+            Review Trivy FS scan logs/evidence; unknown/skipped (-1)
+            does not trigger this alert.
+
   # Monitoring stack self-checks (route-prefix, Grafana->Prometheus reachability,
   # datasource config/health drift), published by
   # spectre/monitoring/exporters/monitoring-stack-metrics-exporter.sh via
