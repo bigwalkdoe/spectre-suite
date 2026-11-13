@@ -38,12 +38,12 @@
 - Consumes: current dashboard panels/queries in `grafana-dashboards/resource-monitoring.json`; metric patterns from repo (`container_memory_usage_bytes`, `container_last_seen`, `container_cpu_usage_seconds_total`, `node_filesystem_*`, `aws_cost_estimated`).
 - Produces: updated dashboard JSON with container-primary sections, secondary cost/disk section, explicit `gridPos`, readable units/legends, and valid JSON.
 
-- [ ] **Step 1: Inspect current dashboard and confirm baseline**
+- [x] **Step 1: Inspect current dashboard and confirm baseline**
 
 Run: `python3 -m json.tool grafana-dashboards/resource-monitoring.json >/tmp/opencode/resource-monitoring.before.json && wc -l /tmp/opencode/resource-monitoring.before.json`
 Expected: command succeeds (valid JSON) and prints a line count.
 
-- [ ] **Step 2: Rewrite `grafana-dashboards/resource-monitoring.json` with container-focused layout**
+- [x] **Step 2: Rewrite `grafana-dashboards/resource-monitoring.json` with container-focused layout**
 
 Implement the approved structure:
 - **Container overview (top row/section):** compact stat panels such as active containers (from `container_last_seen`, using a resilient count expression) and aggregate container CPU/memory where sensible (standard cAdvisor metrics).
@@ -51,7 +51,7 @@ Implement the approved structure:
 - **Other resources (secondary, below):** retain **Cost by Provider** (`sum(aws_cost_estimated) by (service)`) and **Disk Usage Trend** (`100 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100)`) with clear titles/units; keep or rework “Unused Resources” only if it adds value without clutter.
 - Apply explicit `gridPos` to every panel, consistent widths/heights for density, unique panel IDs, and clear sectioning (row panels or ordered layout with descriptive titles). Keep `datasource: "Prometheus"` and reasonable dashboard metadata (`title`, `uid`, `tags`, `timezone`, `schemaVersion`/fields consistent with file style).
 
-- [ ] **Step 3: Validate JSON and key content**
+- [x] **Step 3: Validate JSON and key content**
 
 Run: `python3 -m json.tool grafana-dashboards/resource-monitoring.json >/tmp/opencode/resource-monitoring.after.json`
 Expected: PASS (no parse errors).
@@ -62,7 +62,7 @@ Expected: all named signals/panels present.
 Run: `rg -n "gridPos" grafana-dashboards/resource-monitoring.json`
 Expected: multiple matches (every panel positioned explicitly).
 
-- [ ] **Step 4: Sanity-check for readability/density choices**
+- [x] **Step 4: Sanity-check for readability/density choices**
 
 Run: `python3 - <<'PY'
 import json
@@ -75,7 +75,7 @@ print('panels',len(panels),'ids_unique',len(ids)==len(set(ids)),'all_gridPos',Tr
 PY`
 Expected: prints panel count with `ids_unique True all_gridPos True`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add grafana-dashboards/resource-monitoring.json docs/superpowers/plans/2026-11-11-grafana-container-resource-dashboard-layout.md
