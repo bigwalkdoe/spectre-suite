@@ -61,19 +61,19 @@ restore-all.sh [--dry-run] [--execute --yes] [--all]
                          --remote-location SERVER|BUCKET]
 ```
 
-- [ ] **Step 1: Write the failing test** — `tests/test_restore_all.sh`. Stub sibling scripts in a temp `RESTORE_ACTION_DIR`; assert dry-run runs nothing, `--execute` without `--yes` exits 2, `--execute --yes --databases --volumes` calls both stubs and writes `ok`, a failing stub yields exit 1 and `failed`, a missing stub yields non-zero naming the path, restic without `--restic-target` exits 2, restic with a target passes the expected args, and unknown flags exit 2.
-- [ ] **Step 2: Run test to verify it fails** — `bash tests/test_restore_all.sh`; expect failures because the current script is a backup-all copy with no flags.
-- [ ] **Step 3: Implement the script** — parse flags strictly, default `DRY_RUN=1`, refuse `--execute` without `--yes`, resolve/validate every selected component before running any, run components capturing status, print a summary, write the verdict marker only on execute, notify via logger/notify-send on failure.
-- [ ] **Step 4: Run test to verify it passes** — `bash tests/test_restore_all.sh`, `bash -n spectre/actions/backups/restore-all.sh`; both PASS.
-- [ ] **Step 5: Wire the test and commit** — add `test_restore_all.sh` to `tests/run_tests.sh`; commit.
+- [x] **Step 1: Write the failing test** — `tests/test_restore_all.sh`. Stub sibling scripts in a temp `RESTORE_ACTION_DIR`; assert dry-run runs nothing, `--execute` without `--yes` exits 2, `--execute --yes --databases --volumes` calls both stubs and writes `ok`, a failing stub yields exit 1 and `failed`, a missing stub yields non-zero naming the path, restic without `--restic-target` exits 2, restic with a target passes the expected args, and unknown flags exit 2.
+- [x] **Step 2: Run test to verify it fails** — `bash tests/test_restore_all.sh`; expect failures because the current script is a backup-all copy with no flags.
+- [x] **Step 3: Implement the script** — parse flags strictly, default `DRY_RUN=1`, refuse `--execute` without `--yes`, resolve/validate every selected component before running any, run components capturing status, print a summary, write the verdict marker only on execute, notify via logger/notify-send on failure.
+- [x] **Step 4: Run test to verify it passes** — `bash tests/test_restore_all.sh`, `bash -n spectre/actions/backups/restore-all.sh`; both PASS.
+- [x] **Step 5: Wire the test and commit** — add `test_restore_all.sh` to `tests/run_tests.sh`; commit.
 
 ### Task 2: Make the registry entry operator-only
 
 **File:** `spectre/dispatch/registry_data.json`
 
-- [ ] **Step 1: Update the entry** — keep `name`/`action`/`group`, replace the summary with the DR wording, keep `mutates: true` and `concurrency: "forbid"`, set `schedule_hint: null`, and set `replaces` to the retired units `unit:backups-restore-all.service` and `unit:backups-restore-all.timer`.
-- [ ] **Step 2: Validate** — `python3 -c "from spectre.dispatch.registry import get_job; j=get_job('backups/restore-all'); assert j.schedule_hint is None and j.mutates and j.concurrency=='forbid'"`.
-- [ ] **Step 3: Commit**.
+- [x] **Step 1: Update the entry** — keep `name`/`action`/`group`, replace the summary with the DR wording, keep `mutates: true` and `concurrency: "forbid"`, set `schedule_hint: null`, and set `replaces` to the retired units `unit:backups-restore-all.service` and `unit:backups-restore-all.timer`.
+- [x] **Step 2: Validate** — `python3 -c "from spectre.dispatch.registry import get_job; j=get_job('backups/restore-all'); assert j.schedule_hint is None and j.mutates and j.concurrency=='forbid'"`.
+- [x] **Step 3: Commit**.
 
 ### Task 3: Retire the scheduler units
 
@@ -81,16 +81,16 @@ restore-all.sh [--dry-run] [--execute --yes] [--all]
 - Delete: `systemd/backups-restore-all.service`
 - Delete: `systemd/backups-restore-all.timer`
 
-- [ ] **Step 1: Delete the unit files** (`git rm`).
-- [ ] **Step 2: Confirm nothing references them** — `grep -rn 'backups-restore-all' --exclude-dir=.git .` only finds the plan/ledger/registry hardware-retirement entries.
-- [ ] **Step 3: Commit**.
+- [x] **Step 1: Delete the unit files** (`git rm`).
+- [x] **Step 2: Confirm nothing references them** — `grep -rn 'backups-restore-all' --exclude-dir=.git .` only finds the plan/ledger/registry hardware-retirement entries.
+- [x] **Step 3: Commit**.
 
 ### Task 4: Smoke test / CI gate
 
-- [ ] **Step 1: CLI visibility** — `python3 -m spectre.cli.main actions show backups/restore-all` shows `schedule: manual`.
-- [ ] **Step 2: Help path** — `python3 -m spectre.cli.main run backups/restore-all -- --help` exits 0 and prints the usage block.
-- [ ] **Step 3: Dry-run path** — `python3 -m spectre.cli.main run backups/restore-all` exits 0 and prints `DRY RUN` (no live data touched).
-- [ ] **Step 4: Full related suite** — `bash tests/run_tests.sh` (or the subset named in the ledger).
+- [x] **Step 1: CLI visibility** — `python3 -m spectre.cli.main actions show backups/restore-all` shows `schedule: manual`.
+- [x] **Step 2: Help path** — `python3 -m spectre.cli.main run backups/restore-all -- --help` exits 0 and prints the usage block.
+- [x] **Step 3: Dry-run path** — `python3 -m spectre.cli.main run backups/restore-all` exits 0 and prints `DRY RUN` (no live data touched).
+- [x] **Step 4: Full related suite** — `bash tests/run_tests.sh` (or the subset named in the ledger).
 
 ## Operator follow-up (requires root; not performed by the agent)
 
