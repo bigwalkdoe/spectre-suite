@@ -98,11 +98,16 @@ documented in their own areas rather than re-listed:
 - Multi-server management — `docs/MULTI_DISTRIBUTION_SUPPORT.md`
 - Machine learning for anomaly detection — `spectre/ml/`
 
+## [1.0.2] - 2026-11-13
+
+### Added
+- `spectre run <group>` runs all jobs in a registry group sequentially, stopping on first failure, writing one provenance record per job (group job execution)
+- `check-security-scan-outcome.sh --append-runbook <path>` appends a timestamped `## security-scan outcome` section (timer status, journal window, `actions verify` output) to a runbook file
+
+### Fixed
+- `gitleaks` no longer flags `TEST_API_KEY` test fixtures in `tests/agent/test_api.py` and `tests/agent/test_control_plane_api.py` as generic-api-key leaks (added to path allowlist)
+
+### Security
+- `gitleaks` allowlist only covers reviewed synthetic test API keys (`test-api-key-12345`); production credentials remain flagged
+
 ## [Unreleased]
-
-
-No items remain in this block.
-
----
-
-For more information about the project structure and configuration, see the main [README.md](README.md) file.
