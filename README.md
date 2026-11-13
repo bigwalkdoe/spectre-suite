@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge"></a>
-  <a href="pyproject.toml"><img alt="Version 1.0.1" src="https://img.shields.io/badge/Version-1.0.1-0ea5e9?style=for-the-badge"></a>
+  <a href="pyproject.toml"><img alt="Version 1.0.2" src="https://img.shields.io/badge/Version-1.0.2-0ea5e9?style=for-the-badge"></a>
   <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white"></a>
   <a href="https://www.linux.org/"><img alt="Linux" src="https://img.shields.io/badge/Platform-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=111827"></a>
 </p>
