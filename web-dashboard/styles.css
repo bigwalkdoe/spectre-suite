@@ -395,6 +395,11 @@ button {
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow);
+    /* Painted above the full-viewport backdrop so the close button and
+       modal body are clickable; the backdrop still receives clicks on the
+       area outside the modal (it is a sibling, painted beneath this). */
+    position: relative;
+    z-index: 1001;
 }
 .modal-header {
     display: flex;

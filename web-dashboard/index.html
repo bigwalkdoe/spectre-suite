@@ -329,11 +329,11 @@
     </div>
 
     <div id="keyboardHelp" class="modal" role="dialog" aria-modal="true" aria-labelledby="keyboardHelpTitle">
-        <div class="modal-backdrop" onclick="hideHelpDialog()"></div>
+        <div class="modal-backdrop" data-help-close aria-label="Close"></div>
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="keyboardHelpTitle">Keyboard Shortcuts</h2>
-                <button class="btn btn-sm" onclick="hideHelpDialog()" aria-label="Close"><i class="fas fa-times"></i></button>
+                <button class="btn btn-sm" data-help-close aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <table class="keyboard-shortcuts">
