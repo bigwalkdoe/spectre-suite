@@ -60,9 +60,9 @@ Values use explicit status codes where helpful: `1=pass/clean/ok`, `0=fail/findi
 - A/D hybrid: exporter may read suite logs (`SECURITY_BASELINE_LOG_DIR`) and, if configured, `SPECTRE_SECURITY_ROOT`/spectre-security baseline logs/reports.
 - Alerts/dashboards should distinguish `spectre_agent_*` (runtime) from `spectre_security_baseline_*` (pipeline evidence). Reconcile/rename spectre-security-named assets only with compatibility/transition plan.
 
-## 5. Reconciliation backlog (suite repo)
-- [ ] Add baseline exporter registry job + scheduling (additive).
-- [ ] Add/adjust Prometheus alert rules for `spectre_security_baseline_*` with unknown/stale/never-run handling (do not conflate with agent alerts).
-- [ ] Import/reconcile spectre-security Grafana dashboard to suite observability assets with canonical metric names and clear data-source semantics.
-- [ ] Update/add tests for exporter output semantics (never-run/unknown/stale/clean/fail).
-- [ ] Document migration for any renamed metrics/labels.
+## 5. Reconciliation backlog (suite repo) — **all closed 2026-11-14**
+- [x] Add baseline exporter registry job + scheduling (additive) — `prometheus/security-baseline-metrics-exporter` registered (`mutates`, `concurrency=forbid`, `schedule_hint: */5 * * * *`), installed as `spectre-baseline-metrics.{service,timer}` (enabled/active).
+- [x] Add/adjust Prometheus alert rules for `spectre_security_baseline_*` with unknown/stale/never-run handling (do not conflate with agent alerts) — 16 rules in `prometheus/alert_rules.yml` `security_baseline_alerts` group; `-1` (unknown/skipped) never triggers; `never_run`/`stale`/`unknown` explicit; agent (`spectre_agent_*`) and pipeline (`spectre_security_baseline_*`) signals never conflated. Runbook: `docs/runbooks/security-baseline-opa-alerts.md`.
+- [x] Import/reconcile spectre-security Grafana dashboard to suite observability assets with canonical metric names and clear data-source semantics — `grafana-dashboards/security-baseline-pipeline.json` documents the agent-vs-pipeline distinction; canonical `spectre_security_baseline_*` names only.
+- [x] Update/add tests for exporter output semantics (never-run/unknown/stale/clean/fail) — `tests/test_security_baseline_metrics.sh` covers never-run/unknown/stale/fresh/failure/opa_compat_report_ok report-ran semantics; PASS.
+- [x] Document migration for any renamed metrics/labels — `spectre-security-baseline-metrics` renamed to `spectre-baseline-metrics` (2026-11-08); old units retired to `~/.local/state/spectre-suite/retired-units/`; runbook documents the mapping.
