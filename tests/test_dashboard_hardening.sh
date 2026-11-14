@@ -339,4 +339,46 @@ vm.runInContext(src, vm.createContext(sandbox), { filename: 'dashboard.js' });
 NODE
 if [ $? -eq 0 ]; then pass "chart library failure degrades without queries or TypeErrors"; else fail "missing chart library causes queries or no error message"; fi
 
+echo "Test 4: getChartTheme provides tooltip colors in both modes"
+node - "$JS_FILE" <<'NODE'
+const fs = require('fs');
+const vm = require('vm');
+
+function classList() {
+    const set = new Set();
+    return {
+        add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c),
+        toggle: (c, force) => { if (force === undefined) { if (set.has(c)) { set.delete(c); return false; } set.add(c); return true; } if (force) set.add(c); else set.delete(c); return force; },
+    };
+}
+
+function themeFor(dark) {
+    // Extract just getChartTheme() — the file runs top-level boot code that
+    // needs a full DOM sandbox, which is unnecessary for a pure theme fn.
+    const src = fs.readFileSync(process.argv[2], 'utf8');
+    const m = src.match(/function getChartTheme\(\)[\s\S]*?\n\}/);
+    if (!m) { console.error('getChartTheme not found'); process.exit(1); }
+    const fn = new Function('document', m[0] + '\nreturn getChartTheme();');
+    const document = { documentElement: { classList: classList() } };
+    if (dark) document.documentElement.classList.add('dark');
+    return fn(document);
+}
+
+const light = themeFor(false);
+const dark = themeFor(true);
+let ok = true;
+function assert(name, cond) { console.log(cond ? 'PASS: ' + name : 'FAIL: ' + name); if (!cond) ok = false; }
+
+assert('light mode has tooltipBg', typeof light.tooltipBg === 'string' && light.tooltipBg.length > 0);
+assert('light mode has tooltipText', typeof light.tooltipText === 'string' && light.tooltipText.length > 0);
+assert('light mode has tooltipBorder', typeof light.tooltipBorder === 'string' && light.tooltipBorder.length > 0);
+assert('dark mode has tooltipBg', typeof dark.tooltipBg === 'string' && dark.tooltipBg.length > 0);
+assert('dark mode has tooltipText', typeof dark.tooltipText === 'string' && dark.tooltipText.length > 0);
+assert('dark mode has tooltipBorder', typeof dark.tooltipBorder === 'string' && dark.tooltipBorder.length > 0);
+assert('dark tooltip bg differs from light', dark.tooltipBg !== light.tooltipBg);
+assert('dark tooltip text differs from light', dark.tooltipText !== light.tooltipText);
+if (!ok) process.exit(1);
+NODE
+if [ $? -eq 0 ]; then pass "getChartTheme provides tooltip colors in both modes"; else fail "getChartTheme is missing tooltip colors"; fi
+
 echo "ALL DASHBOARD HARDENING TESTS PASSED"
