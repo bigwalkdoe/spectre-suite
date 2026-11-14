@@ -1,0 +1,29 @@
+[Unit]
+Description=Spectre Background Daemon (Kernel + monitoring + scheduled workflows)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# The daemon owns the Kernel lifecycle: periodic health checks, scheduled
+# workflows, and the ServiceBus. It is deliberately separate from
+# spectre-api.service (the FastAPI control surface on 127.0.0.1:8106), which
+# serves requests and runs ad-hoc jobs on demand. Running both is intended —
+# the daemon is the always-on maintenance loop, the API is the operator's
+# remote surface.
+ExecStart=%h/.local/share/spectre-venv/bin/python -m spectre.daemon.main
+WorkingDirectory=%h/.config/spectre
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.config/spectre
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target
