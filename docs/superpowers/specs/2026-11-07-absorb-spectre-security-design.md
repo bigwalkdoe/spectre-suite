@@ -18,14 +18,14 @@
 - OPA: `spectre/policies/*.rego` + `baseline.json`. Packages use `security.*`/`import rego.v1` style (e.g. `security.docker`, `security.compliance`). CI (`lint.yml`) runs `opa check spectre/policies/`, fail-closed count on empty input (`count([m | data.security[k].deny[m]])` >= 38), and baseline eval with no denials.
 - Monitoring/metrics: `spectre/monitoring/exporters/*`, dashboard/prometheus config; doc-drift/config checks in CI.
 
-### `spectre-security` (source, local at `~//dev/github/spectre-security`)
+### `spectre-security` (source, local at `~/dev/github/spectre-security`)
 - **Baseline orchestrator:** `security/baseline-runner.sh` phases: (1) OPA validate + `test-opa-policies.sh`, (2) hardening (`run-security-hardening.sh`), (3) Trivy FS, (4) Wazuh status, (5) AIDE, (6) Gitleaks, (7) optional Trivy image (`IMAGE_NAME`), (8) SBOM (`generate-sbom.sh`), (9) drift (`drift-detection.sh`), (10) alerting (`alerting.sh`). Logs/evidence under `security/logs/`.
 - **OPA:** `security/opa/policies/*` includes `*_test.rego` and policies like `docker-security.rego` (`package docker.security`), `security-compliance.rego` (`package security.compliance`), `backup-policy.rego`, `network-security.rego`, `kubernetes-admission.rego`; plus `versions/*` with `metadata.json`/`index.json`; `evaluate-policies.sh` builds live infra input and evaluates. `test-opa-policies.sh` uses different data contracts/queries (e.g. `data.backup.policy.deny`, `data.docker.security.deny`, `current-infrastructure.json`).
 - **Baseline metrics/exporters:** `security-baseline-exporter.sh`, fast/http variants, Python HTTP exporter, systemd service/timer units, Grafana dashboard, workflow `security-baseline.yml`. Metrics use `security_baseline_*` prefix (OPA pass/fail/total, phase durations, Trivy/Gitleaks/AIDE/Wazuh/SBOM/drift/image statuses).
 - **Other assets:** Trivy/ZAP/Sonar compose/artifacts, trivy reports, remediation/update-baseline scripts, top-level overlaps (`run-security-hardening.sh`, `setup-backup-cron.sh`, `archive-project.sh`, etc.).
 
 ### Host/install overlap (fedora, 2026-11-07)
-- `/usr/local/bin` contains legacy `~//scripts`-referencing wrappers/installers matching `spectre-security` filenames but **hashes differ** from current repo copies; **no active scheduler refs found** in checked cron/systemd/user-unit locations. Treat as **cross-repo/host coordination** (do not delete blindly). `setup-backup-cron.sh` in `/usr/local/bin` would regress clean `spectre run` crontab if executed.
+- `/usr/local/bin` contains legacy `~/scripts`-referencing wrappers/installers matching `spectre-security` filenames but **hashes differ** from current repo copies; **no active scheduler refs found** in checked cron/systemd/user-unit locations. Treat as **cross-repo/host coordination** (do not delete blindly). `setup-backup-cron.sh` in `/usr/local/bin` would regress clean `spectre run` crontab if executed.
 
 ## 3. Recommended direction (pragmatic, 2026-11-07)
 - **Clarify data sources (distinct signals):** treat **Spectre agent runtime** findings/availability and **spectre-security baseline pipeline** (OPA test/drift/SBOM/scan phase/evidence) as separate signals. Name/label metrics so `agent down`, `no scan recorded/never run`, `unknown` (cannot determine), `stale` (evidence older than policy), `drift detected`, and `clean scan` are never conflated.

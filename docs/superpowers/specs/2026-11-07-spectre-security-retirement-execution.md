@@ -16,7 +16,7 @@
 ## Step 2 — Remove hard runtime dependency on the repo path — **repo prep done (graceful/explicit); asset promotion decision-dependent**
 - **Decisions (confirmed 2026-11-07):**
   - **Approach:** **Keep explicit/optional with graceful fallback** — compat/isolated tools use `SPECTRE_SECURITY_ROOT` with clear errors/degradation when absent; **do not fail hard** in compat modes.
-- **Finding:** `SPECTRE_SECURITY_ROOT` defaults to `~//dev/github/spectre-security` in compat/isolated tools (adapter report fallbacks, baseline runner/drift/exporter compat, k8s/versions reports). This is an **optional/compat dependency** by design.
+- **Finding:** `SPECTRE_SECURITY_ROOT` defaults to `~/dev/github/spectre-security` in compat/isolated tools (adapter report fallbacks, baseline runner/drift/exporter compat, k8s/versions reports). This is an **optional/compat dependency** by design.
 - **Executed (additive):** improved graceful/explicit behavior and docs — `versions-index-report`/`kubernetes-admission-report` report explicit missing-root/path errors and remain isolated; dependency documented here and in governance/ops docs. Tests skip when spectre-security assets absent.
 - **Not done (requires decision):** copying/promoting spectre-security OPA policies/versions/test-data into suite as canonical assets (governance decision under path C) if full removal is needed. Current approach keeps dependency explicit/versioned for compat-only paths.
 
@@ -44,12 +44,12 @@
   - `setup-resource-monitoring.sh` `616c18f7...22fe`
   - `setup-secrets-management.sh` `b5ee1663...5ef0`
   - `setup-security-scanning.sh` `5129ee4c...8147`
-- **Verification:** spot-check removed; `rg -l ~//scripts /usr/local/bin` → **no refs remain**. Archive contains 14 files total (all non-executable). Note: archiving prevents execution from `/usr/local/bin` but does not undo any prior system changes made by these scripts.
+- **Verification:** spot-check removed; `rg -l ~/scripts /usr/local/bin` → **no refs remain**. Archive contains 14 files total (all non-executable). Note: archiving prevents execution from `/usr/local/bin` but does not undo any prior system changes made by these scripts.
 
 ## Step 5 — Archive spectre-security read-only (coordinated) — **COMPLETE (evidenced)**
 - **5b (GitHub `bigwalkdoe/spectre-security`):** **Complete (2026-11-08).** Archived via `gh repo archive bigwalkdoe/spectre-security -y` (explicit override of the prior “Not now” decision). Verified: `gh repo view bigwalkdoe/spectre-security --json isArchived` → `true` (public, default branch `main`, last push `2026-11-03T13:56:07Z`).
 - **5c (retirement marker):** README notice added and committed **locally** in spectre-security (`06f5a86`), **not pushed** (confirmed). Local clone removal means that unpushed commit and untracked `AGENTS.md` are **lost**.
-- **5a (local clone `~//dev/github/spectre-security`):** **Complete (evidenced 2026-11-07).** Initial `rm -rf` left 88 root-owned items (permission denied); `sudo rm -rf ~//dev/github/spectre-security` completed removal — path no longer exists. Unpushed local README marker commit (`06f5a86`) and untracked `AGENTS.md` lost with clone removal.
+- **5a (local clone `~/dev/github/spectre-security`):** **Complete (evidenced 2026-11-07).** Initial `rm -rf` left 88 root-owned items (permission denied); `sudo rm -rf ~/dev/github/spectre-security` completed removal — path no longer exists. Unpushed local README marker commit (`06f5a86`) and untracked `AGENTS.md` lost with clone removal.
 - **Impact:** suite compat/isolated tools degrade gracefully when `SPECTRE_SECURITY_ROOT` is missing (step 2 decision). Default path absent; expected. GitHub repo is archived/read-only.
 
 **GitHub repo archived (5b complete).**

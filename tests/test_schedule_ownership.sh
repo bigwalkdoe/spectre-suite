@@ -2,7 +2,7 @@
 # Scheduled-job ownership tests
 #
 # The repository was fixed while a stale fork of these same scripts kept running
-# on schedule from ~//scripts. Every job reported success: the backups
+# on schedule from $HOME/scripts. Every job reported success: the backups
 # wrote 81 empty archives, replication claimed to have run when it had not, and
 # vacuuming had never executed at all. No repository-level check could see it,
 # because the repository was not what was running.
@@ -97,14 +97,17 @@ outside=$(printf '%s\n' "$scheduled" \
 #   1. A copy of a script this repository provides, living somewhere else. That
 #      is the drift that let a fork keep running: backup-all.sh wrote hollow
 #      archives over the real database nightly and docker-cleanup.sh ran unscoped
-#      host-wide volume prunes, both from ~//scripts.
+#      host-wide volume prunes, both from $HOME/scripts.
 #   2. Another project's tool entirely -- this host also runs arcaden-labs'
 #      docker-gc and a KDE helper. Those are not ours to relocate, and failing the
 #      build over them would train everyone to ignore the check.
 #
 # So: fail on the fork root, and on any basename this repo also provides.
 # Everything else is reported and allowed.
-FORK_ROOTS="~//scripts/"
+# The fork root is $HOME/scripts on the affected machine; resolve it from the
+# running user's HOME so the check still catches the fork there without
+# pinning the test to one machine or leaking a home path into a public repo.
+FORK_ROOTS="$HOME/scripts/"
 repo_scripts=$(cd "$PROJECT_ROOT" && find scripts prometheus spectre/actions spectre/monitoring/exporters -name '*.sh' -printf '%f\n' 2>/dev/null | sort -u)
 
 offenders=""

@@ -9,7 +9,9 @@ set -euo pipefail
 export HOME="${HOME:-/root}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SPECTRE_SECURITY_ROOT="${SPECTRE_SECURITY_ROOT:-~//dev/github/spectre-security}"
+# Optional compat fallback for the retired spectre-security repo. Leave unset
+# on machines that never had it; an empty value is handled safely.
+SPECTRE_SECURITY_ROOT="${SPECTRE_SECURITY_ROOT:-}"
 STATE_DIR="${SECURITY_BASELINE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/spectre/security-baseline}"
 mkdir -p "$STATE_DIR"
 

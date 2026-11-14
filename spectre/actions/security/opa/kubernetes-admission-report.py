@@ -29,7 +29,10 @@ VENDORED_VERSIONS = VENDORED_POLICY_DIR / "versions"
 
 
 def _security_root() -> Path:
-    return Path(os.environ.get("SPECTRE_SECURITY_ROOT", "~//dev/github/spectre-security"))
+    # Optional compat fallback for the retired spectre-security repo. Unset on
+    # machines that never had it; the vendored policy under spectre/policies/k8s
+    # is the primary path and is checked first by the callers.
+    return Path(os.environ.get("SPECTRE_SECURITY_ROOT", ""))
 
 
 def find_policy(explicit: str) -> Path:

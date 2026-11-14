@@ -1,7 +1,7 @@
 #!/bin/bash
 # Reclaim unused Docker resources and stale backups.
 #
-# Ported from ~//scripts/maintenance/cleanup-unused-resources.sh. The
+# Ported from ~/scripts/maintenance/cleanup-unused-resources.sh. The
 # behaviour is the same but the blast radius is smaller, because the original ran
 # unscoped `docker container prune -f`, `docker image prune -af` and
 # `docker volume prune -f` with no project or label filter on a host running

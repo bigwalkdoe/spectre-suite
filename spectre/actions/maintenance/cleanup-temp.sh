@@ -2,7 +2,7 @@
 # Temporary directory cleanup
 #
 # Removes files older than TEMP_MAX_AGE_DAYS from the configured temporary
-# directories. Ported from ~//scripts/cleanup-temp.sh, which had no
+# directories. Ported from ~/scripts/cleanup-temp.sh, which had no
 # `set -euo pipefail`, logged to a hardcoded path outside this repository, and had
 # no dry run -- so the only way to see what it would delete was to let it delete.
 set -euo pipefail

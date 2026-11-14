@@ -5,8 +5,10 @@ After=network.target
 [Service]
 Type=oneshot
 # Adjust WorkingDirectory and python path for your checkout/install.
-WorkingDirectory=~//dev/github/spectre-suite
-Environment=SPECTRE_REPO_ROOT=~//dev/github/spectre-suite
+# SPECTRE_REPO_ROOT is optional: the exporter resolves the repo from its own
+# location when it is unset, so this unit works from any checkout.
+WorkingDirectory=/path/to/your/spectre-suite-checkout
+Environment=SPECTRE_REPO_ROOT=/path/to/your/spectre-suite-checkout
 ExecStart=/usr/bin/python3 -m spectre.cli.main run prometheus/security-baseline-metrics-exporter
 
 [Install]

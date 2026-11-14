@@ -1,6 +1,7 @@
 #!/bin/bash
 # Adopted restic engine library for spectre-suite.
-# Source of behavior: ~//dev/github/spectre-backup/lib/spectre-backup-common.sh
+# Source of behavior: the retired spectre-backup repo's lib/spectre-backup-common.sh
+# (path varies per machine; the suite engine in this file is the canonical copy).
 # Suite adaptations: config/state under spectre-suite/backups, tag-scoped args, markers,
 # build_targets/build_artifact_targets with dedup and repository-path refusal.
 

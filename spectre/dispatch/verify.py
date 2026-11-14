@@ -227,7 +227,7 @@ class Finding:
     """One inconsistency, as a code plus a detail naming the job and the path.
 
     The detail is the whole value of the finding. `missing` alone is a category;
-    "no action at ~//.../scripts/t/beta.sh" is the fact an operator can act
+    "no action at $HOME/.../scripts/t/beta.sh" is the fact an operator can act
     on without re-running anything.
     """
 

@@ -23,7 +23,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/../../.." && pwd)"}"
 
-CONFIG_FILE="${BACKUP_CONFIG:-~//.secrets/backup-config.env}"
+# No hardcoded home path: this is a public repo and the default would pin the
+# config to one user's machine. Set BACKUP_CONFIG explicitly per host.
+CONFIG_FILE="${BACKUP_CONFIG:-$HOME/.secrets/backup-config.env}"
 LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/../logs}"
 DRY_RUN=0
 TARGETS=""
@@ -37,7 +39,7 @@ Usage: replicate-backups.sh [--dry-run] [target...]
 Targets: remote, s3, b2. With no target, every configured one is attempted.
 
 Configuration is read from $BACKUP_CONFIG (default
-~//.secrets/backup-config.env). Nothing is interpolated into a command
+$HOME/.secrets/backup-config.env). Nothing is interpolated into a command
 line from an unset variable, and a target whose configuration is incomplete is
 reported as NOT CONFIGURED and skipped -- never as completed.
 
@@ -169,7 +171,7 @@ for target in $TARGETS; do
                 report remote skip "REMOTE_HOST/REMOTE_USER/REMOTE_PATH not set in $CONFIG_FILE"
                 continue
             fi
-            if [ ! -f "${REMOTE_KEY:-~//.ssh/backup_rsync}" ] && [ ! -f "${HOME}/.ssh/backup_rsync" ]; then
+            if [ ! -f "${REMOTE_KEY:-$HOME/.ssh/backup_rsync}" ] && [ ! -f "${HOME}/.ssh/backup_rsync" ]; then
                 report remote skip "no ssh identity at ${REMOTE_KEY:-$HOME/.ssh/backup_rsync}"
                 continue
             fi

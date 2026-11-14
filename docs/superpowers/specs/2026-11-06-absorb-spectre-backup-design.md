@@ -91,7 +91,7 @@ a copy inside the repository.
 - `~/archives` is a symlink to `~/archive`. Restic archives the symlink itself,
   not its target, so the 13G under `~/archive/backups` and the 192M under
   `~/archive/old-projects` are not in the snapshot. The snapshot's only matching
-  entry is `~//archives` as a link. Absorbing the home scope must list
+  entry is `~/archives` as a link. Absorbing the home scope must list
   real paths, not the symlink.
 - `/usr/local/bin/backup-all.sh` is a transitional forwarder to `spectre run
   backups/backup-all`. No system `backup.timer`/`backup.service` is installed.
@@ -122,7 +122,7 @@ a copy inside the repository.
 - Changing the offsite provider or the Drive quota.
 - Re-keying the restic repository.
 - Fixing unrelated defects (`backup-projects.sh` referencing the retired
-  `~//scripts` fork, the `backup-configurations.sh` Guardrail-only
+  `~/scripts` fork, the `backup-configurations.sh` Guardrail-only
   project tar) as part of this change.
 - Providing a server-role installer for other machines. Parity for this change
   is the workstation role on this host; the server role is explicitly outside
@@ -253,11 +253,11 @@ removed only after the cutover.
 file must contain:
 
 ```
-~//.config/spectre-backup          # old install; contains the old key
-~//.secrets/spectre-restic-password # the repository key; never inside
-~//.secrets/restic-repo-password    # unused key that cannot open the repo
-~//archive/backups                  # home-backup output; redundant
-~//archives                         # symlink to ~/archive; see below
+**/.config/spectre-backup          # old install; contains the old key
+**/.secrets/spectre-restic-password # the repository key; never inside
+**/.secrets/restic-repo-password    # unused key that cannot open the repo
+**/archive/backups                  # home-backup output; redundant
+**/archives                         # symlink to ~/archive; see below
 ```
 
 The environment file `~/.secrets/spectre-suite-backups.env` is intentionally
@@ -332,15 +332,15 @@ must never be a backup target.
 `include.conf` additions for the absorbed home-backup scope:
 
 ```
-~//dev
-~//docs
-~//.secrets
-~//archive/old-projects
-~//archive/installers
-~//archive/README.md
+~/dev
+~/docs
+~/.secrets
+~/archive/old-projects
+~/archive/installers
+~/archive/README.md
 ```
 
-`~//code` and `~//documents` are symlinks to `~/dev` and
+`~/code` and `~/documents` are symlinks to `~/dev` and
 `~/docs`; they are not listed, so each byte is stored once under its real path.
 The existing `~/archives` symlink entry is removed and replaced by the real paths
 above. The non-existent `~/resources`, `~/downloads`, and `~/Screenshots`
@@ -361,7 +361,7 @@ Offsite targets:
 2. `/backups/databases` and the pre-backup dump directory (which contains the
    host `pg_dumpall` and the container configs). These are small and
    irreplaceable; the current offsite scope omits the host dump entirely.
-3. `~//docs` (83M of source, irreplaceable). This replaces the `~/docs`
+3. `~/docs` (83M of source, irreplaceable). This replaces the `~/docs`
    coverage that only home-backup had.
 4. Deliberately not the Docker volumes, configurations, projects, working trees,
    or `~/.secrets`. The Drive quota governs this list, and credentials beyond
