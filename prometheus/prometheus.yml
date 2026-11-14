@@ -33,10 +33,12 @@ scrape_configs:
     scrape_interval: 15s
 
   # cAdvisor - Container metrics
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-    scrape_interval: 15s
+  # Disabled: cadvisor container is stopped (was consuming ~116% CPU).
+  # Re-enable by uncommenting and restarting cadvisor together with prometheus.
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #   scrape_interval: 15s
 
   # Redis Exporter
   - job_name: 'redis'
