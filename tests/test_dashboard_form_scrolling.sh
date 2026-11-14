@@ -22,6 +22,7 @@ function hasProp(selector, prop) {
     return rules.some((r) => r.selectors.includes(selector) && re.test(r.decls));
 }
 const controls = ['.refresh-interval-select', '.report-type-select', '.report-range-select', '.container-filter-input'];
+const scrollers = ['#containersGrid.containers-grid', '.report-table-wrap'];
 let bad = 0;
 for (const sel of controls) {
     for (const prop of ['overscroll-behavior', '-webkit-overflow-scrolling']) {
@@ -31,9 +32,15 @@ for (const sel of controls) {
         }
     }
 }
+for (const sel of scrollers) {
+    if (!hasProp(sel, 'overscroll-behavior')) {
+        console.error(`missing overscroll-behavior on scroll container ${sel}`);
+        bad++;
+    }
+}
 process.exit(bad === 0 ? 0 : 1);
 NODE
-if [ $? -eq 0 ]; then pass "all form controls set overscroll-behavior and -webkit-overflow-scrolling"; else fail "form controls missing touch-scroll containment"; fi
+if [ $? -eq 0 ]; then pass "form controls and inner scroll regions contain their own gestures"; else fail "form controls or scroll regions chain scrolling to the page"; fi
 
 echo "Test 2: buttons use touch-action: manipulation"
 node - "$CSS_FILE" <<'NODE'

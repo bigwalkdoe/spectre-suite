@@ -293,7 +293,7 @@ main.content { display: grid; gap: 12px; }
 }
 
 /* Container grouping (presentational; data/status semantics unchanged) */
-#containersGrid.containers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; align-items: start; max-height: 340px; overflow: auto; padding-right: 2px; }
+#containersGrid.containers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; align-items: start; max-height: 340px; overflow: auto; overscroll-behavior: contain; padding-right: 2px; }
 .dashboard-page--focused #containersGrid.containers-grid { max-height: min(70vh, 720px); grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .container-group { border: 1px solid var(--line-soft); border-radius: 8px; background: color-mix(in srgb, var(--surface-2) 55%, var(--card-bg)); overflow: hidden; height: 100%; }
 .container-group-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); }
@@ -305,8 +305,9 @@ main.content { display: grid; gap: 12px; }
 .container-filter-input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; padding: 0; outline: none; }
 .container-filter-input::placeholder { color: var(--subtle); }
 
-/* Touch devices: keep a scroll gesture inside the focused control (dropdown
-   option list / search input) instead of scrolling the whole page. */
+/* Touch devices: declare containment on the form controls, and (the part the
+   browser can act on) keep scroll chaining inside the real inner scroll
+   regions below. Native <select> popups are OS UI, not CSS scroll boxes. */
 .refresh-interval-select,
 .report-type-select,
 .report-range-select,
@@ -340,7 +341,7 @@ button {
 .report-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .report-controls .btn { font-size: 12px; padding: 4px 10px; }
 .report-chart { height: 260px; position: relative; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); }
-.report-table-wrap { overflow: auto; max-height: 320px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); margin-bottom: 10px; }
+.report-table-wrap { overflow: auto; overscroll-behavior: contain; max-height: 320px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); margin-bottom: 10px; }
 .report-table { width: 100%; border-collapse: collapse; font: 13px/1.4 var(--sans); }
 .report-table th { text-align: left; font: 600 12px/1 var(--sans); color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); white-space: nowrap; }
 .report-table td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
