@@ -1387,7 +1387,10 @@ async function checkPrometheusConnection() {
 // Initialize Chart
 function initializeChart() {
     const canvas = document.getElementById('resourceChart');
-    if (!canvas || typeof canvas.getContext !== 'function' || typeof Chart === 'undefined') return;
+    if (!canvas || typeof canvas.getContext !== 'function' || typeof Chart === 'undefined') {
+        setCardError('chartCard', 'Chart library unavailable');
+        return;
+    }
     const ctx = canvas.getContext('2d');
     const theme = getChartTheme();
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1511,6 +1514,10 @@ function initializeChart() {
 }
 
 async function updateChart(range) {
+    if (!chart) {
+        setCardError('chartCard', 'Chart unavailable');
+        return;
+    }
     const secondsMap = { '1h': 3600, '6h': 21600, '24h': 86400, '7d': 604800 };
     const seconds = secondsMap[range] || 3600;
     // Cap chart resolution to roughly 400 points per series. The previous 60s
@@ -1670,9 +1677,16 @@ function exportChartCSV() {
     const labels = chart.data.labels;
     const datasets = chart.data.datasets;
 
+    // RFC 4180: quote any field containing a comma, quote, or newline so
+    // labels such as "Network I/O (RX+TX, 5m rate)" stay in one column.
+    const csvCell = (value) => {
+        const text = String(value ?? '');
+        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+
     // Build CSV header
     const headers = ['Timestamp', ...datasets.map(d => d.label || 'Series')];
-    const rows = [headers.join(',')];
+    const rows = [headers.map(csvCell).join(',')];
 
     // Build data rows
     for (let i = 0; i < labels.length; i++) {
@@ -1681,7 +1695,7 @@ function exportChartCSV() {
             const value = datasets[j].data[i];
             row.push(value !== undefined && value !== null ? value.toFixed(2) : '');
         }
-        rows.push(row.join(','));
+        rows.push(row.map(csvCell).join(','));
     }
 
     const csv = rows.join('\n');

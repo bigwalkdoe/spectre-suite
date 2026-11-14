@@ -130,6 +130,7 @@ function classList() {
 
 const clicks = [];
 const charts = [];
+let capturedBlob = null;
 class ChartStub {
     constructor(ctx, config) {
         this.ctx = ctx;
@@ -152,7 +153,7 @@ const sandbox = {
     CSS: { escape: (s) => s },
     fetch: () => Promise.reject(new Error('offline')),
     AbortController, URLSearchParams, Blob,
-    URL: { createObjectURL: () => 'blob:stub', revokeObjectURL: () => {} },
+    URL: { createObjectURL: (blob) => { capturedBlob = blob; return 'blob:stub'; }, revokeObjectURL: () => {} },
     Chart: ChartStub,
     document: {
         hidden: false,
@@ -180,25 +181,162 @@ sandbox.window.addEventListener = () => {};
 const src = fs.readFileSync(process.argv[2], 'utf8');
 vm.runInContext(src, vm.createContext(sandbox), { filename: 'dashboard.js' });
 
-sandbox.initializeChart();
-if (charts.length !== 1) {
-    console.error(`expected one chart, got ${charts.length}`);
-    process.exit(1);
+function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (quoted) {
+            if (c === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else quoted = false;
+            } else field += c;
+        } else if (c === '"') {
+            quoted = true;
+        } else if (c === ',') {
+            row.push(field); field = '';
+        } else if (c === '\n') {
+            row.push(field); rows.push(row); row = []; field = '';
+        } else if (c !== '\r') {
+            field += c;
+        }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows;
 }
-const chart = charts[0];
-chart.data.labels = ['10:00', '10:01'];
-chart.data.datasets[0].data = [41.5, 42.25];
 
-sandbox.exportChartCSV();
-if (clicks.length !== 1) {
-    console.error('exportChartCSV() did not download a CSV file');
-    process.exit(1);
-}
-if (!String(clicks[0].download).endsWith('.csv')) {
-    console.error(`unexpected download name: ${clicks[0].download}`);
-    process.exit(1);
-}
+(async () => {
+    sandbox.initializeChart();
+    if (charts.length !== 1) {
+        console.error(`expected one chart, got ${charts.length}`);
+        process.exit(1);
+    }
+    const chart = charts[0];
+    chart.data.labels = ['Nov 14, 10:00 AM', 'Nov 14, 10:01 AM'];
+    chart.data.datasets[0].data = [41.5, 42.25];
+
+    sandbox.exportChartCSV();
+    if (clicks.length !== 1) {
+        console.error('exportChartCSV() did not download a CSV file');
+        process.exit(1);
+    }
+    if (!String(clicks[0].download).endsWith('.csv')) {
+        console.error(`unexpected download name: ${clicks[0].download}`);
+        process.exit(1);
+    }
+    if (!capturedBlob) {
+        console.error('exportChartCSV() did not produce a Blob');
+        process.exit(1);
+    }
+
+    const rows = parseCsv(await capturedBlob.text());
+    const expectedColumns = 1 + chart.data.datasets.length;
+    if (rows[0].length !== expectedColumns) {
+        console.error(`header has ${rows[0].length} fields, expected ${expectedColumns}: ${rows[0].join(' | ')}`);
+        process.exit(1);
+    }
+    if (rows[0][expectedColumns - 1] !== 'Network I/O (RX+TX, 5m rate)') {
+        console.error(`comma-bearing label was split: ${rows[0].join(' | ')}`);
+        process.exit(1);
+    }
+    rows.forEach((row, i) => {
+        if (row.length !== expectedColumns) {
+            console.error(`row ${i} has ${row.length} fields, expected ${expectedColumns}: ${row.join(' | ')}`);
+            process.exit(1);
+        }
+    });
+    if (rows[1][0] !== 'Nov 14, 10:00 AM') {
+        console.error(`comma-bearing timestamp was split: ${rows[1][0]}`);
+        process.exit(1);
+    }
+})();
 NODE
-if [ $? -eq 0 ]; then pass "exportChartCSV downloads the chart data"; else fail "exportChartCSV cannot see the initialized chart"; fi
+if [ $? -eq 0 ]; then pass "exportChartCSV downloads well-formed CSV"; else fail "exportChartCSV writes a malformed CSV"; fi
+
+echo "Test 3: missing chart library reports a chart error and skips queries"
+node - "$JS_FILE" <<'NODE'
+const fs = require('fs');
+const vm = require('vm');
+
+function classList() {
+    const set = new Set();
+    return {
+        add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c),
+        toggle: (c, force) => { if (force === undefined) { if (set.has(c)) { set.delete(c); return false; } set.add(c); return true; } if (force) set.add(c); else set.delete(c); return force; },
+    };
+}
+
+const appended = [];
+const chartCard = {
+    classList: classList(),
+    setAttribute() {},
+    querySelector: () => null,
+    appendChild: (el) => { appended.push(el); },
+};
+let fetches = 0;
+
+const sandbox = {
+    console: { log() {}, info() {}, warn() {}, error() {} },
+    setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
+    requestAnimationFrame: () => 0,
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    location: { search: '', host: '', hostname: 'localhost', protocol: 'http:', hash: '' },
+    navigator: { clipboard: { writeText: () => Promise.resolve() } },
+    CSS: { escape: (s) => s },
+    fetch: () => { fetches++; return Promise.reject(new Error('offline')); },
+    AbortController, URLSearchParams, Blob,
+    URL: { createObjectURL: () => 'blob:stub', revokeObjectURL: () => {} },
+    document: {
+        hidden: false,
+        documentElement: { classList: classList() },
+        body: { dataset: {}, classList: classList(), appendChild() {} },
+        addEventListener() {}, removeEventListener() {},
+        getElementById: (id) => {
+            if (id === 'resourceChart') return { getContext: () => ({}) };
+            if (id === 'chartCard') return chartCard;
+            return null;
+        },
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        createElement: () => ({
+            className: '', innerHTML: '', style: {}, dataset: {},
+            setAttribute() {}, removeAttribute() {}, appendChild() {},
+            querySelector: () => null, click() {}, remove() {},
+        }),
+    },
+};
+sandbox.window = sandbox;
+sandbox.globalThis = sandbox;
+sandbox.window.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
+sandbox.window.addEventListener = () => {};
+
+const src = fs.readFileSync(process.argv[2], 'utf8');
+vm.runInContext(src, vm.createContext(sandbox), { filename: 'dashboard.js' });
+
+(async () => {
+    // No global Chart: the vendored chart bundle failed to load.
+    sandbox.initializeChart();
+    if (appended.length !== 1) {
+        console.error('initializeChart() did not report a chart error');
+        process.exit(1);
+    }
+    const message = String(appended[0].innerHTML || '');
+    if (!/chart/i.test(message) || !/unavailable|library/i.test(message)) {
+        console.error(`unexpected chart error message: ${message}`);
+        process.exit(1);
+    }
+
+    const before = fetches;
+    await sandbox.updateChart('1h');
+    if (fetches !== before) {
+        console.error('updateChart() queried Prometheus even though no chart exists');
+        process.exit(1);
+    }
+})();
+NODE
+if [ $? -eq 0 ]; then pass "chart library failure degrades without queries or TypeErrors"; else fail "missing chart library causes queries or no error message"; fi
 
 echo "ALL DASHBOARD HARDENING TESTS PASSED"
