@@ -309,6 +309,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('themeToggle').addEventListener('click', toggleDarkMode);
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) exportBtn.addEventListener('click', exportSnapshot);
+    const exportCsvBtn = document.getElementById('chartExportCsv');
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportChartCSV);
     document.querySelectorAll('[data-dashboard-action]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const action = btn.dataset.dashboardAction;
@@ -1616,6 +1618,44 @@ async function exportSnapshot() {
         URL.revokeObjectURL(url);
         showToast('Snapshot downloaded (clipboard unavailable)', 'info');
     }
+}
+
+// Export chart data as CSV
+function exportChartCSV() {
+    const chart = window.chart;
+    if (!chart || !chart.data || !chart.data.labels || chart.data.labels.length === 0) {
+        showToast('No chart data to export', 'error');
+        return;
+    }
+
+    const labels = chart.data.labels;
+    const datasets = chart.data.datasets;
+
+    // Build CSV header
+    const headers = ['Timestamp'] + datasets.map(d => d.label || 'Series');
+    const rows = [headers.join(',')];
+
+    // Build data rows
+    for (let i = 0; i < labels.length; i++) {
+        const row = [labels[i]];
+        for (let j = 0; j < datasets.length; j++) {
+            const value = datasets[j].data[i];
+            row.push(value !== undefined && value !== null ? value.toFixed(2) : '');
+        }
+        rows.push(row.join(','));
+    }
+
+    const csv = rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `spectre-dashboard-chart-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Chart exported as CSV', 'success');
 }
 
 // Quick Actions (frontend hook with graceful fallback; real backend required for execution)
