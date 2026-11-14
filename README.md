@@ -59,6 +59,7 @@ Instead of calling legacy scripts directly, scheduled and manual jobs run throug
 
 | Area | What it covers |
 |---|---|
+| **Web dashboard** | Operator view at `http://localhost:8081` — Overview, System Health, Active Alerts, Containers, Resource Trends, Security, Backup, and a **Reports** page for historical trends over 24h/7d/30d/90d ranges with JSON/CSV export. Auto-refresh with countdown, keyboard shortcuts (`R`/`?`/`Esc`), chart CSV export, and dark/light themes. |
 | **Dispatch** | `spectre run <job>`, `spectre actions list/show/verify`; registry metadata (`sudo`, `mutates`, `timeout`, `schedule_hint`, `concurrency`) and run provenance. |
 | **Backups** | Database, Docker volume, config, and project backups; replication, encryption/verification helpers; missed-backup catch-up; adopted **restic** engine with tag-scoped retention and degraded-offsite behavior. |
 | **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter, business/security textfile exporters, restic marker metrics, dashboards/provisioning. |
@@ -246,7 +247,32 @@ SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
   spectre run setup-notification-channels -- --test
 ```
 
-`Watchdog` acts as a dead-man’s-switch alert. See `prometheus/alertmanager-secrets/README.md`.
+`Watchdog` acts as a dead-man's-switch alert. See `prometheus/alertmanager-secrets/README.md`.
+
+### Web dashboard
+
+The static operator view served at `http://localhost:8081` (bind-mounted read-only
+from `web-dashboard/`, served by nginx). It is the primary way to watch the
+monitoring stack without opening Grafana directly.
+
+| Page | Contents |
+|---|---|
+| Overview | Security overview card |
+| System Health | CPU / memory / disk / network, backup & restic status, security findings |
+| Active Alerts | Alertmanager alerts, filterable by severity |
+| Containers | Container inventory + filter |
+| Resource Trends | Chart.js trend of the four core resource series |
+| Security | Security scan summary |
+| Backup | Backup & restic health |
+| Reports | Historical trends over a chosen range (24h/7d/30d/90d): backup & restic health, security findings, alert history, or system health, with JSON/CSV export |
+
+**Features:** auto-refresh (15s/30s/1m/5m/Off) with a live countdown, keyboard
+shortcuts (`R` refresh, `?` help, `Esc` dismiss), chart data CSV export, and
+dark/light themes. Prometheus is read same-origin through the `/api/` proxy
+(nginx rewrites `/api/*` → `/prometheus/api/*`), so no CORS is needed; the
+dashboard degrades to an error state rather than blank cards when Prometheus is
+unreachable. Source: `web-dashboard/index.html`, `web-dashboard/dashboard.js`,
+`web-dashboard/reports.js`, `web-dashboard/nginx.conf`.
 
 ---
 
@@ -299,6 +325,7 @@ spectre-suite/
 │   └── cli/, agents/, ...       # Python package (CLI, services, API/TUI/daemon)
 ├── prometheus/                  # Monitoring config/rules/alertmanager assets
 ├── grafana-dashboards/          # Dashboards/provisioning assets
+├── web-dashboard/               # Static operator view (index.html, dashboard.js, reports.js, nginx.conf)
 ├── config/                      # Templates (including restic templates)
 ├── systemd/                     # Unit/timer helpers
 ├── docs/                        # Runbooks, migration notes, specs/plans
@@ -325,6 +352,8 @@ python3 -c "from spectre.dispatch.verify import verify, read_host_inventory; pri
 | Document | Purpose |
 |---|---|
 | [`docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md`](docs/superpowers/specs/2026-10-05-spectre-consolidation-design.md) | Consolidation design/spec |
+| [`docs/superpowers/specs/2026-11-06-web-dashboard-ux-design.md`](docs/superpowers/specs/2026-11-06-web-dashboard-ux-design.md) | Web dashboard UX design |
+| [`docs/superpowers/specs/2026-11-13-web-dashboard-reports-subsystem-design.md`](docs/superpowers/specs/2026-11-13-web-dashboard-reports-subsystem-design.md) | Reports page design |
 | [`docs/migration/2026-11-06-phase2-3-repointing-runbook.md`](docs/migration/2026-11-06-phase2-3-repointing-runbook.md) | Phase 2/3 repointing status |
 | [`docs/migration/2026-11-06-absorb-spectre-backup.md`](docs/migration/2026-11-06-absorb-spectre-backup.md) | Restic absorption/cutover runbook |
 | [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) | RTO/RPO and recovery procedures |
