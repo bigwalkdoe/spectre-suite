@@ -151,6 +151,46 @@ function setRefreshing(refreshing) {
     btn.disabled = refreshing;
     btn.setAttribute('aria-busy', refreshing ? 'true' : 'false');
     btn.classList.toggle('btn--loading', refreshing);
+    if (refreshing) {
+        stopRefreshCountdown();
+    } else {
+        startRefreshCountdown();
+    }
+}
+
+let countdownIntervalId = null;
+let countdownSeconds = 0;
+
+function startRefreshCountdown() {
+    stopRefreshCountdown();
+    if (!refreshIntervalMs || refreshIntervalMs <= 0) return;
+    countdownSeconds = Math.floor(refreshIntervalMs / 1000);
+    updateCountdown();
+    countdownIntervalId = setInterval(() => {
+        countdownSeconds--;
+        if (countdownSeconds <= 0) {
+            countdownSeconds = Math.floor(refreshIntervalMs / 1000);
+        }
+        updateCountdown();
+    }, 1000);
+}
+
+function stopRefreshCountdown() {
+    if (countdownIntervalId) {
+        clearInterval(countdownIntervalId);
+        countdownIntervalId = null;
+    }
+}
+
+function updateCountdown() {
+    const el = document.getElementById('refreshCountdown');
+    if (!el) return;
+    if (!refreshIntervalMs || refreshIntervalMs <= 0) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'inline';
+    el.textContent = `Next refresh in ${countdownSeconds}s`;
 }
 
 function loadRefreshInterval() {
@@ -172,6 +212,7 @@ function applyRefreshInterval() {
     if (refreshIntervalMs > 0 && !document.hidden) {
         refreshTimerId = setInterval(fetchAllMetrics, refreshIntervalMs);
     }
+    startRefreshCountdown();
     updateDiagnostics();
 }
 
