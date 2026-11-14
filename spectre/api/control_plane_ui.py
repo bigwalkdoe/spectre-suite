@@ -145,7 +145,7 @@ CONTROL_PLANE_HTML = r"""<!doctype html>
       </header>
 
       <main id="main">
-        <div class="banner" role="note"><strong>Observability only.</strong> This GitGuardian-inspired enterprise view surfaces health, dispatch state, monitoring reachability, backup markers, and run history. It does not execute actions. Use <span class="mono">python -m spectre.cli.main run &lt;job&gt;</span> from an authorized terminal session.</div>
+        <div class="banner" role="note"><strong>Observability only.</strong> This control-plane view surfaces health, dispatch state, monitoring reachability, backup markers, and run history. It does not execute actions. Use <span class="mono">python -m spectre.cli.main run &lt;job&gt;</span> from an authorized terminal session.</div>
 
         <section id="overview" class="kpis section-anchor" aria-label="Key indicators">
           <div class="panel kpi"><div class="kpi-label">Control Status</div><div id="kpiHealth" class="kpi-value muted">—</div><div id="kpiHealthSub" class="kpi-sub">Waiting for data</div></div>
