@@ -1,7 +1,7 @@
 # Absorb `spectre-security` into `spectre-suite` (suite-as-canonical) — Design Draft
 
 **Date:** 2026-11-07  
-**Status:** draft / in progress (user opted to “dive in”; implementation proceeds in additive, verifiable slices)  
+**Status:** **complete (all 5 phases delivered; operator decisions remain)**  
 **Goal:** Make `spectre-suite` the canonical home for security baseline/drift/SBOM/compliance/OPA capabilities currently owned by `spectre-security`, while preserving mature workflows, evidence quality, and CI gates.
 
 ## 1. Intent
@@ -78,3 +78,4 @@
 
 ## 9. Progress log
 - 2026-11-07: Created this draft. Added additive canonical baseline runner `spectre/actions/security/baseline/baseline-runner.sh` and registry entry `security/baseline/run` (foundation; phase helpers/OPA compatibility/metrics unification follow in subsequent slices). No changes made to `spectre-security` repo; no host installer deletions.
+- 2026-11-14: **All 5 phases delivered.** Phase 1 (path fix + tests + suite wiring), Phase 2 (14 baseline phase helpers all registered + executed end-to-end on host), Phase 3 (OPA Path C: shared core + adapters, k8s/versions isolated, 67/67 tests pass), Phase 4 (metrics/exporters reconciled: 16 `spectre_security_baseline_*` alerts, Grafana dashboard, exporter tests), Phase 5 (retirement: spectre-security archived, host legacy scripts archived, `actions verify` clean). **Remaining:** operator decisions on SonarQube/ZAP/hosted-services disposition and any further host repointing — no further destructive actions without explicit confirmation.

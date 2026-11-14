@@ -1,6 +1,7 @@
 # spectre-security Retirement — Systematic Execution Status
 
 **Date:** 2026-11-07 (executed stepwise; repo-only/additive where safe); **5b GitHub archival completed 2026-11-08** (explicit override).  
+**Status (2026-11-14):** **all repo-side phases complete** — absorption (Phases 1–5), retirement (Steps 1–5), OPA Path C groundwork, live-infra evidence inventory. `spectre actions verify` clean; OPA gates 67/67; baseline metrics tests pass; 16 baseline alert rules; Grafana dashboard reconciled. **Only operator/org decisions remain:** SonarQube/ZAP/hosted-services disposition, any further host repointing. No further destructive host or GitHub actions without explicit confirmation.  
 **Coordination:** cross-repo + host + org. Host/systemd repointing and destructive host mutations were not performed without confirmation; GitHub archival of `bigwalkdoe/spectre-security` was performed on 2026-11-08 by explicit request (see Step 5b).  
 **Canonical plan:** `2026-11-07-spectre-security-ops-dedupe-retirement-plan.md`
 
