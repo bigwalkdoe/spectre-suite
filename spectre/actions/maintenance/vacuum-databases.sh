@@ -4,7 +4,7 @@
 # Replaces a script that had never once run, for three independent reasons:
 #   1. It targeted guardrail-ai-postgres-1, a container from another project.
 #   2. It connected as role "postgres", which does not exist here (POSTGRES_USER
-#      is 'owner').
+#      is the owner user).
 #   3. It logged to /var/log/pg-vacuum.log, which is not writable by the cron
 #      user, so under `set -euo pipefail` it aborted on its very first echo --
 #      before resolving anything, and without leaving a log to say so.

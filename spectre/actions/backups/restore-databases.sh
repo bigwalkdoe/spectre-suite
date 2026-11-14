@@ -138,7 +138,7 @@ restore_postgres() {
         log "Using PostgreSQL container: $pg_container"
 
         # Read the role from the container rather than assuming "postgres", which
-        # does not exist in this stack (POSTGRES_USER is 'owner') and made every
+        # does not exist in this stack (POSTGRES_USER is the owner user) and made every
         # restore fail with 'role postgres does not exist'.
         local pg_user
         pg_user=$(docker exec "$pg_container" sh -c 'printf %s "${POSTGRES_USER:-postgres}"' 2>/dev/null || printf 'postgres')

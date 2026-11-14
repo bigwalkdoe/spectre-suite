@@ -6,7 +6,7 @@ set -euo pipefail
 
 CRITICAL_THRESHOLD=90
 WARNING_THRESHOLD=80
-# This unit runs as owner, which cannot write /var/log, so every single log line
+# This unit runs as the owner user, which cannot write /var/log, so every single log line
 # came back as "tee: /var/log/disk-space-check.log: Permission denied" and the
 # real output was buried in it. And the assignment was duplicated verbatim, which
 # is why the wrong value survived the first one being wrong.

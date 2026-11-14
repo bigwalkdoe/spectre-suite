@@ -7,14 +7,14 @@
 # system-level timers execute scripts from it. Those two cases are not
 # equivalent under SELinux, and the difference is invisible until a unit fails:
 #
-#   * ~/.config/systemd/user/*.service runs as owner in the unconfined_u domain,
+#   * ~/.config/systemd/user/*.service runs as the owner user in the unconfined_u domain,
 #     which is permitted to execute user_home_t. These have always worked.
 #
 #   * /etc/systemd/system/*.service is exec'd by PID 1 in system_u/init_t before
-#     the uid switch to owner. That domain is not permitted to execute
+#     the uid switch to the owner user. That domain is not permitted to execute
 #     user_home_t, so the unit fails at 203/EXEC with "Unable to locate
 #     executable ... Permission denied" -- even though the file is rwxr-xr-x,
-#     owned by owner, and every parent directory is traversable.
+#     owned by the owner user, and every parent directory is traversable.
 #
 # disk-space-check and security-scan both failed this way on every scheduled run.
 # disk-space-check had been failing since at least the previous day and

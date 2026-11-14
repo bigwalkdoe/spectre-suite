@@ -33,7 +33,7 @@ The spec implies inputs no task tests by default that are most likely to bite. E
 2. **Unscoped retention touches old snapshots** — `forget`/prune without `--tag spectre-suite` selects `fad2bfa8` (`spectre-backup,workstation`); expect only new tagged snapshots selected. (Task 3 unit test + Task 5 args.)
 3. **`~/archives` symlink hides `/archive` content** — listing the symlink stores a link, not `~/archive/old-projects`; expect real source paths and `~/archive/backups` excluded. (Task 2 config + Task 3 build_targets/fixture.)
 4. **Offsite failure fails the whole backup** — rclone/Drive error during the remote leg returns non-zero and skips local markers; expect local success markers written and remote marked degraded. (Task 4.)
-5. **`root:root 0600` artifacts unreadable** — `backup-configurations.sh` copies `sshd_config`/`fail2ban_jail_*` so only root can read them; restic runs as `owner` and must read what it snapshots. (Task 1.)
+5. **`root:root 0600` artifacts unreadable** — `backup-configurations.sh` copies `sshd_config`/`fail2ban_jail_*` so only root can read them; restic runs as the owner user and must read what it snapshots. (Task 1.)
 
 ## File Map
 

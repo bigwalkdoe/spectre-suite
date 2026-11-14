@@ -55,7 +55,7 @@ if ! container_exists "$POSTGRES_CONTAINER"; then
     note_failure "PostgreSQL container '$POSTGRES_CONTAINER' not found"
 else
     # Read the credentials this container was actually started with rather than
-    # assuming: POSTGRES_USER is 'owner' here, and a hardcoded -U postgres fails
+    # assuming: POSTGRES_USER is the owner user here, and a hardcoded -U postgres fails
     # with 'role postgres does not exist'.
     PG_USER=$(docker exec "$POSTGRES_CONTAINER" sh -c 'printf %s "${POSTGRES_USER:-postgres}"')
     PG_DB=$(docker exec "$POSTGRES_CONTAINER" sh -c 'printf %s "${POSTGRES_DB:-postgres}"')

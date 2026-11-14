@@ -19,7 +19,7 @@ if [ ! -f "$SERVERS_FILE" ]; then
     echo "# Example: production-server-1,admin,192.168.1.100,22" >> "$SERVERS_FILE"
     echo "" >> "$SERVERS_FILE"
     echo "# Add your servers below:" >> "$SERVERS_FILE"
-    echo "local,owner,localhost,22" >> "$SERVERS_FILE"
+    echo "local,$USER,localhost,22" >> "$SERVERS_FILE"
 fi
 
 # Function to execute command on remote server

@@ -107,7 +107,7 @@ Description=Performance Monitoring Service
 [Service]
 Type=oneshot
 ExecStart=$SCRIPT_DIR/check-performance.sh
-User=owner
+User=$USER
 EOF'
 
 sudo bash -c 'cat > /etc/systemd/system/performance-check.timer << "EOF"

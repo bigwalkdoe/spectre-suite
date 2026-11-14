@@ -63,7 +63,7 @@ installed.
 
 `/backups/configurations` contains artifacts copied with `sudo cp` and left
 `root:root 0600` (for example `sshd_config_*` and `fail2ban_jail_*`). A restic
-backup running as `owner` cannot read them, and restic treats unreadable files as
+backup running as the owner user cannot read them, and restic treats unreadable files as
 an incomplete backup. The adopted scope therefore requires a small fix in
 `backup-configurations.sh`: create copied artifacts owned by the invoking user
 (for example `sudo install -o "$USER" -g "$USER" -m 640`), or chown them after

@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Main Security Orchestration Script
 
-# This ran as owner from a system unit, so /var/log was unwritable and every
+# This ran as the owner user from a system unit, so /var/log was unwritable and every
 # write below failed silently under set -e only because they were part of a
 # command substitution chain. Moved to XDG_STATE_HOME to match
 # check-disk-space.sh, and still overridable for a root-run unit.
