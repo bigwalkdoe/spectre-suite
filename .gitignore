@@ -96,6 +96,9 @@ aide.db*
 # Generated reports
 reports/
 
+# Browser automation scratch (Playwright MCP page snapshots)
+.playwright-mcp/
+
 # Agent API key for prometheus/security-metrics-exporter.sh. The Spectre agent's
 # API is fail-closed, so the exporter reads the key from a file. It is a live
 # credential: never commit it.

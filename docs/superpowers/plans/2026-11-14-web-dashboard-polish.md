@@ -63,6 +63,21 @@ The Spectre web dashboard has three production-hardening gaps that need fixing:
 - Exact countdown format for the refresh timer.
 - Whether to add tooltips to all buttons.
 
-## Approval needed
+## Status
 
-Sign off on this short design (reply yes/no). If approved, I'll write the implementation plan and proceed.
+Approved and executed (2026-11-14). All three tasks shipped on `main`:
+form scrolling (`overscroll-behavior: contain`), stub/dead-code removal, and
+production hardening (DOM null checks, graceful Prometheus degradation, error
+boundaries per card). Two follow-up defects found during hardening were fixed
+in the same pass: `exportChartCSV` read `window.chart` (always undefined) and
+built its header with string+array concatenation, and `getChartTheme()`
+omitted tooltip colors so dark-mode tooltips fell back to Chart.js light
+defaults.
+
+## Deferred
+
+- `getChartTheme()` tooltip colors — now provided (`tooltipBg`/`tooltipText`/
+  `tooltipBorder`) with a regression test in `tests/test_dashboard_hardening.sh`.
+- `updateChart()` `if (!chart) return;` guard — already present; no change needed.
+- Reviewer subagent dispatches failed ("Model unavailable" / "Insufficient
+  balance"); self-review was performed against the diff instead.

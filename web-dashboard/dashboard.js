@@ -431,7 +431,12 @@ function getChartTheme() {
     return {
         gridColor: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(0,0,0,0.05)',
         tickColor: isDark ? '#94a3b8' : '#666',
-        legendColor: isDark ? '#e2e8f0' : '#333'
+        legendColor: isDark ? '#e2e8f0' : '#333',
+        // Tooltip colors must be set explicitly: without them Chart.js falls
+        // back to its light defaults, so dark-mode tooltips render unreadable.
+        tooltipBg: isDark ? '#1e293b' : '#ffffff',
+        tooltipText: isDark ? '#e2e8f0' : '#1e293b',
+        tooltipBorder: isDark ? '#475569' : '#cbd5e1',
     };
 }
 
