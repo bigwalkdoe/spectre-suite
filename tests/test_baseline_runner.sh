@@ -51,9 +51,16 @@ fi
 # Test 4: baseline-runner.sh starts and passes OPA check
 echo "Test 4: baseline-runner.sh starts and passes OPA check"
 LOG_DIR="$(mktemp -d)"
-SECURITY_TRIVY_TIMEOUT=1 bash "$PROJECT_ROOT/spectre/actions/security/baseline/baseline-runner.sh" >/tmp/runner-out.txt 2>&1 &
+SECURITY_TRIVY_TIMEOUT=1 SECURITY_BASELINE_LOG_DIR="$LOG_DIR" \
+  bash "$PROJECT_ROOT/spectre/actions/security/baseline/baseline-runner.sh" >/tmp/runner-out.txt 2>&1 &
 RUNNER_PID=$!
-sleep 2
+# Wait for the OPA gate to complete rather than sleeping a fixed time —
+# the sleep-then-kill race let the runner die before the line was written.
+for _ in $(seq 1 60); do
+  if grep -q "OPA check: OK" /tmp/runner-out.txt; then break; fi
+  if ! kill -0 "$RUNNER_PID" 2>/dev/null; then break; fi
+  sleep 0.25
+done
 kill "$RUNNER_PID" 2>/dev/null || true
 wait "$RUNNER_PID" 2>/dev/null || true
 if ! grep -q "OPA check: OK" /tmp/runner-out.txt; then
