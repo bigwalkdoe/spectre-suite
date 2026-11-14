@@ -45,7 +45,7 @@ These will break functionality, CI, or tests if `scripts/` or top-level `prometh
 | Migration/superpowers docs | `docs/migration/*.md`, `docs/superpowers/specs/*.md`, `docs/superpowers/plans/*` contain extensive legacy-path references as inventory/history/design context. | **Preserve historical accuracy.** Do not mass-edit. Add notes only if needed to avoid operator confusion. |
 | `spectre/dispatch/verify.py` | Docstring/example text includes `scripts/t/beta.sh`. | Harmless example; optional. |
 | `tests/test_config_consistency.sh` temp sandbox | Creates temp `scripts/` dir to exercise path logic; copies canonical checker. | Intentional test fixture, not legacy dependency. |
-| `tests/test_schedule_ownership.sh` | Checks `~//scripts/` absence and mentions `scripts/` consolidation — host/fork context differs from repo `scripts/` tree. | Review carefully; fork-root check is not the same as repo legacy forwarders. |
+| `tests/test_schedule_ownership.sh` | Checks `~/scripts/` absence and mentions `scripts/` consolidation — host/fork context differs from repo `scripts/` tree. | Review carefully; fork-root check is not the same as repo legacy forwarders. |
 
 ## Key findings / corrections to parent plan
 1. **Forwarder classification heuristic was misleading but substance confirmed:** repo `scripts/**/*.sh` are effectively Phase 1 forwarders/delegators (spot checks), not duplicate full implementations. C1.2 must still confirm per path before bulk removal.

@@ -2,7 +2,7 @@
 # Track cloud resource costs
 set -euo pipefail
 
-# Data output, not code: ~//scripts was the untracked fork this repo
+# Data output, not code: ~/scripts was the untracked fork this repo
 # superseded, and writing reports back into it was a coupling that kept the
 # fork alive. Same pattern as the other reporters (/var/log, /tmp).
 REPORT_DIR="${CLOUD_COST_REPORT_DIR:-/var/log/cloud-cost}"

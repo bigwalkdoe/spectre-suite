@@ -2,7 +2,7 @@
 # Downloads directory cleanup
 #
 # Removes files older than DOWNLOADS_MAX_AGE_DAYS from ~/Downloads. Ported from
-# ~//scripts/cleanup-downloads.sh, which had no `set -euo pipefail`, logged
+# ~/scripts/cleanup-downloads.sh, which had no `set -euo pipefail`, logged
 # to a hardcoded path outside this repository, and had no dry run.
 #
 # This is the only script here that deletes something a person may care about:

@@ -18,7 +18,10 @@ VENDORED_VERSIONS = SUITE_ROOT / "spectre" / "policies" / "k8s" / "versions"
 
 
 def _security_root() -> Path:
-    return Path(os.environ.get("SPECTRE_SECURITY_ROOT", "~//dev/github/spectre-security"))
+    # Optional compat fallback for the retired spectre-security repo. Unset on
+    # machines that never had it; the vendored versions index is the primary
+    # path and is checked first by _default_versions_root.
+    return Path(os.environ.get("SPECTRE_SECURITY_ROOT", ""))
 
 
 def _default_versions_root() -> Path:

@@ -199,7 +199,7 @@ sudo systemctl restart NetworkManager
 **Solution**:
 ```bash
 # Check network monitor log
-cat ~//.local/share/network-monitor.log
+cat ~/.local/share/network-monitor.log
 
 # Test network connectivity
 ping -c 3 8.8.8.8
@@ -372,7 +372,7 @@ sudo touch /var/log/test.log
 df -h /var
 
 # Verify log directory exists
-ls -la ~//.local/share/
+ls -la ~/.local/share/
 ```
 
 ### Timers Not Triggering
@@ -398,7 +398,7 @@ sudo systemctl restart timer_name
 
 If you continue to experience issues:
 
-1. Check the logs in /var/log/ and ~//.local/share/
+1. Check the logs in /var/log/ and ~/.local/share/
 2. Review the main README.md for configuration guidance
 3. Open an issue on GitHub with:
    - System information (OS, distribution, version)

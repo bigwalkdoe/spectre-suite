@@ -2,7 +2,7 @@
 # Cache directory cleanup
 #
 # Removes cache files older than CACHE_MAX_AGE_DAYS. Ported from
-# ~//scripts/cleanup-cache.sh, which had no `set -euo pipefail`, logged to
+# ~/scripts/cleanup-cache.sh, which had no `set -euo pipefail`, logged to
 # a hardcoded path outside this repository, and had no dry run.
 #
 # The age is deliberately long. A cache is cheap to rebuild, but a package

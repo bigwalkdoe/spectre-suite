@@ -37,7 +37,7 @@ Command pattern (recorded): walk `scripts/**/*.sh`; classify each as `forwarder`
 ### 3) Host/scheduler state (relevant safety context)
 - `spectre actions verify`: **0 findings** (no `legacy-path` / `unregistered`).
 - Crontab and observed systemd units invoke `/usr/local/bin/spectre run <job>` (not repo `scripts/` or top-level `prometheus/*.sh`).
-- `~//scripts` absent. **Remaining host risk is not scheduler legacy-path**, but any local/manual tooling, docs, CI, tests, or external references to `scripts/...` / `prometheus/*-exporter.sh` inside this repo.
+- `~/scripts` absent. **Remaining host risk is not scheduler legacy-path**, but any local/manual tooling, docs, CI, tests, or external references to `scripts/...` / `prometheus/*-exporter.sh` inside this repo.
 
 ## C1 execution plan (future, requires explicit confirmation before any deletion)
 

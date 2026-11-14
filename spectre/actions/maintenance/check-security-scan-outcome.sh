@@ -30,7 +30,7 @@ trap 'rm -f "$CAPTURE"' EXIT
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." 2>/dev/null && pwd)}"
   if [ ! -d "$ROOT/spectre/dispatch" ]; then
-    ROOT="~//dev/github/spectre-suite"
+    ROOT="$SCRIPT_DIR/../../.."
   fi
   (cd "$ROOT" && python3 -m spectre.cli.main actions verify) 2>&1 | tail -12 || true
 } > "$CAPTURE"

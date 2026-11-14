@@ -9,7 +9,10 @@ export HOME="${HOME:-/root}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUITE_ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../../../.." && pwd)}"
-SPECTRE_SECURITY_ROOT="${SPECTRE_SECURITY_ROOT:-~//dev/github/spectre-security}"
+# Optional compat fallback for the retired spectre-security repo. Leave unset
+# on machines that never had it; the suite's vendored policies are the default
+# and an empty value is handled safely (existence checks skip it).
+SPECTRE_SECURITY_ROOT="${SPECTRE_SECURITY_ROOT:-}"
 LOG_DIR="${SECURITY_BASELINE_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/spectre/security-baseline}"
 mkdir -p "$LOG_DIR"
 

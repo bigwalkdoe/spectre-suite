@@ -20,7 +20,9 @@ _REPO_ROOT="${SPECTRE_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 OUTPUT_DIR="${1:-$_REPO_ROOT/prometheus/business-metrics}"
 BACKUP_STATE_DIR="${BACKUP_STATE_DIR:-/backups/backup-state}"
 BACKUP_REPO_DIR="${BACKUP_REPO_DIR:-/backups/fedora-back-up/data}"
-RESTIC_MARKER_DIR="${RESTIC_MARKER_DIR:-${HOME:-~/}/.local/state/spectre-suite/backups}"
+# No hardcoded home path: this is a public repo and the fallback would pin the
+# marker dir to one user's machine. HOME is resolved by the shell already.
+RESTIC_MARKER_DIR="${RESTIC_MARKER_DIR:-$HOME/.local/state/spectre-suite/backups}"
 mkdir -p "$OUTPUT_DIR"
 
 # Prints exactly one number: the count of non-empty lines on stdin, or 0.

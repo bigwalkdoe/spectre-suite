@@ -4,7 +4,7 @@
 
 **Goal:** Make spectre-suite the single owner of workstation restic backups by adopting the proven spectre-backup engine, absorbing the home-backup scope, keeping the existing `/backups/spectre-backup` repo/password/Drive remote, and retiring the standalone installs only after a verified cutover.
 
-**Architecture:** Copy/adapt the proven shell engine from `~//dev/github/spectre-backup` into `scripts/backups/restic/` (library, git mirror, backup/prune/verify/restore). The new engine reads `~/.config/spectre-suite/backups/*` and `~/.secrets/spectre-suite-backups.env` / `~/.secrets/spectre-restic-password`, writes state markers under `~/.local/state/spectre-suite/backups/`, tags every snapshot `spectre-suite,workstation`, and scopes `forget` to that tag so it never touches the grandfathered `spectre-backup` snapshots. Local success is never blocked by an offsite failure. Monitoring reads markers, not `restic`.
+**Architecture:** Copy/adapt the proven shell engine from `<retired-repo>/spectre-backup` into `scripts/backups/restic/` (library, git mirror, backup/prune/verify/restore). The new engine reads `~/.config/spectre-suite/backups/*` and `~/.secrets/spectre-suite-backups.env` / `~/.secrets/spectre-restic-password`, writes state markers under `~/.local/state/spectre-suite/backups/`, tags every snapshot `spectre-suite,workstation`, and scopes `forget` to that tag so it never touches the grandfathered `spectre-backup` snapshots. Local success is never blocked by an offsite failure. Monitoring reads markers, not `restic`.
 
 **Tech Stack:** Bash + coreutils + jq, `restic`, `rclone`, `pg_dumpall`/Podman config copy, `systemd --user` timers, Prometheus textfile metrics + `promqltest`/alert rules, the suite's `tests/run_tests.sh` shell runner.
 
@@ -43,7 +43,7 @@ The spec implies inputs no task tests by default that are most likely to bite. E
 | `config/backups/restic/env.example` (create) | Canonical env template (deployed values preserved). |
 | `config/backups/restic/include.conf` (create) | Local home + archive-real-path scope. |
 | `config/backups/restic/exclude.conf` (create) | Key/excludes/symlink/archive-backups suppression. |
-| `config/backups/restic/include-remote.conf` (create) | Small offsite scope + `~//docs`. |
+| `config/backups/restic/include-remote.conf` (create) | Small offsite scope + `~/docs`. |
 | `config/backups/restic/include-artifacts.conf` (create) | Explicit `/backups` globs (no repo path). |
 | `scripts/backups/restic/common.sh` (create) | Adopted lib: distro/dirs/env, markers, `build_targets` (glob, skip, dedup, refuse repo path), restic arg helpers, degraded/offsite helpers. Source: `spectre-backup/lib/spectre-backup-common.sh` + engine helpers. |
 | `scripts/backups/restic/git-mirror.sh` (create) | Adopted mirror. Source: `spectre-backup/scripts/git-mirror.sh`. |
@@ -378,7 +378,7 @@ git commit -m "feat(backups): adopt tag-scoped prune, verify, and restore wrappe
 - Modify: `tests/run_tests.sh`
 
 **Interfaces:**
-- Consumes: markers under `${RESTIC_MARKER_DIR:-$HOME/.local/state/spectre-suite/backups}` (also accept the historical `~//...` form via a variable for tests).
+- Consumes: markers under `${RESTIC_MARKER_DIR:-$HOME/.local/state/spectre-suite/backups}` (also accept the historical `~/...` form via a variable for tests).
 - Produces: gauges with the exact names from spec §7.6:
 
 ```
@@ -568,4 +568,4 @@ git commit -m "docs(backups): record restic absorption cutover rehearsal evidenc
 
 **4. Review Focus:** (1) key in snapshot — Task 3 excludes, Task 9 `restic ls` asserts absence. (2) unscoped forget — Task 3 unit test + Task 5 wrapper test. (3) `~/archives` symlink — Task 2 real paths + Task 3 fixture. (4) offsite fails whole run — Task 4 degraded subtest. (5) unreadable config artifacts — Task 1. All five have owning tasks.
 
-**5. Proportion:** Plan states decisions, interfaces, exact values, and checks; the adopted engine bodies remain in `~//dev/github/spectre-backup` to copy/adapt, not transcribed here.
+**5. Proportion:** Plan states decisions, interfaces, exact values, and checks; the adopted engine bodies remain in `<retired-repo>/spectre-backup` to copy/adapt, not transcribed here.

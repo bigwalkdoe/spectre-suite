@@ -10,7 +10,7 @@ Two problems, in priority order:
 
 1. **Phantom state.** Work gets executed from a location that is no longer
    authoritative, or two tools disagree about system state. There have been real
-   incidents: a fork under `~//scripts` "ran nightly for the life of the
+   incidents: a fork under `~/scripts` "ran nightly for the life of the
    crontab, targeted containers from another project, and reported success over
    empty files."
 2. **Too many places to operate.** It is not knowable from memory whether a job
@@ -31,7 +31,7 @@ Three implementations of substantially the same jobs:
 |---|---|---|
 | `spectre-suite` | ~90 bash actions, systemd units, crontab, Prometheus/Grafana/OPA, Terraform/Ansible | **live** — owns all scheduling |
 | `spectre-agent` | ~5.8k LOC Python, 8 agents, 31 CLI commands, FastAPI, TUI, daemon, 317 tests | **live** |
-| `~//scripts` | 180 files, not a git repository | **dead fork** |
+| `~/scripts` | 180 files, not a git repository | **dead fork** |
 
 ### 2.1 The fork is a fork
 
@@ -91,9 +91,9 @@ not merely to tidy.
 
 ```
 fedora-optimize.timer          weekly, Persistent=true
-  └─> fedora-optimize.service   ConditionPathExists=~//scripts/fedora-optimize.sh
+  └─> fedora-optimize.service   ConditionPathExists=~/scripts/fedora-optimize.sh
         └─> /usr/local/sbin/fedora-optimize     (82-byte wrapper)
-              └─> exec ~//scripts/fedora-optimize.sh   (814 lines, untracked, root)
+              └─> exec ~/scripts/fedora-optimize.sh   (814 lines, untracked, root)
 ```
 
 Deleting or moving that file makes the unit **silently skip**. `ConditionPathExists`
@@ -405,7 +405,7 @@ becomes cleanup rather than the risky part.
 | 1 | Merge both repos into the `spectre/` tree on a branch; place forwarder shims at all ~90 old paths | nothing on the host has changed |
 | 2 | Install the CLI; `spectre actions verify` green | 24 schedulers producing run records |
 | 3 | Repoint schedulers one at a time — 14 crontab entries, 10 units — verifying each | `actions verify` shows zero legacy paths |
-| 4 | Remove shims; delete `~//scripts`; archive the agent repo read-only | no path outside the repo is referenced |
+| 4 | Remove shims; delete `~/scripts`; archive the agent repo read-only | no path outside the repo is referenced |
 | 5 | README truth pass; merged CI | docs match what `actions list` reports |
 
 Each phase is independently verifiable and reversible.

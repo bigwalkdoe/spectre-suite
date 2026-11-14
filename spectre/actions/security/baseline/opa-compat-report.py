@@ -57,7 +57,7 @@ def main() -> int:
             src = args.input or str(Path.home() / ".local/state/spectre/security-baseline/current-infrastructure.json")
             if not Path(src).exists():
                 # compat fallback (spectre-security repo is archived; SPECTRE_SECURITY_ROOT may be set explicitly)
-                sec_root = Path(os.environ.get("SPECTRE_SECURITY_ROOT", "~//dev/github/spectre-security"))
+                sec_root = Path(os.environ.get("SPECTRE_SECURITY_ROOT", ""))
                 cand = sec_root / "security/test-data/current-infrastructure.json"
                 if cand.exists():
                     src = str(cand)

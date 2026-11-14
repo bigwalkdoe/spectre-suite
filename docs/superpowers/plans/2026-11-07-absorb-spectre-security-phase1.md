@@ -38,7 +38,7 @@ These input classes/failure modes are implied by the spec but not all pinned by 
 
 **Interfaces:**
 - Consumes: none
-- Produces: `SUITE_ROOT` resolves to the repo root (`~//dev/github/spectre-suite`), so `POLICY_DIR` = `$SUITE_ROOT/spectre/policies` exists and `run-security-hardening.sh` resolves under `$SUITE_ROOT/spectre/actions/security/`.
+- Produces: `SUITE_ROOT` resolves to the repo root (`<repo-root>`), so `POLICY_DIR` = `$SUITE_ROOT/spectre/policies` exists and `run-security-hardening.sh` resolves under `$SUITE_ROOT/spectre/actions/security/`.
 
 - [x] **Step 1: Write the failing test**
 
@@ -145,14 +145,14 @@ fi
 echo "ALL BASELINE RUNNER TESTS PASSED"
 ```
 
-Expected: FAIL — `SUITE_ROOT` is wrong (`../../../../..` resolves to `~//dev/github` instead of `~//dev/github/spectre-suite`), so `POLICY_DIR` doesn't exist and `baseline-runner.sh` warns about missing directory but still exits 0 (it degrades gracefully). Actually — since baseline-runner.sh degrades gracefully (warns instead of failing), Test 1 might pass even with the bug. Test 3 (POLICY_DIR exists) is the one that definitively catches the path bug.
+Expected: FAIL — `SUITE_ROOT` is wrong (`../../../../..` resolves to `<parent-of-repo>` instead of `<repo-root>`), so `POLICY_DIR` doesn't exist and `baseline-runner.sh` warns about missing directory but still exits 0 (it degrades gracefully). Actually — since baseline-runner.sh degrades gracefully (warns instead of failing), Test 1 might pass even with the bug. Test 3 (POLICY_DIR exists) is the one that definitively catches the path bug.
 
 Let me reconsider: baseline-runner.sh warns on missing POLICY_DIR but continues and exits 0. So Test 1 (exit 0) passes even with the bug. Test 3 (POLICY_DIR exists) is the definitive check. Good — the test file has both.
 
 - [x] **Step 2: Run test to verify it fails**
 
 Run: `bash tests/test_baseline_runner.sh`
-Expected: FAIL — Test 3 fails because `POLICY_DIR` points to `~//dev/github/spectre/policies` which doesn't exist (SUITE_ROOT resolves to `~//dev/github`).
+Expected: FAIL — Test 3 fails because `POLICY_DIR` points to `<parent-of-repo>/spectre/policies` which doesn't exist (SUITE_ROOT resolves to `<parent-of-repo>`).
 
 - [x] **Step 3: Implement the fix (Task 1)**
 

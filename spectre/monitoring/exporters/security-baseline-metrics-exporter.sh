@@ -17,7 +17,10 @@ OUT="$OUTPUT_DIR/security_baseline_metrics.prom"
 TMP="$OUTPUT_DIR/.security_baseline_metrics.prom.$$"
 
 SUITE_LOG_DIR="${SECURITY_BASELINE_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/spectre/security-baseline}"
-SEC_ROOT="${SPECTRE_SECURITY_ROOT:-~//dev/github/spectre-security}"
+# Optional compat fallback for the retired spectre-security repo. Leave unset
+# on machines that never had it; SEC_LOG_DIR falls back to the suite log dir
+# (phase_status/latest_mtime skip missing files, so an empty SEC_ROOT is safe).
+SEC_ROOT="${SPECTRE_SECURITY_ROOT:-}"
 SEC_LOG_DIR="${SECURITY_BASELINE_COMPAT_LOG_DIR:-$SEC_ROOT/security/logs}"
 STALE_SECONDS="${SPECTRE_SECURITY_BASELINE_STALE_SECONDS:-172800}" # 48h
 
