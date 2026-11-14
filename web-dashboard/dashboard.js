@@ -384,6 +384,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (containerFilter) {
         containerFilter.addEventListener('input', () => renderContainers());
     }
+
+    // Help dialog close controls. Bound via addEventListener — inline
+    // onclick handlers are blocked by the CSP script-src 'self' directive.
+    document.querySelectorAll('[data-help-close]').forEach((el) => {
+        el.addEventListener('click', hideHelpDialog);
+    });
 });
 
 function initializeTheme() {
