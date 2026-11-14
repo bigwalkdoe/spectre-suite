@@ -1,4 +1,4 @@
-/* GitGuardian-inspired enterprise redesign for Spectre Suite Dashboard (8081).
+/* Spectre Suite Dashboard (8081) styles.
    Preserves IDs/classes/hooks used by dashboard.js and Chart.js behavior. */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
