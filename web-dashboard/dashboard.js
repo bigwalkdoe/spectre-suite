@@ -457,7 +457,6 @@ function updateDiagnostics() {
     const backupExporter = document.getElementById('backupExporterStatus');
     const agentMetrics = document.getElementById('agentMetricsStatus');
     const baselineExporter = document.getElementById('baselineExporterStatus');
-    const securityExporter = document.getElementById('securityExporterStatus');
     const autoRefresh = document.getElementById('autoRefreshStatus');
     const diagStatus = document.getElementById('diagnosticsStatus');
 
@@ -476,9 +475,6 @@ function updateDiagnostics() {
     }
     if (baselineExporter) {
         baselineExporter.textContent = lastExporterStatus.baseline ? 'Publishing metrics' : 'No data (not scheduled or no output)';
-    }
-    if (securityExporter) {
-        securityExporter.textContent = (lastExporterStatus.agent || lastExporterStatus.baseline) ? 'Publishing metrics' : 'No data (agent/exporter unavailable)';
     }
     if (autoRefresh) {
         if (refreshIntervalMs > 0) {
@@ -721,8 +717,7 @@ async function fetchAllMetrics(opts = {}) {
         lastExporterStatus = {
             backup: [backupLastSuccess, backupHealthOk, resticLastSuccess, resticHealthOk, resticHealthTs].some(v => v !== null),
             agent: spectreUp !== null,
-            baseline: baselineExporterUp === 1,
-            security: spectreUp !== null || baselineExporterUp === 1
+            baseline: baselineExporterUp === 1
         };
 
         const agentReason = agentReasonResult?.metric?.reason || null;
@@ -1595,9 +1590,7 @@ async function exportSnapshot() {
             queryHealth: document.getElementById('queryHealth')?.textContent,
             backupExporter: document.getElementById('backupExporterStatus')?.textContent,
             agentMetrics: document.getElementById('agentMetricsStatus')?.textContent,
-            baselineExporter: document.getElementById('baselineExporterStatus')?.textContent,
-            securityExporter: document.getElementById('securityExporterStatus')?.textContent
-                || ((lastExporterStatus.agent || lastExporterStatus.baseline) ? 'Publishing metrics' : 'No data (agent/exporter unavailable)')
+            baselineExporter: document.getElementById('baselineExporterStatus')?.textContent
         }
     };
 
