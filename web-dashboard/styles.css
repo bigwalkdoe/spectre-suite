@@ -304,6 +304,20 @@ main.content { display: grid; gap: 12px; }
 .container-filter:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
 .container-filter-input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; padding: 0; outline: none; }
 .container-filter-input::placeholder { color: var(--subtle); }
+
+/* Touch devices: keep a scroll gesture inside the focused control (dropdown
+   option list / search input) instead of scrolling the whole page. */
+.refresh-interval-select,
+.report-type-select,
+.report-range-select,
+.container-filter-input {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.btn,
+button {
+  touch-action: manipulation;
+}
 .alert-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .alert-actions a { font: 600 11px/1 var(--sans); color: var(--accent); text-decoration: none; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line-soft); background: var(--card-bg); }
 .alert-actions a:hover { text-decoration: underline; border-color: #c6d3e1; }
