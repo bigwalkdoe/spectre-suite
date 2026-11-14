@@ -123,6 +123,24 @@ function clearCardError(cardId) {
     if (errorEl) errorEl.remove();
 }
 
+// Null-safe DOM writers: the dashboard degrades when an element is missing
+// (older markup, focused page layouts, or a partially failed render).
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    el.textContent = value;
+    return true;
+}
+
+function runCardUpdate(cardId, fn) {
+    try {
+        fn();
+    } catch (error) {
+        console.error(`Error rendering ${cardId}:`, error);
+        setCardError(cardId, 'Render failed');
+    }
+}
+
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -305,8 +323,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Event listeners
-    document.getElementById('refreshBtn').addEventListener('click', fetchAllMetrics);
-    document.getElementById('themeToggle').addEventListener('click', toggleDarkMode);
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', fetchAllMetrics);
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) themeToggle.addEventListener('click', toggleDarkMode);
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) exportBtn.addEventListener('click', exportSnapshot);
     const exportCsvBtn = document.getElementById('chartExportCsv');
@@ -320,7 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (action === 'logs') viewLogs();
         });
     });
-    document.getElementById('refreshInterval').addEventListener('change', (e) => {
+    const refreshIntervalSelect = document.getElementById('refreshInterval');
+    if (refreshIntervalSelect) refreshIntervalSelect.addEventListener('change', (e) => {
         refreshIntervalMs = parseInt(e.target.value, 10) || 0;
         localStorage.setItem('spectre-refresh-interval', String(refreshIntervalMs));
         applyRefreshInterval();
@@ -369,7 +390,7 @@ function initializeTheme() {
     const html = document.documentElement;
     const savedTheme = localStorage.getItem('spectre-theme');
     const toggle = document.getElementById('themeToggle');
-    const icon = toggle.querySelector('i');
+    const icon = toggle ? toggle.querySelector('i') : null;
     const isDark = savedTheme === 'dark';
 
     html.classList.toggle('dark', isDark);
@@ -385,7 +406,7 @@ function toggleDarkMode() {
     const html = document.documentElement;
     const isDark = html.classList.toggle('dark');
     const toggle = document.getElementById('themeToggle');
-    const icon = toggle.querySelector('i');
+    const icon = toggle ? toggle.querySelector('i') : null;
 
     if (icon) {
         icon.classList.toggle('fa-sun', isDark);
@@ -538,8 +559,10 @@ function initializeDashboard() {
 
 function updateTimestamp() {
     if (document.hidden) return;
+    const el = document.getElementById('timestamp');
+    if (!el) return;
     const now = new Date();
-    document.getElementById('timestamp').textContent = now.toLocaleString();
+    el.textContent = now.toLocaleString();
 }
 
 // Prometheus query function
@@ -680,11 +703,11 @@ async function fetchAllMetrics(opts = {}) {
             showToast('Prometheus unreachable — showing no data', 'error');
             ['cpuCard', 'memoryCard', 'diskCard', 'networkCard', 'healthCard'].forEach(id => setCardError(id, 'No data from Prometheus'));
         } else {
-            updateCPUMetrics(cpu);
-            updateMemoryMetrics(mem);
-            updateDiskMetrics(disk);
-            updateNetworkMetrics(netIn, netOut);
-            updateSystemHealth(load1, bootTime, processes, temp);
+            runCardUpdate('cpuCard', () => updateCPUMetrics(cpu));
+            runCardUpdate('memoryCard', () => updateMemoryMetrics(mem));
+            runCardUpdate('diskCard', () => updateDiskMetrics(disk));
+            runCardUpdate('networkCard', () => updateNetworkMetrics(netIn, netOut));
+            runCardUpdate('healthCard', () => updateSystemHealth(load1, bootTime, processes, temp));
 
             if (cpu === null) setCardError('cpuCard', 'CPU data unavailable');
             if (mem === null) setCardError('memoryCard', 'Memory data unavailable');
@@ -721,8 +744,8 @@ async function fetchAllMetrics(opts = {}) {
         };
 
         const agentReason = agentReasonResult?.metric?.reason || null;
-        updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs);
-        updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason, baseline);
+        runCardUpdate('backupCard', () => updateBackupStatus(backupLastSuccess, backupHealthOk, backupHealthTs, backupRepoBytes, backupRepoFree, resticLastSuccess, resticOffsite, resticHealthOk, resticHealthTs, resticVerifyOk, resticVerifyTs));
+        runCardUpdate('securityCard', () => updateSecurityStatus(spectreUp, spectreEverScanned, securityLastScan, findingsUnresolved, findingsCritical, findingsHigh, findingsMedium, findingsLow, agentReason, baseline));
         ['backupCard', 'securityCard'].forEach(id => setCardLoading(id, false));
         await Promise.allSettled([alertsPromise, containersPromise, chartPromise]);
         ['alertsCard', 'containersCard', 'chartCard'].forEach(id => setCardLoading(id, false));
@@ -743,17 +766,19 @@ async function fetchAllMetrics(opts = {}) {
 // Update CPU metrics
 function updateCPUMetrics(cpuUsage) {
     if (cpuUsage !== null) {
-        document.getElementById('cpuUsage').textContent = cpuUsage.toFixed(1) + '%';
+        setText('cpuUsage', cpuUsage.toFixed(1) + '%');
         const change = document.getElementById('cpuChange');
-        if (cpuUsage > 80) {
-            change.textContent = 'High';
-            change.className = 'stat-change negative';
-        } else if (cpuUsage > 60) {
-            change.textContent = 'Moderate';
-            change.className = 'stat-change';
-        } else {
-            change.textContent = 'Normal';
-            change.className = 'stat-change positive';
+        if (change) {
+            if (cpuUsage > 80) {
+                change.textContent = 'High';
+                change.className = 'stat-change negative';
+            } else if (cpuUsage > 60) {
+                change.textContent = 'Moderate';
+                change.className = 'stat-change';
+            } else {
+                change.textContent = 'Normal';
+                change.className = 'stat-change positive';
+            }
         }
         clearCardError('cpuCard');
         setCardUpdated('cpuCard');
@@ -763,17 +788,19 @@ function updateCPUMetrics(cpuUsage) {
 // Update Memory metrics
 function updateMemoryMetrics(memoryUsage) {
     if (memoryUsage !== null) {
-        document.getElementById('memoryUsage').textContent = memoryUsage.toFixed(1) + '%';
+        setText('memoryUsage', memoryUsage.toFixed(1) + '%');
         const change = document.getElementById('memoryChange');
-        if (memoryUsage > 80) {
-            change.textContent = 'High';
-            change.className = 'stat-change negative';
-        } else if (memoryUsage > 60) {
-            change.textContent = 'Moderate';
-            change.className = 'stat-change';
-        } else {
-            change.textContent = 'Normal';
-            change.className = 'stat-change positive';
+        if (change) {
+            if (memoryUsage > 80) {
+                change.textContent = 'High';
+                change.className = 'stat-change negative';
+            } else if (memoryUsage > 60) {
+                change.textContent = 'Moderate';
+                change.className = 'stat-change';
+            } else {
+                change.textContent = 'Normal';
+                change.className = 'stat-change positive';
+            }
         }
         clearCardError('memoryCard');
         setCardUpdated('memoryCard');
@@ -783,17 +810,19 @@ function updateMemoryMetrics(memoryUsage) {
 // Update Disk metrics
 function updateDiskMetrics(diskUsage) {
     if (diskUsage !== null) {
-        document.getElementById('diskUsage').textContent = diskUsage.toFixed(1) + '%';
+        setText('diskUsage', diskUsage.toFixed(1) + '%');
         const change = document.getElementById('diskChange');
-        if (diskUsage > 80) {
-            change.textContent = 'High';
-            change.className = 'stat-change negative';
-        } else if (diskUsage > 60) {
-            change.textContent = 'Moderate';
-            change.className = 'stat-change';
-        } else {
-            change.textContent = 'Normal';
-            change.className = 'stat-change positive';
+        if (change) {
+            if (diskUsage > 80) {
+                change.textContent = 'High';
+                change.className = 'stat-change negative';
+            } else if (diskUsage > 60) {
+                change.textContent = 'Moderate';
+                change.className = 'stat-change';
+            } else {
+                change.textContent = 'Normal';
+                change.className = 'stat-change positive';
+            }
         }
         clearCardError('diskCard');
         setCardUpdated('diskCard');
@@ -804,20 +833,25 @@ function updateDiskMetrics(diskUsage) {
 function updateNetworkMetrics(networkIn, networkOut) {
     if (networkIn !== null && networkOut !== null) {
         const totalBytes = networkIn + networkOut;
-        document.getElementById('networkIO').textContent = formatBytesPerSec(totalBytes);
-        document.getElementById('networkIO').title = `${(totalBytes / 1024).toFixed(1)} KB/s (RX+TX, 5m rate)`;
+        const networkEl = document.getElementById('networkIO');
+        if (networkEl) {
+            networkEl.textContent = formatBytesPerSec(totalBytes);
+            networkEl.title = `${(totalBytes / 1024).toFixed(1)} KB/s (RX+TX, 5m rate)`;
+        }
         const change = document.getElementById('networkChange');
-        if (totalBytes > 100 * 1024 * 1024) { // > 100 MB/s
-            change.textContent = 'High';
-            change.className = 'stat-change negative';
-        } else if (totalBytes < 5120) { // < ~5 KB/s: effectively idle/near-zero; avoid green "Normal" for 0.00
-            change.textContent = 'Idle';
-            change.className = 'stat-change';
-            change.title = 'Near-zero measured RX+TX (5m rate). Verify in Prometheus if unexpected.';
-        } else {
-            change.textContent = 'Normal';
-            change.className = 'stat-change positive';
-            change.title = '';
+        if (change) {
+            if (totalBytes > 100 * 1024 * 1024) { // > 100 MB/s
+                change.textContent = 'High';
+                change.className = 'stat-change negative';
+            } else if (totalBytes < 5120) { // < ~5 KB/s: effectively idle/near-zero; avoid green "Normal" for 0.00
+                change.textContent = 'Idle';
+                change.className = 'stat-change';
+                change.title = 'Near-zero measured RX+TX (5m rate). Verify in Prometheus if unexpected.';
+            } else {
+                change.textContent = 'Normal';
+                change.className = 'stat-change positive';
+                change.title = '';
+            }
         }
         clearCardError('networkCard');
         setCardUpdated('networkCard');
@@ -827,37 +861,38 @@ function updateNetworkMetrics(networkIn, networkOut) {
 // Update System Health
 function updateSystemHealth(systemLoad, bootTime, processCount, temperature) {
     if (systemLoad !== null) {
-        document.getElementById('systemLoad').textContent = systemLoad.toFixed(2);
-        
+        setText('systemLoad', systemLoad.toFixed(2));
+
         const healthStatus = document.getElementById('healthStatus');
-        if (systemLoad > 2.0) {
-            healthStatus.textContent = 'High Load';
-            healthStatus.className = 'badge badge-danger';
-        } else if (systemLoad > 1.0) {
-            healthStatus.textContent = 'Moderate Load';
-            healthStatus.className = 'badge badge-warning';
-        } else {
-            healthStatus.textContent = 'Healthy';
-            healthStatus.className = 'badge badge-success';
+        if (healthStatus) {
+            if (systemLoad > 2.0) {
+                healthStatus.textContent = 'High Load';
+                healthStatus.className = 'badge badge-danger';
+            } else if (systemLoad > 1.0) {
+                healthStatus.textContent = 'Moderate Load';
+                healthStatus.className = 'badge badge-warning';
+            } else {
+                healthStatus.textContent = 'Healthy';
+                healthStatus.className = 'badge badge-success';
+            }
         }
     }
 
     if (bootTime !== null) {
         const uptimeSeconds = Date.now() / 1000 - bootTime;
-        const uptime = formatUptime(uptimeSeconds);
-        document.getElementById('uptime').textContent = uptime;
+        setText('uptime', formatUptime(uptimeSeconds));
     }
 
     if (processCount !== null) {
-        document.getElementById('processes').textContent = Math.floor(processCount);
+        setText('processes', Math.floor(processCount));
     } else {
-        document.getElementById('processes').textContent = 'No data';
+        setText('processes', 'No data');
     }
 
     if (temperature !== null) {
-        document.getElementById('temperature').textContent = Math.floor(temperature) + '°C';
+        setText('temperature', Math.floor(temperature) + '°C');
     } else {
-        document.getElementById('temperature').textContent = 'No data';
+        setText('temperature', 'No data');
     }
     clearCardError('healthCard');
     setCardUpdated('healthCard');
@@ -1176,7 +1211,10 @@ async function updateContainerStatus() {
         currentContainerNames = [];
         lastContainerMeta = { hasUnlabeledRecent: false };
         setCardError('containersCard', 'Container data unavailable');
-        document.getElementById('containersGrid').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Container data unavailable.</strong> Unable to fetch recent container status.</span></div>';
+        const grid = document.getElementById('containersGrid');
+        if (grid) {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Container data unavailable.</strong> Unable to fetch recent container status.</span></div>';
+        }
         const containerStatus = document.getElementById('containerStatus');
         if (containerStatus) {
             containerStatus.textContent = 'No data';
@@ -1210,10 +1248,12 @@ function renderAlerts() {
         : currentAlerts.filter(a => (a.labels?.severity || 'info') === activeAlertFilter);
 
     const countEl = document.getElementById('alertCount');
-    countEl.textContent = String(currentAlerts.length);
-    const hasCritical = currentAlerts.some(a => (a.labels?.severity || '') === 'critical');
-    const hasWarning = currentAlerts.some(a => (a.labels?.severity || '') === 'warning');
-    countEl.className = hasCritical ? 'badge badge-danger' : hasWarning ? 'badge badge-warning' : 'badge badge-success';
+    if (countEl) {
+        countEl.textContent = String(currentAlerts.length);
+        const hasCritical = currentAlerts.some(a => (a.labels?.severity || '') === 'critical');
+        const hasWarning = currentAlerts.some(a => (a.labels?.severity || '') === 'warning');
+        countEl.className = hasCritical ? 'badge badge-danger' : hasWarning ? 'badge badge-warning' : 'badge badge-success';
+    }
 
     if (currentAlerts.length === 0) {
         alertsList.innerHTML = '<div class="no-alerts no-alerts--ok"><i class="fas fa-check-circle" aria-hidden="true"></i><span><strong>All clear.</strong> No active alerts are firing.</span></div>';
@@ -1288,7 +1328,10 @@ async function checkAlerts() {
         clearCardError('alertsCard');
         const alertsCard = document.getElementById('alertsCard');
         if (alertsCard) alertsCard.classList.add('card--error');
-        document.getElementById('alertsList').innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Alerts unavailable.</strong> Unable to fetch alert data from Prometheus/Alertmanager.</span></div>';
+        const alertsList = document.getElementById('alertsList');
+        if (alertsList) {
+            alertsList.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>Alerts unavailable.</strong> Unable to fetch alert data from Prometheus/Alertmanager.</span></div>';
+        }
     }
 }
 
@@ -1296,12 +1339,16 @@ async function checkAlerts() {
 async function checkPrometheusConnection() {
     const statusIndicator = document.getElementById('systemStatus');
     const statusText = document.getElementById('systemStatusText');
+    const prometheusStatus = document.getElementById('prometheusStatus');
+    const setPrometheusStatus = (text, color) => {
+        if (!prometheusStatus) return;
+        prometheusStatus.textContent = text;
+        prometheusStatus.style.color = color;
+    };
     try {
         const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/status/buildinfo`);
-        const prometheusStatus = document.getElementById('prometheusStatus');
         if (response.ok) {
-            prometheusStatus.textContent = 'Connected';
-            prometheusStatus.style.color = '#10b981';
+            setPrometheusStatus('Connected', '#10b981');
             if (statusIndicator) {
                 statusIndicator.classList.remove('offline');
                 statusIndicator.classList.add('online');
@@ -1312,8 +1359,7 @@ async function checkPrometheusConnection() {
             }
             lastPrometheusConnected = true;
         } else {
-            prometheusStatus.textContent = 'Disconnected';
-            prometheusStatus.style.color = '#ef4444';
+            setPrometheusStatus('Disconnected', '#ef4444');
             if (statusIndicator) {
                 statusIndicator.classList.remove('online');
                 statusIndicator.classList.add('offline');
@@ -1325,8 +1371,7 @@ async function checkPrometheusConnection() {
             lastPrometheusConnected = false;
         }
     } catch (error) {
-        document.getElementById('prometheusStatus').textContent = 'Disconnected';
-        document.getElementById('prometheusStatus').style.color = '#ef4444';
+        setPrometheusStatus('Disconnected', '#ef4444');
         if (statusIndicator) {
             statusIndicator.classList.remove('online');
             statusIndicator.classList.add('offline');
@@ -1341,7 +1386,9 @@ async function checkPrometheusConnection() {
 
 // Initialize Chart
 function initializeChart() {
-    const ctx = document.getElementById('resourceChart').getContext('2d');
+    const canvas = document.getElementById('resourceChart');
+    if (!canvas || typeof canvas.getContext !== 'function' || typeof Chart === 'undefined') return;
+    const ctx = canvas.getContext('2d');
     const theme = getChartTheme();
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     chart = new Chart(ctx, {
@@ -1615,7 +1662,6 @@ async function exportSnapshot() {
 
 // Export chart data as CSV
 function exportChartCSV() {
-    const chart = window.chart;
     if (!chart || !chart.data || !chart.data.labels || chart.data.labels.length === 0) {
         showToast('No chart data to export', 'error');
         return;
@@ -1625,7 +1671,7 @@ function exportChartCSV() {
     const datasets = chart.data.datasets;
 
     // Build CSV header
-    const headers = ['Timestamp'] + datasets.map(d => d.label || 'Series');
+    const headers = ['Timestamp', ...datasets.map(d => d.label || 'Series')];
     const rows = [headers.join(',')];
 
     // Build data rows
