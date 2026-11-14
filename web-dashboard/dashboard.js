@@ -193,6 +193,37 @@ function updateCountdown() {
     el.textContent = `Next refresh in ${countdownSeconds}s`;
 }
 
+function showHelpDialog() {
+    const dialog = document.getElementById('keyboardHelp');
+    if (dialog) dialog.style.display = 'flex';
+}
+
+function hideHelpDialog() {
+    const dialog = document.getElementById('keyboardHelp');
+    if (dialog) dialog.style.display = 'none';
+}
+
+function handleKeyboard(e) {
+    // Don't trigger shortcuts when typing in an input/textarea
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        fetchAllMetrics();
+    } else if (e.key === '?') {
+        e.preventDefault();
+        showHelpDialog();
+    } else if (e.key === 'Escape') {
+        hideHelpDialog();
+        // Dismiss toasts
+        const container = document.getElementById('toast-container');
+        if (container) {
+            const toasts = container.querySelectorAll('.toast');
+            toasts.forEach(t => t.remove());
+        }
+    }
+}
+
 function loadRefreshInterval() {
     const saved = localStorage.getItem('spectre-refresh-interval');
     const ms = saved !== null ? parseInt(saved, 10) : DEFAULT_REFRESH_INTERVAL;
@@ -254,7 +285,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateTimestamp, 1000);
     applyRefreshInterval();
 
-    // Stop polling while the tab is hidden and refresh once when it becomes
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        handleKeyboard(e);
+    });
+
+    startRefreshCountdown();
     // visible again. Background tabs otherwise keep querying Prometheus forever.
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {

@@ -326,6 +326,28 @@
         </div>
     </div>
 
+    <div id="keyboardHelp" class="modal" role="dialog" aria-modal="true" aria-labelledby="keyboardHelpTitle">
+        <div class="modal-backdrop" onclick="hideHelpDialog()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="keyboardHelpTitle">Keyboard Shortcuts</h2>
+                <button class="btn btn-sm" onclick="hideHelpDialog()" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <table class="keyboard-shortcuts">
+                    <thead>
+                        <tr><th>Key</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><kbd>R</kbd></td><td>Refresh dashboard data</td></tr>
+                        <tr><td><kbd>?</kbd></td><td>Show this help dialog</td></tr>
+                        <tr><td><kbd>Esc</kbd></td><td>Close dialogs / dismiss toasts</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script src="dashboard.js?v=20261111-ux3"></script>
     <script src="reports.js?v=20261113-reports1"></script>
 </body>
