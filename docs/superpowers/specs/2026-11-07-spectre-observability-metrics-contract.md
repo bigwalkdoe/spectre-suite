@@ -1,7 +1,7 @@
-# Spectre Observability Metrics Contract (draft)
+# Spectre Observability Metrics Contract
 
 **Date:** 2026-11-07  
-**Status:** draft, implementation in progress (observability-first, additive)  
+**Status:** complete (all reconciliation backlog items closed 2026-11-14)  
 **Scope:** Canonical metric families for integrating Spectre agent runtime signals and spectre-security/suite security-baseline pipeline evidence.
 
 ## 1. Data sources — never conflated
