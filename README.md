@@ -31,6 +31,22 @@
                     backups · observability · hardening · maintenance · proof
 ```
 
+## Contents
+
+- [What Spectre Suite is](#-what-spectre-suite-is)
+- [Feature map](#-feature-map)
+- [Visuals & screenshots](#-visuals--screenshots)
+- [Quick start](#-quick-start)
+- [Unified dispatch model](#-unified-dispatch-model)
+- [Schedule reference](#-schedule-reference-host-dependent)
+- [Monitoring stack](#-monitoring-stack)
+- [Restic](#-restic-adopted)
+- [Security & metrics notes](#-security--metrics-notes)
+- [Project layout](#-project-layout)
+- [Testing](#-testing)
+- [Documentation](#-documentation)
+- [License](#-license)
+
 ## ▸ What Spectre Suite is
 
 Spectre Suite is a consolidated Linux operations suite for **automated backups**, **restic snapshot workflows**, **monitoring/alerting** (Prometheus + Grafana + Alertmanager), **security/hardening helpers**, **maintenance jobs**, and **operational reporting**.
@@ -154,7 +170,8 @@ python3 -m spectre.cli.main run maintenance/system-health-check
 python3 -m spectre.cli.main run backups/backup-all -- --help
 ```
 
-If you have the package installed in an environment where `spectre` is on `PATH`, use `spectre ...` directly.
+> [!TIP]
+> If the package is installed and `spectre` is on your `PATH`, you can use `spectre actions ...` / `spectre run ...` directly instead of `python3 -m spectre.cli.main ...`.
 
 ### Install / host integration notes
 
@@ -178,20 +195,26 @@ For sleep/resume-safe catch-up (checks health first; runs only when stale):
 ## ▸ Unified dispatch model
 
 ```text
-spectre/actions/<group>/<job>.sh          ← canonical job implementations
-spectre/monitoring/exporters/*            ← canonical exporter implementations
-spectre/policies/*                        ← OPA rego + baseline.json (real dir)
-spectre/dispatch/registry_data.json        ← registry source of truth (with dispatch modules)
+spectre/actions/<group>/<job>.sh          # Canonical job implementations
+spectre/monitoring/exporters/*            # Canonical exporter implementations
+spectre/policies/*                        # OPA policies and baseline.json
+spectre/dispatch/registry_data.json       # Registry source of truth (dispatch metadata)
 ```
 
 ```bash
+# From source
+python3 -m spectre.cli.main actions list
+python3 -m spectre.cli.main actions show backups/backup-all
+python3 -m spectre.cli.main actions verify
+python3 -m spectre.cli.main run backups/backup-all
+
+# If installed on PATH
 spectre actions list
-spectre actions show backups/backup-all
-spectre actions verify
 spectre run backups/backup-all
 ```
 
-**C1 complete:** no tracked legacy `scripts/` compatibility tree (`git ls-files scripts` = 0). Use `spectre run <job>` and canonical paths. CI guardrails block reintroducing tracked `scripts/` paths.
+> [!NOTE]
+> Legacy `scripts/` compatibility paths have been retired from the tracked tree. Use `spectre run <job>` and canonical paths; CI guardrails prevent reintroducing tracked `scripts/` paths.
 
 ---
 
@@ -251,9 +274,9 @@ SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
 
 ### Web dashboard
 
-The static operator view served at `http://localhost:8081` (bind-mounted read-only
-from `web-dashboard/`, served by nginx). It is the primary way to watch the
-monitoring stack without opening Grafana directly.
+The static operator view is served at `http://localhost:8081` (bind-mounted read-only
+from `web-dashboard/` and served by nginx). It provides a lightweight way to monitor
+the stack without opening Grafana directly.
 
 | Page | Contents |
 |---|---|
@@ -316,22 +339,24 @@ opa check spectre/policies/
 
 ```text
 spectre-suite/
-├── assets/                      # README visuals (banner, previews, screenshot placeholders)
+├── assets/                      # README visuals and screenshot/capture helpers
+├── config/                      # Configuration templates (including restic)
+├── docs/                        # Runbooks, migration notes, specs, and plans
+├── grafana-dashboards/          # Dashboard and provisioning assets
+├── prometheus/                  # Prometheus, alert rules, and Alertmanager assets
 ├── spectre/
 │   ├── actions/                 # Canonical dispatched job implementations
-│   ├── dispatch/                # Registry, resolve, verify, run records/provenance
-│   ├── monitoring/              # Prometheus/Grafana assets, exporters
-│   ├── policies/                # OPA policies + baseline.json
-│   └── cli/, agents/, ...       # Python package (CLI, services, API/TUI/daemon)
-├── prometheus/                  # Monitoring config/rules/alertmanager assets
-├── grafana-dashboards/          # Dashboards/provisioning assets
-├── web-dashboard/               # Static operator view (index.html, dashboard.js, reports.js, nginx.conf)
-├── config/                      # Templates (including restic templates)
-├── systemd/                     # Unit/timer helpers
-├── docs/                        # Runbooks, migration notes, specs/plans
-├── tests/                       # bash suite + agent tests
+│   ├── agents/                  # Agent integrations and metrics helpers
+│   ├── api/, cli/, daemon/      # Python surfaces (CLI, API, daemon, services)
+│   ├── dispatch/                # Registry, resolution, verification, provenance
+│   ├── monitoring/              # Exporters and monitoring assets
+│   └── policies/                # OPA policies and baseline definitions
+├── systemd/                     # Unit/timer files and helpers
+├── tests/                       # Shell and Python test suites
+├── web-dashboard/               # Static operator dashboard (HTML/JS/CSS/nginx)
 ├── docker-compose.monitoring.yml
-└── pyproject.toml
+├── pyproject.toml
+└── README.md
 ```
 
 ---
@@ -339,10 +364,15 @@ spectre-suite/
 ## ▸ Testing
 
 ```bash
+# Run the shell test suite
 bash tests/run_tests.sh
 
-# Dispatcher/registry checks
-python3 -c "from spectre.dispatch.verify import verify, read_host_inventory; print(verify(read_host_inventory()))"
+# Run dispatcher/registry verification checks
+python3 - <<'PY'
+from spectre.dispatch.verify import read_host_inventory, verify
+
+print(verify(read_host_inventory()))
+PY
 ```
 
 ---

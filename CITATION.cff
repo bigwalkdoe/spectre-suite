@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use Spectre Suite in your work, please cite it using the metadata below."
 title: "Spectre Suite"
 type: software
-version: "0.3.0"
+version: "1.0.2"
 license: MIT
 repository-code: "https://github.com/bigwalkdoe/spectre-suite"
 url: "https://github.com/bigwalkdoe/spectre-suite"
