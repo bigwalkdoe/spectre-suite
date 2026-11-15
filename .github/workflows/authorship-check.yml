@@ -31,10 +31,10 @@ jobs:
           fi
 
           bad=0
-          # Authors must all be bigwalkdoe
+          # Authors must all be the repository owner
           while IFS= read -r author; do
             [ -z "$author" ] && continue
-            if [ "$author" != "bigwalkdoe <owner@example.com>" ]; then
+            if [ "$author" != "owner <owner@example.com>" ]; then
               echo "Forbidden author: $author"
               bad=1
             fi

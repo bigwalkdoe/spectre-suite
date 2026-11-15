@@ -1,5 +1,5 @@
 #!/bin/sh
-# Enforce the solo-developer policy: bigwalkdoe is the sole author/committer.
+# Enforce the solo-developer policy: sole author/committer.
 # Reject commits that credit other humans, bots, or AI tools.
 msg_file="$1"
 if grep -iEq 'Co-Authored-By:' "$msg_file"; then

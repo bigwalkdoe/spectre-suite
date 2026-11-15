@@ -1,13 +1,13 @@
 # Canonical identity for all commits in these repositories.
-bigwalkdoe <owner@example.com> BWD <owner@users.noreply.github.com>
-bigwalkdoe <owner@example.com> Owner <owner@example.com>
-bigwalkdoe <owner@example.com> Owner <owner@example.com>
-bigwalkdoe <owner@example.com> Doe <owner@users.noreply.github.com>
-bigwalkdoe <owner@example.com> Bigwalkdoe <owner@users.noreply.github.com>
-bigwalkdoe <owner@example.com> owner <owner@users.noreply.github.com>
-bigwalkdoe <owner@example.com> owner <owner@example.com>
-bigwalkdoe <owner@example.com> bigwalkdoe <owner@users.noreply.github.com>
-bigwalkdoe <owner@example.com> Test User <test@example.com>
-bigwalkdoe <owner@example.com> d <d@x>
-bigwalkdoe <owner@example.com> Security Baseline <security@example.com>
-bigwalkdoe <owner@example.com> GitHub <noreply@github.com>
+owner <owner@example.com> BWD <owner@users.noreply.github.com>
+owner <owner@example.com> Owner <owner@example.com>
+owner <owner@example.com> Owner <owner@example.com>
+owner <owner@example.com> Doe <owner@users.noreply.github.com>
+owner <owner@example.com> Bigwalkdoe <owner@users.noreply.github.com>
+owner <owner@example.com> owner <owner@users.noreply.github.com>
+owner <owner@example.com> owner <owner@example.com>
+owner <owner@example.com> owner <owner@users.noreply.github.com>
+owner <owner@example.com> Test User <test@example.com>
+owner <owner@example.com> d <d@x>
+owner <owner@example.com> Security Baseline <security@example.com>
+owner <owner@example.com> GitHub <noreply@github.com>
