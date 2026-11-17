@@ -1,7 +1,7 @@
 import { PROMETHEUS_URL, EXTERNAL_BACKENDS, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase, READ_ONLY, ACTIONS_ALLOWED } from './config.js';
 import { fetchWithTimeout, escapeHtml, setText, setCardLoading, setCardError, clearCardError, runCardUpdate, showToast, setCardUpdated, formatBytes, formatBytesPerSec, formatRelativeTime, formatUptime } from './dom.js';
 import { state } from './state.js';
-import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp } from './prometheus.js';
+import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp, querySampleAgeSeconds } from './prometheus.js';
 import { triggerAction, initActionsApi } from './actions.js';
 import { initActionActivity } from './activity.js';
 import { initializeChart, updateChart, applyChartTheme, exportChartCSV } from './chart.js';
@@ -597,7 +597,15 @@ async function updateCoverageStatus(coreValues = {}) {
     ]);
 
     const fsSeries = await queryPrometheusSeries('node_filesystem_avail_bytes{mountpoint="/"}');
+    const [fsAge, nodeAge, backupAge, agentAge, baselineAge] = await Promise.all([
+        querySampleAgeSeconds('node_filesystem_avail_bytes{mountpoint="/"}'),
+        querySampleAgeSeconds('node_cpu_seconds_total'),
+        querySampleAgeSeconds('backup_last_success_timestamp'),
+        querySampleAgeSeconds('spectre_agent_up'),
+        querySampleAgeSeconds('spectre_security_baseline_exporter_up')
+    ]);
     const coverage = {};
+    const staleIfOld = (age, warnAfterSec) => (age !== null && age > warnAfterSec);
 
     coverage.prometheus = state.lastPrometheusConnected === true
         ? { status: 'ok', reason: 'Prometheus API reachable' }
@@ -606,6 +614,9 @@ async function updateCoverageStatus(coreValues = {}) {
             : { status: 'unknown', reason: 'Prometheus connectivity not yet checked' };
 
     coverage.node_exporter = nodeUp || { status: 'unknown', reason: 'Node exporter status unknown' };
+    if (coverage.node_exporter.status === 'ok' && staleIfOld(nodeAge, 300)) {
+        coverage.node_exporter = { ...coverage.node_exporter, status: 'stale', reason: `Node exporter samples stale (~${Math.round(nodeAge)}s old)` };
+    }
 
     if (cadvisorUp?.status === 'missing') {
         coverage.cadvisor = { status: 'disabled', reason: 'cAdvisor scrape job/target not present (disabled in prometheus.yml by default due to CPU usage)' };
@@ -619,7 +630,11 @@ async function updateCoverageStatus(coreValues = {}) {
     coverage.blackbox = blackboxUp || { status: 'unknown', reason: 'Blackbox exporter status unknown' };
 
     if (Array.isArray(fsSeries) && fsSeries.length > 0) {
-        coverage.root_filesystem = { status: 'ok', reason: 'node_filesystem_* series available for mountpoint "/"' };
+        if (staleIfOld(fsAge, 300)) {
+            coverage.root_filesystem = { status: 'stale', reason: `node_filesystem_* samples stale for mountpoint "/" (~${Math.round(fsAge)}s old)` };
+        } else {
+            coverage.root_filesystem = { status: 'ok', reason: 'node_filesystem_* series available for mountpoint "/"' };
+        }
     } else if (coreValues.disk !== null && coreValues.disk !== undefined) {
         coverage.root_filesystem = { status: 'ok', reason: 'Root filesystem usage metric available' };
     } else if (coverage.node_exporter.status === 'ok') {
@@ -629,13 +644,13 @@ async function updateCoverageStatus(coreValues = {}) {
     }
 
     coverage.backup_metrics = state.lastExporterStatus.backup
-        ? { status: 'ok', reason: 'Backup/restic textfile metrics publishing' }
+        ? { status: staleIfOld(backupAge, 86400) ? 'stale' : 'ok', reason: staleIfOld(backupAge, 86400) ? `Backup metric samples stale (~${Math.round(backupAge)}s old)` : 'Backup/restic textfile metrics publishing' }
         : { status: 'missing', reason: 'No backup/restic metrics (exporter not scheduled, not run, or no output)' };
     coverage.agent_metrics = state.lastExporterStatus.agent
-        ? { status: 'ok', reason: 'Spectre agent/security metrics publishing' }
+        ? { status: staleIfOld(agentAge, 600) ? 'stale' : 'ok', reason: staleIfOld(agentAge, 600) ? `Agent metric samples stale (~${Math.round(agentAge)}s old)` : 'Spectre agent/security metrics publishing' }
         : { status: 'missing', reason: 'No spectre agent/security metrics (agent unavailable or not exporting)' };
     coverage.baseline_metrics = state.lastExporterStatus.baseline
-        ? { status: 'ok', reason: 'Security baseline textfile metrics publishing' }
+        ? { status: staleIfOld(baselineAge, 86400) ? 'stale' : 'ok', reason: staleIfOld(baselineAge, 86400) ? `Baseline metric samples stale (~${Math.round(baselineAge)}s old)` : 'Security baseline textfile metrics publishing' }
         : { status: 'missing', reason: 'No security baseline metrics (baseline exporter not run or no output)' };
 
     state.coverageStatus = coverage;

@@ -77,11 +77,13 @@ export function initActionActivity({ intervalMs = 30000 } = {}) {
         renderActionRuns(result);
     };
     if (refreshBtn) refreshBtn.addEventListener('click', () => { refresh().catch(() => {}); });
-    refresh().catch(() => {});
+    // In read-only/viewer mode, avoid automatic polling/fetches that may require operator token context; allow manual refresh.
+    if (!READ_ONLY) refresh().catch(() => {});
+    else renderActionRuns({ ok: false, error: 'read_only', message: 'Read-only mode: action activity auto-refresh is disabled. Use refresh if you have operator access/token.' });
     if (activityTimer) clearInterval(activityTimer);
     activityTimer = setInterval(() => {
         if (document.hidden) return;
-        if (READ_ONLY) return; // still useful, but avoid noisy unauth polling in viewer mode without token context; can refresh manually
+        if (READ_ONLY || !ACTIONS_ALLOWED) return;
         refresh().catch(() => {});
     }, intervalMs);
 }

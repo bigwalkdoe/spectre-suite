@@ -145,7 +145,8 @@ class Handler(BaseHTTPRequestHandler):
                 runs = self._list_runs()
                 if status_filter:
                     runs = [r for r in runs if str(r.get("status", "")) == status_filter]
-                json_response(self, 200, {"ok": True, "runs": runs[:limit], "count": len(runs[:limit])})
+                total = len(runs)
+                json_response(self, 200, {"ok": True, "runs": runs[:limit], "count": total, "returned": len(runs[:limit])})
                 return
             if len(parts) == 2:
                 run = self._read_run_file(parts[1])

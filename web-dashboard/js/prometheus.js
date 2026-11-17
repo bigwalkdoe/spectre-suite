@@ -77,3 +77,11 @@ export async function checkTargetUp(job) {
     if (allDown) return { status: 'down', reason, up: upCount, total };
     return { status: 'unknown', reason: `Unknown target state (job "${job}")`, up: upCount, total };
 }
+
+export async function querySampleAgeSeconds(metricSelector, timeoutMs) {
+    // Returns age in seconds for newest sample of selector, or null if unavailable.
+    const query = `time() - max(timestamp(${metricSelector}))`;
+    const value = await queryPrometheus(query);
+    if (value === null || Number.isNaN(value) || value < 0) return null;
+    return value;
+}
