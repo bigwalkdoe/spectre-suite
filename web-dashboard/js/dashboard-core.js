@@ -97,6 +97,7 @@ function restorePersistedUiState() {
     }
     const savedRange = localStorage.getItem('spectre-chart-range');
     if (savedRange && { '1h': 1, '6h': 1, '24h': 1, '7d': 1 }[savedRange]) {
+        state.currentChartRange = savedRange;
         const btn = document.querySelector(`.chart-controls .btn[data-range="${CSS.escape(savedRange)}"]`);
         if (btn) {
             document.querySelectorAll('.chart-controls .btn').forEach(b => {
@@ -106,6 +107,9 @@ function restorePersistedUiState() {
             btn.classList.add('active');
             btn.setAttribute('aria-pressed', 'true');
         }
+    } else {
+        const active = document.querySelector('.chart-controls .btn.active')?.dataset.range;
+        if (active) state.currentChartRange = active;
     }
 }
 
@@ -706,7 +710,7 @@ export async function fetchAllMetrics(opts = {}) {
 
     const forceSlow = refreshChart;
     const slowIsCached = !forceSlow && state.slowMetricsCache && Date.now() - state.slowMetricsCacheAt < SLOW_METRICS_REFRESH_MS;
-    const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+    const activeRange = state.currentChartRange || document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
     const activePage = document.body.dataset.activePage || 'overview';
     const chartVisible = activePage === 'overview' || activePage === 'trends';
     const alertsVisible = activePage === 'overview' || activePage === 'alerts';
@@ -1118,6 +1122,7 @@ export function initDashboard() {
             target.classList.add('active');
             target.setAttribute('aria-pressed', 'true');
             const range = target.dataset.range || '1h';
+            state.currentChartRange = range;
             localStorage.setItem('spectre-chart-range', range);
             updateChart(range);
         });

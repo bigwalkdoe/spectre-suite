@@ -16,6 +16,7 @@ A custom web-based monitoring dashboard that provides real-time system metrics a
 - **Memory Usage**: Memory consumption tracking
 - **Disk Usage**: Storage monitoring with alerts
 - **Network I/O**: Real-time network traffic monitoring
+- **Resource Trends:** time-range presets (1h/6h/24h/7d) backed by Prometheus `query_range`, persisted in-browser and used for trend chart refreshes
 
 ### System Health
 - System load monitoring

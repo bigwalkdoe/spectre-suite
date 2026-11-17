@@ -13,6 +13,7 @@ export const state = {
     lastExporterStatus: { backup: false, agent: false, baseline: false },
     // Coverage/freshness: { [key]: { status: 'ok'|'missing'|'stale'|'disabled'|'unknown'|'down', reason: string, detail?: string } }
     coverageStatus: {},
+    currentChartRange: '1h',
     lastChartRefreshAt: 0,
     slowMetricsCache: null,
     slowMetricsCacheAt: 0,
