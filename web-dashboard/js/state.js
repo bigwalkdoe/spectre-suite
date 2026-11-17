@@ -11,6 +11,9 @@ export const state = {
     activeAlertFilter: 'all',
     lastQueryStats: { total: 0, succeeded: 0, failed: 0 },
     lastExporterStatus: { backup: false, agent: false, baseline: false },
+    // Coverage/freshness: { [key]: { status: 'ok'|'missing'|'stale'|'disabled'|'unknown'|'down', reason: string, detail?: string } }
+    coverageStatus: {},
+    currentChartRange: '1h',
     lastChartRefreshAt: 0,
     slowMetricsCache: null,
     slowMetricsCacheAt: 0,

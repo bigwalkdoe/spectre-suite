@@ -462,3 +462,39 @@ button {
     pointer-events: none;
 }
 
+
+/* Data coverage diagnostics */
+.coverage-section { margin-top: 0.75rem; border-top: 1px solid var(--border, #e5e7eb); padding-top: 0.75rem; }
+.coverage-heading { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #6b7280); }
+.coverage-details { display: flex; flex-direction: column; gap: 0.35rem; }
+.coverage-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto 2fr; gap: 0.5rem; align-items: center; font-size: 0.85rem; }
+.coverage-label { font-weight: 500; }
+.coverage-reason { color: var(--text-muted, #6b7280); overflow-wrap: anywhere; }
+@media (max-width: 720px) { .coverage-row { grid-template-columns: 1fr; gap: 0.15rem; } }
+
+/* Read-only/viewer mode */
+.read-only-banner { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.75rem 1rem; margin-bottom: 1rem; border: 1px solid var(--border, #e5e7eb); border-left: 4px solid #3b82f6; border-radius: 0.5rem; background: rgba(59,130,246,0.08); }
+.read-only-banner[hidden] { display: none; }
+body.read-only-mode .action-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+/* Drill-down links */
+.inline-drilldown { margin-left: 0.35rem; font-size: 0.8em; color: inherit; opacity: 0.7; }
+.inline-drilldown:hover, .inline-drilldown:focus { opacity: 1; }
+.alert-context { margin-top: 0.2rem; font-size: 0.85em; }
+.alert-actions { display: inline-flex; gap: 0.5rem; flex-wrap: wrap; }
+.alert-actions a { text-decoration: underline; }
+
+/* Action activity */
+.activity-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.activity-item { border: 1px solid var(--border, #e5e7eb); border-radius: 0.5rem; padding: 0.6rem 0.75rem; }
+.activity-title { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.activity-meta, .activity-message { margin-top: 0.2rem; font-size: 0.9em; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; }
+
+/* Alert runbooks */
+.runbook-panel { margin-top: 0.75rem; border: 1px solid var(--border, #e5e7eb); border-radius: 0.5rem; padding: 0.75rem; }
+.runbook-panel[hidden] { display: none; }
+.runbook-panel-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.runbook-content { margin: 0; white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; font-size: 0.9em; line-height: 1.4; }
+.btn-link { background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+.btn-link:hover, .btn-link:focus { opacity: 0.85; }

@@ -1,8 +1,9 @@
-import { PROMETHEUS_URL, EXTERNAL_BACKENDS, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase } from './config.js';
+import { PROMETHEUS_URL, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase, READ_ONLY, ACTIONS_ALLOWED } from './config.js';
 import { fetchWithTimeout, escapeHtml, setText, setCardLoading, setCardError, clearCardError, runCardUpdate, showToast, setCardUpdated, formatBytes, formatBytesPerSec, formatRelativeTime, formatUptime } from './dom.js';
 import { state } from './state.js';
-import { queryPrometheus, queryPrometheusFirst } from './prometheus.js';
+import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp, querySampleAgeSeconds } from './prometheus.js';
 import { triggerAction, initActionsApi } from './actions.js';
+import { initActionActivity } from './activity.js';
 import { initializeChart, updateChart, applyChartTheme, exportChartCSV } from './chart.js';
 
 export function initExternalLinks() {
@@ -96,6 +97,7 @@ function restorePersistedUiState() {
     }
     const savedRange = localStorage.getItem('spectre-chart-range');
     if (savedRange && { '1h': 1, '6h': 1, '24h': 1, '7d': 1 }[savedRange]) {
+        state.currentChartRange = savedRange;
         const btn = document.querySelector(`.chart-controls .btn[data-range="${CSS.escape(savedRange)}"]`);
         if (btn) {
             document.querySelectorAll('.chart-controls .btn').forEach(b => {
@@ -105,6 +107,9 @@ function restorePersistedUiState() {
             btn.classList.add('active');
             btn.setAttribute('aria-pressed', 'true');
         }
+    } else {
+        const active = document.querySelector('.chart-controls .btn.active')?.dataset.range;
+        if (active) state.currentChartRange = active;
     }
 }
 
@@ -165,6 +170,13 @@ function updateLastRefreshed() {
     if (el) el.textContent = ` | Last refreshed: ${new Date().toLocaleTimeString()}`;
 }
 
+function coverageBadgeClass(status) {
+    if (status === 'ok') return 'badge-success';
+    if (status === 'down' || status === 'missing' || status === 'stale') return 'badge-warning';
+    if (status === 'disabled') return 'badge-warning';
+    return '';
+}
+
 function updateDiagnostics() {
     const queryHealth = document.getElementById('queryHealth');
     const backupExporter = document.getElementById('backupExporterStatus');
@@ -172,6 +184,7 @@ function updateDiagnostics() {
     const baselineExporter = document.getElementById('baselineExporterStatus');
     const autoRefresh = document.getElementById('autoRefreshStatus');
     const diagStatus = document.getElementById('diagnosticsStatus');
+    const coverageEl = document.getElementById('coverageDetails');
 
     if (queryHealth) {
         if (state.lastQueryStats.total === 0) queryHealth.textContent = 'No queries run';
@@ -186,9 +199,37 @@ function updateDiagnostics() {
             autoRefresh.textContent = `Every ${label}`;
         } else autoRefresh.textContent = 'Disabled';
     }
+
+    const cov = state.coverageStatus || {};
+    if (coverageEl) {
+        const entries = Object.entries(cov);
+        if (!entries.length) {
+            coverageEl.innerHTML = '<span class="muted">Coverage not yet checked.</span>';
+        } else {
+            const fleetKeys = ['node_exporter','cadvisor','redis_exporter','postgres_exporter','alertmanager','blackbox'];
+            const fleet = fleetKeys.map(k => [k, cov[k]]).filter(([,v]) => v);
+            const fleetHtml = fleet.length ? `<div class="coverage-fleet"><div class="coverage-heading">Targets / fleet rollup</div>${fleet.map(([key, info]) => {
+                const status = info?.status || 'unknown';
+                const reason = escapeHtml(info?.reason || status);
+                const counts = (typeof info?.total === 'number') ? ` <span class="muted">(${info.up}/${info.total} up)</span>` : '';
+                return `<div class="coverage-row"><span class="coverage-label">${escapeHtml(key)}</span><span class="badge ${coverageBadgeClass(status)}">${escapeHtml(status)}</span><span class="coverage-reason">${reason}${counts}</span></div>`;
+            }).join('')}</div>` : '';
+            const other = entries.filter(([k]) => !fleetKeys.includes(k));
+            const otherHtml = other.map(([key, info]) => {
+                const status = info?.status || 'unknown';
+                const reason = escapeHtml(info?.reason || status);
+                const label = escapeHtml(key);
+                return `<div class="coverage-row"><span class="coverage-label">${label}</span><span class="badge ${coverageBadgeClass(status)}">${escapeHtml(status)}</span><span class="coverage-reason">${reason}</span></div>`;
+            }).join('');
+            coverageEl.innerHTML = `${fleetHtml}${otherHtml}`;
+        }
+    }
+
     if (diagStatus) {
-        const healthy = state.lastQueryStats.failed === 0 && state.lastQueryStats.total > 0;
-        const degraded = state.lastQueryStats.succeeded > 0 && state.lastQueryStats.failed > 0;
+        const values = Object.values(cov);
+        const hasCoverageIssues = values.some(v => ['down', 'missing', 'stale', 'disabled'].includes(v?.status));
+        const healthy = state.lastQueryStats.failed === 0 && state.lastQueryStats.total > 0 && !hasCoverageIssues;
+        const degraded = (state.lastQueryStats.succeeded > 0 && state.lastQueryStats.failed > 0) || hasCoverageIssues;
         diagStatus.textContent = healthy ? 'OK' : degraded ? 'Degraded' : state.lastQueryStats.total === 0 ? '--' : 'Issues';
         diagStatus.className = healthy ? 'badge badge-success' : degraded ? 'badge badge-warning' : 'badge';
     }
@@ -432,16 +473,29 @@ function renderAlerts() {
         const ageStr = formatAlertAge(startMs);
         const promBase = extBase('prometheus');
         const amBase = extBase('alertmanager');
+        const grafanaBase = extBase('grafana');
         const alertname = alert.labels?.alertname ? String(alert.labels.alertname) : '';
+        const instance = alert.labels?.instance ? String(alert.labels.instance) : '';
+        const job = alert.labels?.job ? String(alert.labels.job) : '';
+        const contextParts = [instance ? `instance=${instance}` : '', job ? `job=${job}` : ''].filter(Boolean);
         const promqlName = alertname.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ');
         const amFilter = alertname ? encodeURIComponent(`{alertname="${alertname.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ')}"}`) : '';
-        const promGraphHref = (promBase && alertname) ? `${promBase}/graph?g0.expr=${encodeURIComponent(`ALERTS{alertname="${promqlName}"}`)}&g0.tab=1` : (promBase ? `${promBase}/alerts` : '');
+        const promExpr = alertname ? `ALERTS{alertname="${promqlName}",alertstate="firing"}` : '';
+        const promGraphHref = promBase ? (promExpr ? `${promBase}/graph?g0.expr=${encodeURIComponent(promExpr)}&g0.tab=1` : `${promBase}/alerts`) : '';
         const amHref = amBase ? `${amBase}/#/alerts${amFilter ? `?receiver=&silenced=false&inhibited=false&active=true&filter=${amFilter}` : ''}` : '';
-        const links = [promGraphHref ? `<a href="${escapeHtml(promGraphHref)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(alertname ? 'Open in Prometheus with pre-filled ALERTS query' : 'Open Prometheus alerts')}" aria-label="Open in Prometheus">Prometheus</a>` : '', amHref ? `<a href="${escapeHtml(amHref)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(alertname ? 'Open in Alertmanager (filter pre-filled where supported)' : 'Open Alertmanager')}" aria-label="Open in Alertmanager">Alertmanager</a>` : ''].filter(Boolean).join('');
+        const grafanaHref = grafanaBase ? `${grafanaBase}/explore` : '';
+        const genUrl = typeof alert.generatorURL === 'string' ? alert.generatorURL : '';
+        const linkItems = [];
+        if (promGraphHref) linkItems.push(`<a href="${escapeHtml(promGraphHref)}" target="_blank" rel="noopener noreferrer" title="Open firing alert series in Prometheus" aria-label="Open in Prometheus">Prometheus</a>`);
+        if (amHref) linkItems.push(`<a href="${escapeHtml(amHref)}" target="_blank" rel="noopener noreferrer" title="Open matching alerts in Alertmanager" aria-label="Open in Alertmanager">Alertmanager</a>`);
+        if (grafanaHref) linkItems.push(`<a href="${escapeHtml(grafanaHref)}" target="_blank" rel="noopener noreferrer" title="Open Grafana Explore for drill-down" aria-label="Open in Grafana">Grafana</a>`);
+        if (genUrl && /^https?:\/\//i.test(genUrl)) linkItems.push(`<a href="${escapeHtml(genUrl)}" target="_blank" rel="noopener noreferrer" title="Open alert generator URL" aria-label="Open generator URL">Rule source</a>`);
+        if (alertname) linkItems.push(`<button type="button" class="btn-link runbook-btn" data-alert-runbook="${escapeHtml(alertname)}" aria-label="Open runbook for ${escapeHtml(alertname)}">Runbook</button>`);
+        const links = linkItems.join('');
         return `
         <div class="alert-item ${escapeHtml(severity)}">
             <div class="alert-title">${safeName.innerHTML}</div>
-            <div class="alert-description">${safeDesc.innerHTML}</div>
+            <div class="alert-description">${safeDesc.innerHTML}${contextParts.length ? `<div class="alert-context muted">${escapeHtml(contextParts.join(' · '))}</div>` : ''}</div>
             <div class="alert-meta">
                 <span class="alert-severity-tag">${escapeHtml(severity)}</span>
                 <span class="alert-age">${escapeHtml(ageStr)}</span>
@@ -484,9 +538,16 @@ function renderContainers() {
     state.lastRenderedContainerKey = renderKey;
 
     if (!names.length) {
-        grid.innerHTML = state.lastContainerMeta.hasUnlabeledRecent
-            ? '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>'
-            : '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+        const cadvisorCov = state.coverageStatus?.cadvisor;
+        if (cadvisorCov?.status === 'disabled' || cadvisorCov?.status === 'missing') {
+            grid.innerHTML = `<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>Container metrics unavailable.</strong> ${escapeHtml(cadvisorCov.reason || 'cAdvisor metrics are not available.')} To populate this view, enable/tune cAdvisor in <code>prometheus/prometheus.yml</code> and <code>docker-compose.monitoring.yml</code>, then restart Prometheus/cAdvisor.</span></div>`;
+        } else if (cadvisorCov?.status === 'down') {
+            grid.innerHTML = `<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>Container metrics unavailable.</strong> ${escapeHtml(cadvisorCov.reason || 'cAdvisor target is down.')}</span></div>`;
+        } else if (state.lastContainerMeta.hasUnlabeledRecent) {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>';
+        } else {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+        }
         return;
     }
     if (!filteredNames.length) {
@@ -501,11 +562,21 @@ function renderContainers() {
         groups.get(key).push(c);
     }
     const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    const renderItem = (container) => `
+    const renderItem = (container) => {
+        const promBase = extBase('prometheus');
+        const name = container.name || '';
+        const escapedName = String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ').replace(/\r/g, ' ');
+        const q = encodeURIComponent(`rate(container_cpu_usage_seconds_total{name="${escapedName}",image!=""}[5m])`);
+        const href = promBase ? `${promBase}/graph?g0.expr=${q}&g0.tab=0` : '';
+        const nameHtml = href
+            ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Drill down to container CPU in Prometheus">${escapeHtml(name)}</a>`
+            : escapeHtml(name);
+        return `
         <div class="container-item">
-            <div class="container-name">${escapeHtml(container.name)}</div>
+            <div class="container-name">${nameHtml}</div>
             <span class="container-status ${escapeHtml(container.status)}">${escapeHtml(container.status)}</span>
         </div>`;
+    };
     grid.innerHTML = sortedGroups.map(([key, items]) => `
         <section class="container-group" aria-label="${escapeHtml(key)} containers">
             <div class="container-group-header">
@@ -514,6 +585,76 @@ function renderContainers() {
             </div>
             <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
         </section>`).join('');
+}
+
+async function updateCoverageStatus(coreValues = {}) {
+    const [nodeUp, cadvisorUp, redisUp, postgresUp, alertmanagerUp, blackboxUp] = await Promise.all([
+        checkTargetUp('node'),
+        checkTargetUp('cadvisor'),
+        checkTargetUp('redis'),
+        checkTargetUp('postgres'),
+        checkTargetUp('alertmanager'),
+        checkTargetUp('blackbox-http'),
+    ]);
+
+    const fsSeries = await queryPrometheusSeries('node_filesystem_avail_bytes{mountpoint="/"}');
+    const [fsAge, nodeAge, backupAge, agentAge, baselineAge] = await Promise.all([
+        querySampleAgeSeconds('node_filesystem_avail_bytes{mountpoint="/"}'),
+        querySampleAgeSeconds('node_cpu_seconds_total'),
+        querySampleAgeSeconds('backup_last_success_timestamp'),
+        querySampleAgeSeconds('spectre_agent_up'),
+        querySampleAgeSeconds('spectre_security_baseline_exporter_up')
+    ]);
+    const coverage = {};
+    const staleIfOld = (age, warnAfterSec) => (age !== null && age > warnAfterSec);
+
+    coverage.prometheus = state.lastPrometheusConnected === true
+        ? { status: 'ok', reason: 'Prometheus API reachable' }
+        : state.lastPrometheusConnected === false
+            ? { status: 'down', reason: 'Prometheus API unreachable/disconnected' }
+            : { status: 'unknown', reason: 'Prometheus connectivity not yet checked' };
+
+    coverage.node_exporter = nodeUp || { status: 'unknown', reason: 'Node exporter status unknown' };
+    if (coverage.node_exporter.status === 'ok' && staleIfOld(nodeAge, 300)) {
+        coverage.node_exporter = { ...coverage.node_exporter, status: 'stale', reason: `Node exporter samples stale (~${Math.round(nodeAge)}s old)` };
+    }
+
+    if (cadvisorUp?.status === 'missing') {
+        coverage.cadvisor = { status: 'disabled', reason: 'cAdvisor scrape job/target not present (disabled in prometheus.yml by default due to CPU usage)' };
+    } else {
+        coverage.cadvisor = cadvisorUp || { status: 'unknown', reason: 'cAdvisor status unknown' };
+    }
+
+    coverage.redis_exporter = redisUp || { status: 'unknown', reason: 'Redis exporter status unknown' };
+    coverage.postgres_exporter = postgresUp || { status: 'unknown', reason: 'Postgres exporter status unknown' };
+    coverage.alertmanager = alertmanagerUp || { status: 'unknown', reason: 'Alertmanager status unknown' };
+    coverage.blackbox = blackboxUp || { status: 'unknown', reason: 'Blackbox exporter status unknown' };
+
+    if (Array.isArray(fsSeries) && fsSeries.length > 0) {
+        if (staleIfOld(fsAge, 300)) {
+            coverage.root_filesystem = { status: 'stale', reason: `node_filesystem_* samples stale for mountpoint "/" (~${Math.round(fsAge)}s old)` };
+        } else {
+            coverage.root_filesystem = { status: 'ok', reason: 'node_filesystem_* series available for mountpoint "/"' };
+        }
+    } else if (coreValues.disk !== null && coreValues.disk !== undefined) {
+        coverage.root_filesystem = { status: 'ok', reason: 'Root filesystem usage metric available' };
+    } else if (coverage.node_exporter.status === 'ok') {
+        coverage.root_filesystem = { status: 'missing', reason: 'No node_filesystem_* series for mountpoint "/" (can occur when node-exporter cannot read host mountinfo, e.g. userns without pid:host)' };
+    } else {
+        coverage.root_filesystem = { status: 'unknown', reason: 'Root filesystem metrics unavailable (node exporter not healthy)' };
+    }
+
+    coverage.backup_metrics = state.lastExporterStatus.backup
+        ? { status: staleIfOld(backupAge, 86400) ? 'stale' : 'ok', reason: staleIfOld(backupAge, 86400) ? `Backup metric samples stale (~${Math.round(backupAge)}s old)` : 'Backup/restic textfile metrics publishing' }
+        : { status: 'missing', reason: 'No backup/restic metrics (exporter not scheduled, not run, or no output)' };
+    coverage.agent_metrics = state.lastExporterStatus.agent
+        ? { status: staleIfOld(agentAge, 600) ? 'stale' : 'ok', reason: staleIfOld(agentAge, 600) ? `Agent metric samples stale (~${Math.round(agentAge)}s old)` : 'Spectre agent/security metrics publishing' }
+        : { status: 'missing', reason: 'No spectre agent/security metrics (agent unavailable or not exporting)' };
+    coverage.baseline_metrics = state.lastExporterStatus.baseline
+        ? { status: staleIfOld(baselineAge, 86400) ? 'stale' : 'ok', reason: staleIfOld(baselineAge, 86400) ? `Baseline metric samples stale (~${Math.round(baselineAge)}s old)` : 'Security baseline textfile metrics publishing' }
+        : { status: 'missing', reason: 'No security baseline metrics (baseline exporter not run or no output)' };
+
+    state.coverageStatus = coverage;
 }
 
 async function updateContainerStatus() {
@@ -604,7 +745,7 @@ export async function fetchAllMetrics(opts = {}) {
 
     const forceSlow = refreshChart;
     const slowIsCached = !forceSlow && state.slowMetricsCache && Date.now() - state.slowMetricsCacheAt < SLOW_METRICS_REFRESH_MS;
-    const activeRange = document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
+    const activeRange = state.currentChartRange || document.querySelector('.chart-controls .btn.active')?.dataset.range || '1h';
     const activePage = document.body.dataset.activePage || 'overview';
     const chartVisible = activePage === 'overview' || activePage === 'trends';
     const alertsVisible = activePage === 'overview' || activePage === 'alerts';
@@ -718,6 +859,8 @@ export async function fetchAllMetrics(opts = {}) {
         if (containersVisible) settleCardIds.push('containersCard');
         if (shouldRefreshChart) settleCardIds.push('chartCard');
         settleCardIds.forEach(id => setCardLoading(id, false));
+        await updateCoverageStatus({ disk });
+        renderContainers();
         updateLastRefreshed();
         updateDiagnostics();
     } catch (err) {
@@ -790,6 +933,42 @@ async function exportSnapshot() {
         URL.revokeObjectURL(url);
         showToast('Snapshot downloaded (clipboard unavailable)', 'info');
     }
+}
+
+async function openAlertRunbook(alertname) {
+    const panel = document.getElementById('alertRunbookPanel');
+    const title = document.getElementById('alertRunbookTitle');
+    const content = document.getElementById('alertRunbookContent');
+    if (!panel || !title || !content) return;
+    const rawName = String(alertname || '');
+    const safeName = rawName.replace(/[^A-Za-z0-9_.:-]/g, '').replace(/:/g, '-');
+    title.textContent = rawName ? `Runbook: ${rawName}` : 'Runbook';
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    content.textContent = 'Loading runbook…';
+    if (!safeName) {
+        content.textContent = 'No runbook available: invalid alert name.';
+        return;
+    }
+    try {
+        const res = await fetchWithTimeout(`/runbooks/${encodeURIComponent(safeName)}.md`, {}, 12000);
+        if (res.status === 404) {
+            content.textContent = `No runbook found for "${rawName}" (looked up ${safeName}.md). Use Prometheus/Alertmanager drill-down links above and add web-dashboard/runbooks/${safeName}.md if needed.`;
+            return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        content.textContent = text || '(Runbook is empty)';
+    } catch (e) {
+        content.textContent = `Failed to load runbook for "${rawName}". ${e && e.message ? e.message : ''}`.trim();
+    }
+}
+
+function closeAlertRunbook() {
+    const panel = document.getElementById('alertRunbookPanel');
+    if (!panel) return;
+    panel.hidden = true;
+    panel.setAttribute('aria-hidden', 'true');
 }
 
 function initDashboardShell() {
@@ -909,6 +1088,23 @@ function initDashboardShell() {
     setPage(pageFromHash(location.hash), { smooth: false });
 }
 
+function applyReadOnlyMode() {
+    if (!READ_ONLY) return;
+    document.body.classList.add('read-only-mode');
+    const banner = document.getElementById('readOnlyBanner');
+    if (banner) {
+        banner.hidden = false;
+        banner.setAttribute('aria-hidden', 'false');
+    }
+    document.querySelectorAll('[data-dashboard-action="backup"], [data-dashboard-action="maintenance"], [data-dashboard-action="security-scan"]').forEach((btn) => {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+        btn.title = 'Disabled in read-only mode';
+    });
+    const quickActions = document.querySelector('.quick-actions');
+    if (quickActions) quickActions.setAttribute('data-read-only', 'true');
+}
+
 export function initDashboard() {
     initializeTheme();
     loadRefreshInterval();
@@ -916,6 +1112,8 @@ export function initDashboard() {
     initExternalLinks();
     initActionsApi();
     initializeChart();
+    applyReadOnlyMode();
+    initActionActivity({ intervalMs: 30000 });
     fetchAllMetrics({ refreshChart: true });
     checkPrometheusConnection();
     updateTimestamp();
@@ -960,6 +1158,7 @@ export function initDashboard() {
             target.classList.add('active');
             target.setAttribute('aria-pressed', 'true');
             const range = target.dataset.range || '1h';
+            state.currentChartRange = range;
             localStorage.setItem('spectre-chart-range', range);
             updateChart(range);
         });
@@ -975,6 +1174,13 @@ export function initDashboard() {
             renderAlerts();
         });
     });
+    document.getElementById('alertsList')?.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('[data-alert-runbook]') : null;
+        if (!btn) return;
+        const name = btn.getAttribute('data-alert-runbook') || '';
+        openAlertRunbook(name).catch(() => {});
+    });
+    document.getElementById('alertRunbookClose')?.addEventListener('click', closeAlertRunbook);
     document.getElementById('containerFilter')?.addEventListener('input', () => renderContainers());
     document.querySelectorAll('[data-help-close]').forEach((el) => el.addEventListener('click', hideHelpDialog));
 

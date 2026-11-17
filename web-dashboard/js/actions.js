@@ -1,4 +1,4 @@
-import { ACTIONS_BASE } from './config.js';
+import { ACTIONS_BASE, ACTIONS_ALLOWED, READ_ONLY } from './config.js';
 import { showToast } from './dom.js';
 
 const TOKEN_KEY = 'spectre-action-token';
@@ -19,6 +19,10 @@ export function clearActionToken({ notify = true } = {}) {
 }
 
 export async function triggerAction(action, label, retry = true) {
+    if (READ_ONLY || !ACTIONS_ALLOWED) {
+        showToast(`${label}: dashboard is in read-only mode; actions are disabled.`, 'info');
+        return;
+    }
     if (!confirm(`This will request "${label}". Continue?`)) return;
 
     if (!ACTIONS_BASE) {
@@ -26,15 +30,22 @@ export async function triggerAction(action, label, retry = true) {
         return;
     }
 
+    const reasonInput = window.prompt(`Optional reason for "${label}" (leave blank to skip):`, '');
+    const reason = typeof reasonInput === 'string' ? reasonInput.trim() : '';
+    const actor = 'dashboard-ui';
+
     const token = getActionToken();
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['X-Dashboard-Action-Token'] = token;
+
+    const payload = { action, requestedAt: new Date().toISOString(), actor };
+    if (reason) payload.reason = reason;
 
     try {
         const response = await fetch(`${ACTIONS_BASE.replace(/\/$/, '')}/${encodeURIComponent(action)}`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ action, requestedAt: new Date().toISOString() })
+            body: JSON.stringify(payload)
         });
 
         let payload = null;
@@ -62,7 +73,8 @@ export async function triggerAction(action, label, retry = true) {
         }
 
         if (response.ok) {
-            const msg = payload?.message || `${label} accepted.`;
+            const tid = payload?.triggerId ? ` (trigger ${payload.triggerId})` : '';
+            const msg = (payload?.message || `${label} accepted.`) + tid;
             showToast(msg, 'success');
         } else {
             const detail = payload?.message || payload?.error || `HTTP ${response.status}`;
@@ -78,4 +90,6 @@ export function initActionsApi() {
     window.spectreDashboard = window.spectreDashboard || {};
     window.spectreDashboard.clearActionToken = () => clearActionToken({ notify: true });
     window.spectreDashboard.hasActionToken = () => !!getActionToken();
+    window.spectreDashboard.readOnly = READ_ONLY;
+    window.spectreDashboard.actionsAllowed = ACTIONS_ALLOWED;
 }

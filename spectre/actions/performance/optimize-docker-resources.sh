@@ -1,16 +1,48 @@
 #!/bin/bash
 set -euo pipefail
-PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
+
 # Docker Resource Optimization Script
+# Adds resource limits to a Docker Compose project via docker-compose.override.yml.
+#
+# Target resolution:
+#   1) DOCKER_COMPOSE_PROJECT_DIR (explicit project directory)
+#   2) Current working directory, if it contains a compose file
+#
+# To apply limits you can set DOCKER_COMPOSE_PROJECT_DIR=/path/to/project
 
 echo "Optimizing Docker container resource limits..."
 
-# Update docker-compose with resource limits for better performance
-cd "$PROJECTS_ROOT/Guardrail-AI"
+if [[ -n "${DOCKER_COMPOSE_PROJECT_DIR:-}" ]]; then
+    PROJECT_DIR="$DOCKER_COMPOSE_PROJECT_DIR"
+elif [[ -f "docker-compose.yml" || -f "docker-compose.yaml" || -f "compose.yml" || -f "compose.yaml" ]]; then
+    PROJECT_DIR="$PWD"
+else
+    echo "No Docker Compose project found." >&2
+    echo "Set DOCKER_COMPOSE_PROJECT_DIR to a directory containing a compose file and rerun." >&2
+    exit 1
+fi
+
+cd "$PROJECT_DIR"
+
+# Locate compose file
+COMPOSE_FILE=""
+for candidate in docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
+    if [[ -f "$candidate" ]]; then
+        COMPOSE_FILE="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$COMPOSE_FILE" ]]; then
+    echo "No compose file found in $PROJECT_DIR" >&2
+    exit 1
+fi
+
+echo "Target project: $PROJECT_DIR ($COMPOSE_FILE)"
 
 # Check if current docker-compose has resource limits
-if ! grep -q "deploy:" docker-compose.yml; then
-    echo "Adding resource limits to docker-compose.yml"
+if ! grep -q "deploy:" "$COMPOSE_FILE"; then
+    echo "Adding resource limits to docker-compose.override.yml"
 
     # Add resource limits to key services
     # This will be added as a separate optimization file
@@ -98,9 +130,9 @@ services:
           cpus: '0.25'
           memory: 128M
 EOF
-    
+
     echo "Resource limits added to docker-compose.override.yml"
-    echo "Restart containers to apply: docker-compose up -d"
+    echo "Restart containers to apply: docker compose up -d (or docker-compose up -d)"
 else
-    echo "Resource limits already configured"
+    echo "Resource limits already configured in $COMPOSE_FILE"
 fi

@@ -4,7 +4,10 @@ export const proto = location.protocol === 'https:' ? 'https:' : 'http:';
 
 export const PROMETHEUS_URL = qs.get('prometheus') || '';
 const actionsBaseParam = qs.get('actionsBase');
+const readOnlyParam = (qs.get('readOnly') || qs.get('readonly') || '').toLowerCase();
+export const READ_ONLY = readOnlyParam === '1' || readOnlyParam === 'true' || readOnlyParam === 'yes' || readOnlyParam === 'on';
 export const ACTIONS_BASE = actionsBaseParam === 'off' ? '' : (actionsBaseParam || '/actions');
+export const ACTIONS_ALLOWED = !READ_ONLY && !!ACTIONS_BASE;
 
 function backendUrl(urlKey, portKey, _defaultPort, proxyBase) {
     const full = qs.get(urlKey);

@@ -2,6 +2,16 @@
 
 All notable changes to the spectre-suite project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Web dashboard: data coverage/freshness diagnostics and target/fleet rollups, read-only viewer mode (`?readOnly=1`), alert/metric drill-down links, in-context alert runbooks, action run status persistence/API, and Action Activity UI.
+- Dashboard actions: bounded/redacted run status records, read-only runs endpoints (`GET /actions/runs*`), and basic request content-type hardening.
+
+### Changed
+- Dashboard trends/reports: persisted global time-range behavior and improved report query/no-data alignment; cAdvisor enablement documented as tuned/opt-in due to prior CPU impact.
+- Documentation: updated dashboard/root docs and edge-hardening guidance for sharing profiles, ops workflows, and observability caveats.
+
 ## [1.0.0] - 2026-06-21
 
 ### Added

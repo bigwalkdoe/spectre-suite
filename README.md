@@ -276,26 +276,29 @@ SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
 
 The static operator view is served at `http://localhost:8081` (bind-mounted read-only
 from `web-dashboard/` and served by nginx). It provides a lightweight way to monitor
-the stack without opening Grafana directly.
+and operate the stack without opening Grafana/Prometheus directly.
 
 | Page | Contents |
 |---|---|
-| Overview | Security overview card |
-| System Health | CPU / memory / disk / network, backup & restic status, security findings |
-| Active Alerts | Alertmanager alerts, filterable by severity |
-| Containers | Container inventory + filter |
-| Resource Trends | Chart.js trend of the four core resource series |
-| Security | Security scan summary |
-| Backup | Backup & restic health |
-| Reports | Historical trends over a chosen range (24h/7d/30d/90d): backup & restic health, security findings, alert history, or system health, with JSON/CSV export |
+| Overview | Quick stats, alerts/security/backup summaries, diagnostics, action activity |
+| System Health | CPU / memory / disk / network and live health checks |
+| Active Alerts | Prometheus alerts with severity filters, drill-down links, and in-context runbooks |
+| Containers | Container inventory/filter with coverage-aware states (e.g. cAdvisor disabled guidance) |
+| Resource Trends | Chart.js trends (1h/6h/24h/7d, persisted) with CSV export |
+| Security | Agent/baseline status, unresolved findings, severity breakdown |
+| Backup | Backup & restic health/verify/offsite, repo size/free |
+| Reports | Historical trends (24h/7d/30d/90d) for backup/security/alerts/system with JSON/CSV export |
 
-**Features:** auto-refresh (15s/30s/1m/5m/Off) with a live countdown, keyboard
-shortcuts (`R` refresh, `?` help, `Esc` dismiss), chart data CSV export, and
-dark/light themes. Prometheus is read same-origin through the `/api/` proxy
-(nginx rewrites `/api/*` → `/prometheus/api/*`), so no CORS is needed; the
-dashboard degrades to an error state rather than blank cards when Prometheus is
-unreachable. Source: `web-dashboard/index.html`, `web-dashboard/dashboard.js`,
-`web-dashboard/reports.js`, `web-dashboard/nginx.conf`.
+**Features:** auto-refresh with countdown, keyboard shortcuts (`R`/`?`/`Esc`), snapshot/chart export,
+dark/light themes, and drill-down links to Prometheus/Alertmanager/Grafana. Diagnostics shows query
+health plus metric coverage/freshness and target rollups (explicit missing/disabled reasons). Viewer mode
+(`?readOnly=1`) disables operator actions in UI; allowlisted token-protected actions queue triggers and
+expose run status/activity via `GET /actions/runs*` (backed by host handler status records).
+
+Prometheus is read same-origin through `/api/` (proxied to Prometheus). The dashboard degrades to
+explicit coverage/error states rather than misleading blanks when exporters/targets are unavailable.
+Source: `web-dashboard/`, `web-dashboard/actions-backend/`, `prometheus/`. See `web-dashboard/README.md`
+for deployment profiles and hardening guidance.
 
 ---
 

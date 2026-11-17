@@ -8,12 +8,16 @@ A custom web-based monitoring dashboard that provides real-time system metrics a
 - Side panel tabs route to focused pages (Overview, System Health, Alerts, Containers, Trends, Security, Backup)
 - The sidebar and main content scroll independently; the top bar stays sticky
 - All metric cards remain in the DOM so Prometheus-backed updates continue across pages
+- Key metric cards and active alerts include drill-down links to Prometheus/Alertmanager/Grafana (and alert `generatorURL` when provided) for faster investigation
+- Container names (when available) link to Prometheus container CPU drill-down queries; chart drill-downs open in Prometheus/Grafana for deeper analysis
+- Active alerts can open in-context runbooks served from `/runbooks/<AlertName>.md` (with safe plain-text rendering and fallback guidance when missing)
 
 ### Real-time Metrics
 - **CPU Usage**: Live CPU utilization with status indicators
 - **Memory Usage**: Memory consumption tracking
 - **Disk Usage**: Storage monitoring with alerts
 - **Network I/O**: Real-time network traffic monitoring
+- **Resource Trends:** time-range presets (1h/6h/24h/7d) backed by Prometheus `query_range`, persisted in-browser and used for trend chart refreshes
 
 ### System Health
 - System load monitoring
@@ -86,20 +90,17 @@ Web Dashboard → Prometheus API → System Metrics
 ## Configuration
 
 ### Prometheus Connection
-The dashboard connects to Prometheus at `http://localhost:9090` by default. To change this:
+The dashboard is served by nginx and proxies Prometheus at same-origin `/api/` (see `web-dashboard/nginx.conf`). Default in-browser config is set in `web-dashboard/js/config.js`:
 
-Edit `web-dashboard/dashboard.js`:
 ```javascript
-const PROMETHEUS_URL = 'http://your-prometheus-url:9090';
+// web-dashboard/js/config.js
+export const PROMETHEUS_URL = '/api';
 ```
+
+To point at a different proxied path/backend, update `PROMETHEUS_URL` in `web-dashboard/js/config.js` (and nginx proxy config as needed).
 
 ### Refresh Interval
-Default refresh interval is 30 seconds. To change:
-
-Edit `web-dashboard/dashboard.js`:
-```javascript
-const REFRESH_INTERVAL = 30000; // milliseconds
-```
+Default dashboard refresh interval is 30 seconds and can be overridden via URL params/config in `web-dashboard/js/config.js` (e.g. `DEFAULT_REFRESH_INTERVAL`). Chart/report query ranges use the dashboard's selected time range controls.
 
 ### Quick Actions & Action Endpoints
 Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actions/<action>` via the nginx proxy to the `dashboard-actions` service.
@@ -108,17 +109,23 @@ Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actio
 - Set `DASHBOARD_ACTION_TOKEN` in `.env`.
 - Install the host handler: `./spectre/actions/systemd/install-dashboard-actions-handler.sh` (or copy units from `systemd/dashboard-actions/` and adjust paths).
 - Trigger actions with the dashboard; when prompted, enter the token (stored in `sessionStorage` for the browser session).
+- The host trigger handler records bounded, redacted run status/result artifacts under `dashboard-actions/triggers/runs/<trigger-id>.json` (queued/running/succeeded/failed/rejected with timestamps, exit code, and safe message) for audit/status consumption.
+- Read-only, token-protected run status endpoints are proxied via nginx: `GET /actions/runs?limit=&status=` and `GET /actions/runs/<id>` (same `X-Dashboard-Action-Token` auth requirements as action requests). `GET /actions/healthz` is available for service health. Queueing remains `POST /actions/<action>` only.
+- The dashboard includes an **Action Activity** panel (Overview) showing recent queued/running/completed runs, trigger IDs, timestamps, and safe outcomes/messages returned by the runs API. Use the refresh button or wait for periodic updates; provide the action token in-session if required.
 
 To disable actions in the UI: open the dashboard with `?actionsBase=off`.
+For safe sharing/view-only access, open with `?readOnly=1` (or `true`): the UI shows a read-only banner and blocks operator actions. `readOnly` takes precedence for UI/action behavior (actions disabled), while `actionsBase=off` also disables action endpoints in the UI. UI read-only mode is not a substitute for server-side auth/restrictions when exposing the dashboard.
 
 
 ## Customization
 
 ### Adding Custom Metrics
-To add custom metrics to the dashboard:
+To add custom metrics to the dashboard (modular frontend):
 
-1. Add a new query function in `dashboard.js`:
+1. Add query/aggregation logic in `web-dashboard/js/dashboard-core.js` (and `web-dashboard/js/prometheus.js` if a reusable query helper is needed):
 ```javascript
+import { queryPrometheus } from './prometheus.js';
+
 async function queryCustomMetric() {
     return await queryPrometheus('your_prometheus_query');
 }
@@ -165,7 +172,12 @@ Planned features include:
 ### Production Hardening (nginx)
 The dashboard nginx config includes baseline hardening: `server_tokens off`, `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, and an enforced same-origin `Content-Security-Policy` (Font Awesome is vendored under `vendor/fontawesome/`; no CDN script/style/font dependency). Dotfiles and dashboard internals (`nginx.conf`, `README.md`, `actions-backend/`, `edge-hardening.example.nginx.conf`, `00-http-hardening.conf`) are denied from the bind-mounted document root.
 
-`00-http-hardening.conf` defines http-level request/connection limits; it is mounted into nginx `conf.d` by `docker-compose.monitoring.yml`. `/api/` is limited to `GET|HEAD` and `/actions/` to `POST` with stricter rate limits. The web-dashboard container runs read-only with tmpfs and `no-new-privileges`.
+`00-http-hardening.conf` defines http-level request/connection limits; it is mounted into nginx `conf.d` by `docker-compose.monitoring.yml`. `/api/` is limited to `GET|HEAD`; action queueing is `POST /actions/<action>` only while run-status/health reads are `GET|HEAD` on specific `/actions/*` paths, with token checks enforced by the backend when configured. The web-dashboard container runs read-only with tmpfs and `no-new-privileges`.
+
+### Deployment profiles for sharing
+- **Viewer (read-only, safest):** expose dashboard over trusted network/VPN or behind SSO, use `?readOnly=1` for operator UI gating, and avoid sharing action tokens. Consider restricting/removing proxied admin UIs (`/prometheus/`, `/grafana/`, `/alertmanager/`) at the edge or in nginx for non-admin users.
+- **Operator (actions enabled):** require strong edge authentication/authorization (SSO/MFA), TLS+HSTS, and scoped access to `/actions/`; use `DASHBOARD_ACTION_TOKEN` as a controlled secret, rotate it, and monitor/audit `dashboard-actions` stderr events and nginx logs. Keep the host trigger handler and `dashboard-actions/triggers/` permissions tightly controlled.
+- **Restricted proxied UIs:** if sharing broadly, prefer dashboard-only access (`/` + `/api/*`) and do not expose backend UIs through the dashboard proxy; if proxied UIs are needed, gate them behind admin-only auth at the edge/reverse proxy.
 
 ### Production Deployment
 For production use:
@@ -180,7 +192,7 @@ For production use:
 - No built-in authentication (use reverse proxy)
 - HTTP only inside the container (use TLS termination)
 - No user management
-- Action endpoints are allowlisted/token-protected, but deployment still requires careful host-handler and trigger-directory controls
+- Action endpoints are allowlisted/token-protected, but deployment still requires careful host-handler and trigger-directory controls; UI read-only mode is not a server-side authorization boundary.
 
 ## Troubleshooting
 
@@ -203,6 +215,11 @@ For production use:
 2. Check browser console for JavaScript errors
 
 3. Verify Prometheus queries are valid in the Prometheus UI
+
+4. Review the **Diagnostics → Data coverage & freshness** panel in the dashboard (including the targets/fleet rollup showing per-job up/down counts):
+   - It reports target/exporter presence (`up`), disabled scrape jobs, and common missing-series cases.
+   - **Containers:** in this stack, the `cadvisor` Prometheus scrape job is disabled by default (`prometheus/prometheus.yml`) due to prior high CPU usage. The dashboard reports this explicitly. To enable, uncomment/tune the cAdvisor job (e.g. longer scrape/housekeeping intervals) and start/tune the `cadvisor` service in `docker-compose.monitoring.yml`, then restart Prometheus/cAdvisor and re-evaluate host CPU impact.
+   - **Disk/filesystem:** disk cards/alerts depend on `node_filesystem_*` for mountpoint `/`. If node-exporter cannot read host mountinfo (e.g. Docker user namespace remapping without `pid: host`, which is incompatible with `userns-remap`), filesystem series may be missing and will be shown as a coverage issue.
 
 ### CORS Issues
 If you encounter CORS errors when accessing Prometheus:

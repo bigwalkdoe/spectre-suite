@@ -87,6 +87,10 @@
             </header>
 
             <main id="main-content" class="content" tabindex="-1">
+                <div id="readOnlyBanner" class="read-only-banner" hidden aria-hidden="true" role="status">
+                    <i class="fas fa-eye" aria-hidden="true"></i>
+                    <span><strong>Read-only mode.</strong> Actions are disabled for this session. Remove <code>?readOnly=1</code> (and ensure actions are configured) to enable operator actions.</span>
+                </div>
                 <div id="page-overview" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-health" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-alerts" class="page-anchor" aria-hidden="true"></div>
@@ -148,7 +152,7 @@
                     <div class="stat-card cpu card" id="cpuCard">
                         <div class="stat-icon"><i class="fas fa-microchip" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">CPU Usage</div>
+                            <div class="stat-label">CPU Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20avg(rate(node_cpu_seconds_total%7Bmode%3D%22idle%22%7D%5B5m%5D)))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open CPU query in Prometheus" aria-label="Open CPU query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="cpuUsage">--%</div>
                             <div class="stat-change" id="cpuChange">--</div>
                         </div>
@@ -156,7 +160,7 @@
                     <div class="stat-card memory card" id="memoryCard">
                         <div class="stat-icon"><i class="fas fa-memory" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">Memory Usage</div>
+                            <div class="stat-label">Memory Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_memory_MemAvailable_bytes%20%2F%20node_memory_MemTotal_bytes))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open memory query in Prometheus" aria-label="Open memory query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="memoryUsage">--%</div>
                             <div class="stat-change" id="memoryChange">--</div>
                         </div>
@@ -164,7 +168,7 @@
                     <div class="stat-card disk card" id="diskCard">
                         <div class="stat-icon"><i class="fas fa-hdd" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">Disk Usage</div>
+                            <div class="stat-label">Disk Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_filesystem_avail_bytes%7Bmountpoint%3D%22%2F%22%7D%20%2F%20node_filesystem_size_bytes%7Bmountpoint%3D%22%2F%22%7D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open disk usage query in Prometheus" aria-label="Open disk usage query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="diskUsage">--%</div>
                             <div class="stat-change" id="diskChange">--</div>
                         </div>
@@ -172,7 +176,7 @@
                     <div class="stat-card network card" id="networkCard">
                         <div class="stat-icon"><i class="fas fa-network-wired" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">Network I/O</div>
+                            <div class="stat-label">Network I/O <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=sum(rate(node_network_receive_bytes_total%7Bdevice!~%22lo%7Cveth.*%7Cdocker.*%7Cbr-.*%7Ccni.*%7Cflannel.*%7Ccali.*%22%7D%5B5m%5D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open network RX query in Prometheus" aria-label="Open network RX query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="networkIO">--</div>
                             <div class="stat-change" id="networkChange">--</div>
                         </div>
@@ -194,6 +198,13 @@
                             </div>
                             <div class="alerts-list" id="alertsList">
                                 <div class="no-alerts">No active alerts</div>
+                            </div>
+                            <div id="alertRunbookPanel" class="runbook-panel" hidden aria-hidden="true">
+                                <div class="runbook-panel-header">
+                                    <strong id="alertRunbookTitle">Runbook</strong>
+                                    <button type="button" class="btn btn-sm" id="alertRunbookClose" aria-label="Close runbook">Close</button>
+                                </div>
+                                <pre id="alertRunbookContent" class="runbook-content"></pre>
                             </div>
                         </div>
                     </section>
@@ -291,6 +302,19 @@
                         </div>
                     </section>
 
+                    <section class="card full-width" id="actionActivityCard" data-show-pages="overview">
+                        <div class="card-header">
+                            <h2><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Action Activity</h2>
+                            <div>
+                                <span class="badge" id="actionRunsStatus">--</span>
+                                <button id="actionRunsRefreshBtn" class="btn btn-sm" type="button" aria-label="Refresh action activity"><i class="fas fa-sync-alt" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+                        <div class="card-body" aria-live="polite">
+                            <div id="actionRunsList" class="activity-list"><div class="no-alerts"><span>Loading action activity…</span></div></div>
+                        </div>
+                    </section>
+
                     <section class="card" id="diagnosticsCard" data-show-pages="overview security">
                         <div class="card-header">
                             <h2><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnostics</h2>
@@ -303,6 +327,11 @@
                                 <div class="security-item kv-item"><span class="security-label kv-label">Agent Metrics</span><span class="security-value kv-value" id="agentMetricsStatus">--</span></div>
                                 <div class="security-item kv-item"><span class="security-label kv-label">Baseline Exporter</span><span class="security-value kv-value" id="baselineExporterStatus">--</span></div>
                                 <div class="security-item kv-item"><span class="security-label kv-label">Auto-refresh</span><span class="security-value kv-value" id="autoRefreshStatus">--</span></div>
+                            </div>
+                            <div class="coverage-section">
+                                <div class="coverage-heading">Data coverage &amp; freshness</div>
+                                <div id="coverageDetails" class="coverage-details"><span class="muted">Coverage not yet checked.</span></div>
+                                <div class="muted" style="margin-top:0.5rem;font-size:0.85em;">If data is missing, check Prometheus targets, exporter schedules, and known constraints (e.g. cAdvisor disabled by default; root filesystem metrics may be unavailable with Docker userns and no <code>pid: host</code>). Use drill-down links to inspect queries directly.</div>
                             </div>
                         </div>
                     </section>
