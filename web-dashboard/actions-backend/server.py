@@ -251,11 +251,14 @@ def main() -> None:
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     # /triggers is a bind mount owned by the host operator (e.g. uid 1000). The
     # HTTP server drops to the unprivileged 'nobody' user below, so make the
-    # queue directory sticky world-writable so 'nobody' can create trigger
-    # files while the host handler can still move them to processed/ or failed/.
-    # This mirrors the /tmp model: sticky bit lets the directory owner remove
-    # any file, while 'nobody' can create and remove its own files.
-    TRIGGERS_DIR.chmod(0o1777)
+    # queue directory sticky world-writable when possible so 'nobody' can create
+    # trigger files while the host handler can still move them to processed/ or
+    # failed/. On some bind-mount/SELinux setups chmod may be disallowed; in
+    # that case continue and rely on existing permissions.
+    try:
+        TRIGGERS_DIR.chmod(0o1777)
+    except (PermissionError, OSError) as exc:
+        print(f"WARNING: could not chmod {TRIGGERS_DIR} to 1777 ({exc}); continuing with existing permissions", file=sys.stderr)
     # Drop privileges to the unprivileged 'nobody' user before serving, keeping
     # the runtime hardened (no script execution in container, read-only repo
     # mount, only /triggers writable). Must run as root initially for the
