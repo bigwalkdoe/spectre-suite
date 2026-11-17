@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(dirname "$(dirname "$SCRIPT_DIR")")"}"
 # shellcheck disable=SC1091  # resolved at runtime
-source "$PROJECT_ROOT/detect-distribution.sh"
+source "$SCRIPT_DIR/../detect-distribution.sh"
 
 # Initialize distribution settings
 detect_distribution
@@ -102,28 +102,23 @@ maxretry = 3
 # Configure AIDE (Advanced Intrusion Detection Environment)
 configure_aide() {
     echo "Configuring AIDE..."
-    
+
     if ! command -v aide >/dev/null 2>&1; then
         echo "AIDE not installed, skipping configuration"
         return 1
     fi
-    
-    # Initialize AIDE database
-    sudo aide --init
-    sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-    
-    # Create AIDE configuration
-    sudo bash -c 'cat > /etc/aide.conf << "EOF"
+
+    # Create AIDE configuration (AIDE >= 0.17 uses database_in/database_out)
+    sudo tee /etc/aide.conf >/dev/null << 'EOF'
 # AIDE Configuration for Spectre Suite
 
 # Database locations
-database=file:/var/lib/aide/aide.db
+database_in=file:/var/lib/aide/aide.db
 database_out=file:/var/lib/aide/aide.db.new
 
 # Define rules
-All=p+a+rmd+sha256+c+b+s+f+u+g+sha1+m+c+md5+sha256+tiger+xattr
-Norm=p+a+rmd+sha256+c+b+f+u+g+n+sha1+m+c+md5+sha256+tiger
-NoI=p+a+rmd+sha256+c+b+f+u+g+n+sha1+m+c+md5+sha256+tiger+xattr
+All=p+i+n+u+g+s+m+c+sha256
+Norm=p+i+n+u+g+s+m+c+sha256
 
 # Directories to monitor
 /etc All
@@ -142,7 +137,13 @@ NoI=p+a+rmd+sha256+c+b+f+u+g+n+sha1+m+c+md5+sha256+tiger+xattr
 !/dev
 !/proc
 !/sys
-EOF'
+EOF
+
+    # Initialize AIDE database against the written configuration
+    sudo aide --init
+    if [[ -f /var/lib/aide/aide.db.new ]]; then
+        sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+    fi
 }
 
 # Configure security monitoring
