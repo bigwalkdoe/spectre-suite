@@ -1,4 +1,4 @@
-import { PROMETHEUS_URL, EXTERNAL_BACKENDS, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase, READ_ONLY, ACTIONS_ALLOWED } from './config.js';
+import { PROMETHEUS_URL, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase, READ_ONLY, ACTIONS_ALLOWED } from './config.js';
 import { fetchWithTimeout, escapeHtml, setText, setCardLoading, setCardError, clearCardError, runCardUpdate, showToast, setCardUpdated, formatBytes, formatBytesPerSec, formatRelativeTime, formatUptime } from './dom.js';
 import { state } from './state.js';
 import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp, querySampleAgeSeconds } from './prometheus.js';
@@ -565,7 +565,8 @@ function renderContainers() {
     const renderItem = (container) => {
         const promBase = extBase('prometheus');
         const name = container.name || '';
-        const q = encodeURIComponent(`rate(container_cpu_usage_seconds_total{name="${name.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}",image!=""}[5m])`);
+        const escapedName = String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ').replace(/\r/g, ' ');
+        const q = encodeURIComponent(`rate(container_cpu_usage_seconds_total{name="${escapedName}",image!=""}[5m])`);
         const href = promBase ? `${promBase}/graph?g0.expr=${q}&g0.tab=0` : '';
         const nameHtml = href
             ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Drill down to container CPU in Prometheus">${escapeHtml(name)}</a>`
@@ -939,8 +940,9 @@ async function openAlertRunbook(alertname) {
     const title = document.getElementById('alertRunbookTitle');
     const content = document.getElementById('alertRunbookContent');
     if (!panel || !title || !content) return;
-    const safeName = String(alertname || '').replace(/[^A-Za-z0-9_-]/g, '');
-    title.textContent = safeName ? `Runbook: ${safeName}` : 'Runbook';
+    const rawName = String(alertname || '');
+    const safeName = rawName.replace(/[^A-Za-z0-9_.:-]/g, '').replace(/:/g, '-');
+    title.textContent = rawName ? `Runbook: ${rawName}` : 'Runbook';
     panel.hidden = false;
     panel.setAttribute('aria-hidden', 'false');
     content.textContent = 'Loading runbook…';
@@ -951,14 +953,14 @@ async function openAlertRunbook(alertname) {
     try {
         const res = await fetchWithTimeout(`/runbooks/${encodeURIComponent(safeName)}.md`, {}, 12000);
         if (res.status === 404) {
-            content.textContent = `No runbook found for "${safeName}". Use Prometheus/Alertmanager drill-down links above and add web-dashboard/runbooks/${safeName}.md if needed.`;
+            content.textContent = `No runbook found for "${rawName}" (looked up ${safeName}.md). Use Prometheus/Alertmanager drill-down links above and add web-dashboard/runbooks/${safeName}.md if needed.`;
             return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
         content.textContent = text || '(Runbook is empty)';
     } catch (e) {
-        content.textContent = `Failed to load runbook for "${safeName}". ${e && e.message ? e.message : ''}`.trim();
+        content.textContent = `Failed to load runbook for "${rawName}". ${e && e.message ? e.message : ''}`.trim();
     }
 }
 

@@ -30,15 +30,22 @@ export async function triggerAction(action, label, retry = true) {
         return;
     }
 
+    const reasonInput = window.prompt(`Optional reason for "${label}" (leave blank to skip):`, '');
+    const reason = typeof reasonInput === 'string' ? reasonInput.trim() : '';
+    const actor = 'dashboard-ui';
+
     const token = getActionToken();
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['X-Dashboard-Action-Token'] = token;
+
+    const payload = { action, requestedAt: new Date().toISOString(), actor };
+    if (reason) payload.reason = reason;
 
     try {
         const response = await fetch(`${ACTIONS_BASE.replace(/\/$/, '')}/${encodeURIComponent(action)}`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ action, requestedAt: new Date().toISOString() })
+            body: JSON.stringify(payload)
         });
 
         let payload = null;

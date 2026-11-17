@@ -1,5 +1,5 @@
 import { ACTIONS_BASE, ACTIONS_ALLOWED, READ_ONLY } from './config.js';
-import { fetchWithTimeout, escapeHtml, showToast } from './dom.js';
+import { fetchWithTimeout, escapeHtml } from './dom.js';
 import { getActionToken } from './actions.js';
 
 function formatRunTime(value) {

@@ -90,20 +90,17 @@ Web Dashboard → Prometheus API → System Metrics
 ## Configuration
 
 ### Prometheus Connection
-The dashboard connects to Prometheus at `http://localhost:9090` by default. To change this:
+The dashboard is served by nginx and proxies Prometheus at same-origin `/api/` (see `web-dashboard/nginx.conf`). Default in-browser config is set in `web-dashboard/js/config.js`:
 
-Edit `web-dashboard/dashboard.js`:
 ```javascript
-const PROMETHEUS_URL = 'http://your-prometheus-url:9090';
+// web-dashboard/js/config.js
+export const PROMETHEUS_URL = '/api';
 ```
+
+To point at a different proxied path/backend, update `PROMETHEUS_URL` in `web-dashboard/js/config.js` (and nginx proxy config as needed).
 
 ### Refresh Interval
-Default refresh interval is 30 seconds. To change:
-
-Edit `web-dashboard/dashboard.js`:
-```javascript
-const REFRESH_INTERVAL = 30000; // milliseconds
-```
+Default dashboard refresh interval is 30 seconds and can be overridden via URL params/config in `web-dashboard/js/config.js` (e.g. `DEFAULT_REFRESH_INTERVAL`). Chart/report query ranges use the dashboard's selected time range controls.
 
 ### Quick Actions & Action Endpoints
 Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actions/<action>` via the nginx proxy to the `dashboard-actions` service.
@@ -123,10 +120,12 @@ For safe sharing/view-only access, open with `?readOnly=1` (or `true`): the UI s
 ## Customization
 
 ### Adding Custom Metrics
-To add custom metrics to the dashboard:
+To add custom metrics to the dashboard (modular frontend):
 
-1. Add a new query function in `dashboard.js`:
+1. Add query/aggregation logic in `web-dashboard/js/dashboard-core.js` (and `web-dashboard/js/prometheus.js` if a reusable query helper is needed):
 ```javascript
+import { queryPrometheus } from './prometheus.js';
+
 async function queryCustomMetric() {
     return await queryPrometheus('your_prometheus_query');
 }

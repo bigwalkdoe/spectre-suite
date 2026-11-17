@@ -11,6 +11,7 @@ This service does NOT execute scripts itself.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import pwd
@@ -65,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
         remote = self._remote()
         if TOKEN:
             provided = self.headers.get("X-Dashboard-Action-Token", "")
-            if provided != TOKEN:
+            if not hmac.compare_digest(provided, TOKEN):
                 self._audit("auth_rejected", path=self.path, status=401, remote=remote)
                 json_response(self, 401, {"ok": False, "error": "unauthorized", "message": "Missing or invalid X-Dashboard-Action-Token"})
                 return False
@@ -160,6 +161,19 @@ class Handler(BaseHTTPRequestHandler):
 
         self._audit("request_rejected", method="GET", path=self.path, status=404, remote=self._remote())
         json_response(self, 404, {"ok": False, "error": "not_found"})
+
+    def _method_not_allowed(self) -> None:
+        self._audit("request_rejected", method=self.command, path=self.path, status=405, remote=self._remote())
+        json_response(self, 405, {"ok": False, "error": "method_not_allowed"})
+
+    def do_PUT(self) -> None:  # noqa: N802
+        self._method_not_allowed()
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        self._method_not_allowed()
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        self._method_not_allowed()
 
     def do_POST(self) -> None:  # noqa: N802
         remote = self._remote()
