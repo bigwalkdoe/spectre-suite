@@ -173,7 +173,12 @@ Planned features include:
 ### Production Hardening (nginx)
 The dashboard nginx config includes baseline hardening: `server_tokens off`, `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, and an enforced same-origin `Content-Security-Policy` (Font Awesome is vendored under `vendor/fontawesome/`; no CDN script/style/font dependency). Dotfiles and dashboard internals (`nginx.conf`, `README.md`, `actions-backend/`, `edge-hardening.example.nginx.conf`, `00-http-hardening.conf`) are denied from the bind-mounted document root.
 
-`00-http-hardening.conf` defines http-level request/connection limits; it is mounted into nginx `conf.d` by `docker-compose.monitoring.yml`. `/api/` is limited to `GET|HEAD` and `/actions/` to `POST` with stricter rate limits. The web-dashboard container runs read-only with tmpfs and `no-new-privileges`.
+`00-http-hardening.conf` defines http-level request/connection limits; it is mounted into nginx `conf.d` by `docker-compose.monitoring.yml`. `/api/` is limited to `GET|HEAD`; action queueing is `POST /actions/<action>` only while run-status/health reads are `GET|HEAD` on specific `/actions/*` paths, with token checks enforced by the backend when configured. The web-dashboard container runs read-only with tmpfs and `no-new-privileges`.
+
+### Deployment profiles for sharing
+- **Viewer (read-only, safest):** expose dashboard over trusted network/VPN or behind SSO, use `?readOnly=1` for operator UI gating, and avoid sharing action tokens. Consider restricting/removing proxied admin UIs (`/prometheus/`, `/grafana/`, `/alertmanager/`) at the edge or in nginx for non-admin users.
+- **Operator (actions enabled):** require strong edge authentication/authorization (SSO/MFA), TLS+HSTS, and scoped access to `/actions/`; use `DASHBOARD_ACTION_TOKEN` as a controlled secret, rotate it, and monitor/audit `dashboard-actions` stderr events and nginx logs. Keep the host trigger handler and `dashboard-actions/triggers/` permissions tightly controlled.
+- **Restricted proxied UIs:** if sharing broadly, prefer dashboard-only access (`/` + `/api/*`) and do not expose backend UIs through the dashboard proxy; if proxied UIs are needed, gate them behind admin-only auth at the edge/reverse proxy.
 
 ### Production Deployment
 For production use:
@@ -188,7 +193,7 @@ For production use:
 - No built-in authentication (use reverse proxy)
 - HTTP only inside the container (use TLS termination)
 - No user management
-- Action endpoints are allowlisted/token-protected, but deployment still requires careful host-handler and trigger-directory controls
+- Action endpoints are allowlisted/token-protected, but deployment still requires careful host-handler and trigger-directory controls; UI read-only mode is not a server-side authorization boundary.
 
 ## Troubleshooting
 

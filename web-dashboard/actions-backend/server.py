@@ -165,6 +165,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
+        # Basic hardening: require JSON content type for queue requests (best-effort).
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if ctype and ctype not in ("application/json", "text/json"):
+            self._audit("action_rejected", reason="unsupported_content_type", path=self.path, status=415, remote=remote)
+            json_response(self, 415, {"ok": False, "error": "unsupported_media_type", "message": "Use application/json"})
+            return
+
         action = self.path.strip("/").split("/")[-1]
         if action not in ALLOWLIST:
             self._audit("action_rejected", action=action, path=self.path, status=400, remote=remote)
