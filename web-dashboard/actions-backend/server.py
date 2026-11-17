@@ -98,6 +98,28 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, 400, {"ok": False, "error": "invalid_script_path"})
             return
 
+        # Optional, bounded metadata from UI (never log body/token contents).
+        reason = None
+        actor = None
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except Exception:
+            length = 0
+        if length > 0:
+            try:
+                raw = self.rfile.read(min(length, 4096))
+                payload = json.loads(raw.decode("utf-8") or "{}") if raw else {}
+                if isinstance(payload, dict):
+                    r = payload.get("reason")
+                    a = payload.get("actor")
+                    if isinstance(r, str) and r.strip():
+                        reason = r.strip()[:200]
+                    if isinstance(a, str) and a.strip():
+                        actor = a.strip()[:120]
+            except Exception:
+                # Ignore malformed/oversized bodies; queue still proceeds.
+                pass
+
         trigger = {
             "id": str(uuid.uuid4()),
             "action": action,
@@ -106,6 +128,10 @@ class Handler(BaseHTTPRequestHandler):
             "remote": remote,
             "status": "queued",
         }
+        if reason:
+            trigger["reason"] = reason
+        if actor:
+            trigger["actor"] = actor
 
         try:
             TRIGGERS_DIR.mkdir(parents=True, exist_ok=True)
