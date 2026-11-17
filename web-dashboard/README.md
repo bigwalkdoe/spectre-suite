@@ -214,7 +214,7 @@ For production use:
 
 4. Review the **Diagnostics → Data coverage & freshness** panel in the dashboard (including the targets/fleet rollup showing per-job up/down counts):
    - It reports target/exporter presence (`up`), disabled scrape jobs, and common missing-series cases.
-   - **Containers:** in this stack, the `cadvisor` Prometheus scrape job is disabled by default (`prometheus/prometheus.yml`) due to CPU cost, so container metrics may be unavailable until cAdvisor is enabled/tuned and scraped.
+   - **Containers:** in this stack, the `cadvisor` Prometheus scrape job is disabled by default (`prometheus/prometheus.yml`) due to prior high CPU usage. The dashboard reports this explicitly. To enable, uncomment/tune the cAdvisor job (e.g. longer scrape/housekeeping intervals) and start/tune the `cadvisor` service in `docker-compose.monitoring.yml`, then restart Prometheus/cAdvisor and re-evaluate host CPU impact.
    - **Disk/filesystem:** disk cards/alerts depend on `node_filesystem_*` for mountpoint `/`. If node-exporter cannot read host mountinfo (e.g. Docker user namespace remapping without `pid: host`, which is incompatible with `userns-remap`), filesystem series may be missing and will be shown as a coverage issue.
 
 ### CORS Issues
