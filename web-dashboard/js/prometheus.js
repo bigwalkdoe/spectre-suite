@@ -40,3 +40,36 @@ export async function queryPrometheusRange(query, start, end, step, timeoutMs = 
         timeoutMs
     );
 }
+
+export async function queryPrometheusRaw(query, timeoutMs) {
+    try {
+        const response = await fetchWithTimeout(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`, {}, timeoutMs);
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (_error) {
+        return null;
+    }
+}
+
+export async function queryPrometheusVector(query, timeoutMs) {
+    const data = await queryPrometheusRaw(query, timeoutMs);
+    if (!data || data.status !== 'success' || !Array.isArray(data.data?.result)) return null;
+    return data.data.result;
+}
+
+export async function queryPrometheusSeries(query, timeoutMs) {
+    const data = await queryPrometheusRaw(query, timeoutMs);
+    if (!data || data.status !== 'success' || !Array.isArray(data.data?.result)) return [];
+    return data.data.result;
+}
+
+export async function checkTargetUp(job) {
+    const result = await queryPrometheusSeries(`up{job="${String(job).replace(/"/g, '\\"')}"}`);
+    if (!result.length) return { status: 'missing', reason: `No target for job "${job}"` };
+    const upValues = result.map(r => parseFloat(r.value?.[1])).filter(v => !Number.isNaN(v));
+    const anyUp = upValues.some(v => v === 1);
+    const allDown = upValues.length > 0 && upValues.every(v => v === 0);
+    if (anyUp) return { status: 'ok', reason: 'Target up' };
+    if (allDown) return { status: 'down', reason: `Target down (job "${job}")` };
+    return { status: 'unknown', reason: `Unknown target state (job "${job}")` };
+}

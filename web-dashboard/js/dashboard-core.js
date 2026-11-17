@@ -1,7 +1,7 @@
 import { PROMETHEUS_URL, EXTERNAL_BACKENDS, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase } from './config.js';
 import { fetchWithTimeout, escapeHtml, setText, setCardLoading, setCardError, clearCardError, runCardUpdate, showToast, setCardUpdated, formatBytes, formatBytesPerSec, formatRelativeTime, formatUptime } from './dom.js';
 import { state } from './state.js';
-import { queryPrometheus, queryPrometheusFirst } from './prometheus.js';
+import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp } from './prometheus.js';
 import { triggerAction, initActionsApi } from './actions.js';
 import { initializeChart, updateChart, applyChartTheme, exportChartCSV } from './chart.js';
 
@@ -165,6 +165,13 @@ function updateLastRefreshed() {
     if (el) el.textContent = ` | Last refreshed: ${new Date().toLocaleTimeString()}`;
 }
 
+function coverageBadgeClass(status) {
+    if (status === 'ok') return 'badge-success';
+    if (status === 'down' || status === 'missing' || status === 'stale') return 'badge-warning';
+    if (status === 'disabled') return 'badge-warning';
+    return '';
+}
+
 function updateDiagnostics() {
     const queryHealth = document.getElementById('queryHealth');
     const backupExporter = document.getElementById('backupExporterStatus');
@@ -172,6 +179,7 @@ function updateDiagnostics() {
     const baselineExporter = document.getElementById('baselineExporterStatus');
     const autoRefresh = document.getElementById('autoRefreshStatus');
     const diagStatus = document.getElementById('diagnosticsStatus');
+    const coverageEl = document.getElementById('coverageDetails');
 
     if (queryHealth) {
         if (state.lastQueryStats.total === 0) queryHealth.textContent = 'No queries run';
@@ -186,9 +194,27 @@ function updateDiagnostics() {
             autoRefresh.textContent = `Every ${label}`;
         } else autoRefresh.textContent = 'Disabled';
     }
+
+    const cov = state.coverageStatus || {};
+    if (coverageEl) {
+        const entries = Object.entries(cov);
+        if (!entries.length) {
+            coverageEl.innerHTML = '<span class="muted">Coverage not yet checked.</span>';
+        } else {
+            coverageEl.innerHTML = entries.map(([key, info]) => {
+                const status = info?.status || 'unknown';
+                const reason = escapeHtml(info?.reason || status);
+                const label = escapeHtml(key);
+                return `<div class="coverage-row"><span class="coverage-label">${label}</span><span class="badge ${coverageBadgeClass(status)}">${escapeHtml(status)}</span><span class="coverage-reason">${reason}</span></div>`;
+            }).join('');
+        }
+    }
+
     if (diagStatus) {
-        const healthy = state.lastQueryStats.failed === 0 && state.lastQueryStats.total > 0;
-        const degraded = state.lastQueryStats.succeeded > 0 && state.lastQueryStats.failed > 0;
+        const values = Object.values(cov);
+        const hasCoverageIssues = values.some(v => ['down', 'missing', 'stale', 'disabled'].includes(v?.status));
+        const healthy = state.lastQueryStats.failed === 0 && state.lastQueryStats.total > 0 && !hasCoverageIssues;
+        const degraded = (state.lastQueryStats.succeeded > 0 && state.lastQueryStats.failed > 0) || hasCoverageIssues;
         diagStatus.textContent = healthy ? 'OK' : degraded ? 'Degraded' : state.lastQueryStats.total === 0 ? '--' : 'Issues';
         diagStatus.className = healthy ? 'badge badge-success' : degraded ? 'badge badge-warning' : 'badge';
     }
@@ -484,9 +510,16 @@ function renderContainers() {
     state.lastRenderedContainerKey = renderKey;
 
     if (!names.length) {
-        grid.innerHTML = state.lastContainerMeta.hasUnlabeledRecent
-            ? '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>'
-            : '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+        const cadvisorCov = state.coverageStatus?.cadvisor;
+        if (cadvisorCov?.status === 'disabled' || cadvisorCov?.status === 'missing') {
+            grid.innerHTML = `<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>Container metrics unavailable.</strong> ${escapeHtml(cadvisorCov.reason || 'cAdvisor metrics are not available.')} To populate this view, enable/tune cAdvisor in <code>prometheus/prometheus.yml</code> and <code>docker-compose.monitoring.yml</code>, then restart Prometheus/cAdvisor.</span></div>`;
+        } else if (cadvisorCov?.status === 'down') {
+            grid.innerHTML = `<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>Container metrics unavailable.</strong> ${escapeHtml(cadvisorCov.reason || 'cAdvisor target is down.')}</span></div>`;
+        } else if (state.lastContainerMeta.hasUnlabeledRecent) {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span><strong>cAdvisor metrics are present, but no named container labels were found.</strong> Check cAdvisor/Prometheus container label configuration.</span></div>';
+        } else {
+            grid.innerHTML = '<div class="no-alerts no-alerts--degraded"><i class="fas fa-cubes" aria-hidden="true"></i><span>No recent container data.</span></div>';
+        }
         return;
     }
     if (!filteredNames.length) {
@@ -514,6 +547,61 @@ function renderContainers() {
             </div>
             <div class="containers-grid container-group-items">${items.map(renderItem).join('')}</div>
         </section>`).join('');
+}
+
+async function updateCoverageStatus(coreValues = {}) {
+    const [nodeUp, cadvisorUp, redisUp, postgresUp, alertmanagerUp, blackboxUp] = await Promise.all([
+        checkTargetUp('node'),
+        checkTargetUp('cadvisor'),
+        checkTargetUp('redis'),
+        checkTargetUp('postgres'),
+        checkTargetUp('alertmanager'),
+        checkTargetUp('blackbox-http'),
+    ]);
+
+    const fsSeries = await queryPrometheusSeries('node_filesystem_avail_bytes{mountpoint="/"}');
+    const coverage = {};
+
+    coverage.prometheus = state.lastPrometheusConnected === true
+        ? { status: 'ok', reason: 'Prometheus API reachable' }
+        : state.lastPrometheusConnected === false
+            ? { status: 'down', reason: 'Prometheus API unreachable/disconnected' }
+            : { status: 'unknown', reason: 'Prometheus connectivity not yet checked' };
+
+    coverage.node_exporter = nodeUp || { status: 'unknown', reason: 'Node exporter status unknown' };
+
+    if (cadvisorUp?.status === 'missing') {
+        coverage.cadvisor = { status: 'disabled', reason: 'cAdvisor scrape job/target not present (disabled in prometheus.yml by default due to CPU usage)' };
+    } else {
+        coverage.cadvisor = cadvisorUp || { status: 'unknown', reason: 'cAdvisor status unknown' };
+    }
+
+    coverage.redis_exporter = redisUp || { status: 'unknown', reason: 'Redis exporter status unknown' };
+    coverage.postgres_exporter = postgresUp || { status: 'unknown', reason: 'Postgres exporter status unknown' };
+    coverage.alertmanager = alertmanagerUp || { status: 'unknown', reason: 'Alertmanager status unknown' };
+    coverage.blackbox = blackboxUp || { status: 'unknown', reason: 'Blackbox exporter status unknown' };
+
+    if (Array.isArray(fsSeries) && fsSeries.length > 0) {
+        coverage.root_filesystem = { status: 'ok', reason: 'node_filesystem_* series available for mountpoint "/"' };
+    } else if (coreValues.disk !== null && coreValues.disk !== undefined) {
+        coverage.root_filesystem = { status: 'ok', reason: 'Root filesystem usage metric available' };
+    } else if (coverage.node_exporter.status === 'ok') {
+        coverage.root_filesystem = { status: 'missing', reason: 'No node_filesystem_* series for mountpoint "/" (can occur when node-exporter cannot read host mountinfo, e.g. userns without pid:host)' };
+    } else {
+        coverage.root_filesystem = { status: 'unknown', reason: 'Root filesystem metrics unavailable (node exporter not healthy)' };
+    }
+
+    coverage.backup_metrics = state.lastExporterStatus.backup
+        ? { status: 'ok', reason: 'Backup/restic textfile metrics publishing' }
+        : { status: 'missing', reason: 'No backup/restic metrics (exporter not scheduled, not run, or no output)' };
+    coverage.agent_metrics = state.lastExporterStatus.agent
+        ? { status: 'ok', reason: 'Spectre agent/security metrics publishing' }
+        : { status: 'missing', reason: 'No spectre agent/security metrics (agent unavailable or not exporting)' };
+    coverage.baseline_metrics = state.lastExporterStatus.baseline
+        ? { status: 'ok', reason: 'Security baseline textfile metrics publishing' }
+        : { status: 'missing', reason: 'No security baseline metrics (baseline exporter not run or no output)' };
+
+    state.coverageStatus = coverage;
 }
 
 async function updateContainerStatus() {
@@ -718,6 +806,8 @@ export async function fetchAllMetrics(opts = {}) {
         if (containersVisible) settleCardIds.push('containersCard');
         if (shouldRefreshChart) settleCardIds.push('chartCard');
         settleCardIds.forEach(id => setCardLoading(id, false));
+        await updateCoverageStatus({ disk });
+        renderContainers();
         updateLastRefreshed();
         updateDiagnostics();
     } catch (err) {
