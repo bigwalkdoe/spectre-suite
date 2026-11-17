@@ -65,11 +65,15 @@ export async function queryPrometheusSeries(query, timeoutMs) {
 
 export async function checkTargetUp(job) {
     const result = await queryPrometheusSeries(`up{job="${String(job).replace(/"/g, '\\"')}"}`);
-    if (!result.length) return { status: 'missing', reason: `No target for job "${job}"` };
+    if (!result.length) return { status: 'missing', reason: `No target for job "${job}"`, up: 0, total: 0 };
     const upValues = result.map(r => parseFloat(r.value?.[1])).filter(v => !Number.isNaN(v));
-    const anyUp = upValues.some(v => v === 1);
-    const allDown = upValues.length > 0 && upValues.every(v => v === 0);
-    if (anyUp) return { status: 'ok', reason: 'Target up' };
-    if (allDown) return { status: 'down', reason: `Target down (job "${job}")` };
-    return { status: 'unknown', reason: `Unknown target state (job "${job}")` };
+    const upCount = upValues.filter(v => v === 1).length;
+    const total = upValues.length || result.length;
+    const anyUp = upCount > 0;
+    const allDown = total > 0 && upCount === 0;
+    const reason = total ? `${upCount}/${total} targets up (job "${job}")` : `Unknown target state (job "${job}")`;
+    if (anyUp && upCount === total) return { status: 'ok', reason, up: upCount, total };
+    if (anyUp) return { status: 'down', reason, up: upCount, total };
+    if (allDown) return { status: 'down', reason, up: upCount, total };
+    return { status: 'unknown', reason: `Unknown target state (job "${job}")`, up: upCount, total };
 }

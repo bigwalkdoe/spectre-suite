@@ -206,12 +206,22 @@ function updateDiagnostics() {
         if (!entries.length) {
             coverageEl.innerHTML = '<span class="muted">Coverage not yet checked.</span>';
         } else {
-            coverageEl.innerHTML = entries.map(([key, info]) => {
+            const fleetKeys = ['node_exporter','cadvisor','redis_exporter','postgres_exporter','alertmanager','blackbox'];
+            const fleet = fleetKeys.map(k => [k, cov[k]]).filter(([,v]) => v);
+            const fleetHtml = fleet.length ? `<div class="coverage-fleet"><div class="coverage-heading">Targets / fleet rollup</div>${fleet.map(([key, info]) => {
+                const status = info?.status || 'unknown';
+                const reason = escapeHtml(info?.reason || status);
+                const counts = (typeof info?.total === 'number') ? ` <span class="muted">(${info.up}/${info.total} up)</span>` : '';
+                return `<div class="coverage-row"><span class="coverage-label">${escapeHtml(key)}</span><span class="badge ${coverageBadgeClass(status)}">${escapeHtml(status)}</span><span class="coverage-reason">${reason}${counts}</span></div>`;
+            }).join('')}</div>` : '';
+            const other = entries.filter(([k]) => !fleetKeys.includes(k));
+            const otherHtml = other.map(([key, info]) => {
                 const status = info?.status || 'unknown';
                 const reason = escapeHtml(info?.reason || status);
                 const label = escapeHtml(key);
                 return `<div class="coverage-row"><span class="coverage-label">${label}</span><span class="badge ${coverageBadgeClass(status)}">${escapeHtml(status)}</span><span class="coverage-reason">${reason}</span></div>`;
             }).join('');
+            coverageEl.innerHTML = `${fleetHtml}${otherHtml}`;
         }
     }
 
