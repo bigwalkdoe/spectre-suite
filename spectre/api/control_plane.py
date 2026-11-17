@@ -119,10 +119,10 @@ def _dispatch_summary() -> dict[str, Any]:
 
 
 def _monitoring_components() -> list[dict[str, Any]]:
-    prom = os.environ.get("SPECTRE_PROMETHEUS_URL", "http://127.0.0.1:9090")
-    alert = os.environ.get("SPECTRE_ALERTMANAGER_URL", "http://127.0.0.1:9093")
-    grafana = os.environ.get("SPECTRE_GRAFANA_URL", "http://127.0.0.1:3002")
-    blackbox = os.environ.get("SPECTRE_BLACKBOX_URL", "http://127.0.0.1:9115")
+    prom = os.environ.get("SPECTRE_PROMETHEUS_URL", "http://127.0.0.1:20161")
+    alert = os.environ.get("SPECTRE_ALERTMANAGER_URL", "http://127.0.0.1:20162")
+    grafana = os.environ.get("SPECTRE_GRAFANA_URL", "http://127.0.0.1:20163")
+    blackbox = os.environ.get("SPECTRE_BLACKBOX_URL", "http://127.0.0.1:20168")
     checks = [
         _component_http("Prometheus", f"{prom.rstrip('/')}/api/v1/status/buildinfo", "metrics"),
         _component_http("Alertmanager", f"{alert.rstrip('/')}/api/v2/status", "alerts"),
