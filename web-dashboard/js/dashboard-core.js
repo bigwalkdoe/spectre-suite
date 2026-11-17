@@ -1,4 +1,4 @@
-import { PROMETHEUS_URL, EXTERNAL_BACKENDS, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase } from './config.js';
+import { PROMETHEUS_URL, EXTERNAL_BACKENDS, DEFAULT_REFRESH_INTERVAL, CHART_AUTO_REFRESH_MS, SLOW_METRICS_REFRESH_MS, externalUrl, extBase, READ_ONLY, ACTIONS_ALLOWED } from './config.js';
 import { fetchWithTimeout, escapeHtml, setText, setCardLoading, setCardError, clearCardError, runCardUpdate, showToast, setCardUpdated, formatBytes, formatBytesPerSec, formatRelativeTime, formatUptime } from './dom.js';
 import { state } from './state.js';
 import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp } from './prometheus.js';
@@ -999,6 +999,23 @@ function initDashboardShell() {
     setPage(pageFromHash(location.hash), { smooth: false });
 }
 
+function applyReadOnlyMode() {
+    if (!READ_ONLY) return;
+    document.body.classList.add('read-only-mode');
+    const banner = document.getElementById('readOnlyBanner');
+    if (banner) {
+        banner.hidden = false;
+        banner.setAttribute('aria-hidden', 'false');
+    }
+    document.querySelectorAll('[data-dashboard-action="backup"], [data-dashboard-action="maintenance"], [data-dashboard-action="security-scan"]').forEach((btn) => {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+        btn.title = 'Disabled in read-only mode';
+    });
+    const quickActions = document.querySelector('.quick-actions');
+    if (quickActions) quickActions.setAttribute('data-read-only', 'true');
+}
+
 export function initDashboard() {
     initializeTheme();
     loadRefreshInterval();
@@ -1006,6 +1023,7 @@ export function initDashboard() {
     initExternalLinks();
     initActionsApi();
     initializeChart();
+    applyReadOnlyMode();
     fetchAllMetrics({ refreshChart: true });
     checkPrometheusConnection();
     updateTimestamp();

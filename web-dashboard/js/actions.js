@@ -1,4 +1,4 @@
-import { ACTIONS_BASE } from './config.js';
+import { ACTIONS_BASE, ACTIONS_ALLOWED, READ_ONLY } from './config.js';
 import { showToast } from './dom.js';
 
 const TOKEN_KEY = 'spectre-action-token';
@@ -19,6 +19,10 @@ export function clearActionToken({ notify = true } = {}) {
 }
 
 export async function triggerAction(action, label, retry = true) {
+    if (READ_ONLY || !ACTIONS_ALLOWED) {
+        showToast(`${label}: dashboard is in read-only mode; actions are disabled.`, 'info');
+        return;
+    }
     if (!confirm(`This will request "${label}". Continue?`)) return;
 
     if (!ACTIONS_BASE) {
@@ -78,4 +82,6 @@ export function initActionsApi() {
     window.spectreDashboard = window.spectreDashboard || {};
     window.spectreDashboard.clearActionToken = () => clearActionToken({ notify: true });
     window.spectreDashboard.hasActionToken = () => !!getActionToken();
+    window.spectreDashboard.readOnly = READ_ONLY;
+    window.spectreDashboard.actionsAllowed = ACTIONS_ALLOWED;
 }

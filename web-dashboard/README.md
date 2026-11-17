@@ -110,6 +110,7 @@ Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actio
 - Trigger actions with the dashboard; when prompted, enter the token (stored in `sessionStorage` for the browser session).
 
 To disable actions in the UI: open the dashboard with `?actionsBase=off`.
+For safe sharing/view-only access, open with `?readOnly=1` (or `true`): the UI shows a read-only banner and blocks operator actions. `readOnly` takes precedence for UI/action behavior (actions disabled), while `actionsBase=off` also disables action endpoints in the UI. UI read-only mode is not a substitute for server-side auth/restrictions when exposing the dashboard.
 
 
 ## Customization
