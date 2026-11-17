@@ -476,3 +476,10 @@ button {
 .read-only-banner { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.75rem 1rem; margin-bottom: 1rem; border: 1px solid var(--border, #e5e7eb); border-left: 4px solid #3b82f6; border-radius: 0.5rem; background: rgba(59,130,246,0.08); }
 .read-only-banner[hidden] { display: none; }
 body.read-only-mode .action-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+/* Drill-down links */
+.inline-drilldown { margin-left: 0.35rem; font-size: 0.8em; color: inherit; opacity: 0.7; }
+.inline-drilldown:hover, .inline-drilldown:focus { opacity: 1; }
+.alert-context { margin-top: 0.2rem; font-size: 0.85em; }
+.alert-actions { display: inline-flex; gap: 0.5rem; flex-wrap: wrap; }
+.alert-actions a { text-decoration: underline; }

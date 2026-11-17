@@ -8,6 +8,7 @@ A custom web-based monitoring dashboard that provides real-time system metrics a
 - Side panel tabs route to focused pages (Overview, System Health, Alerts, Containers, Trends, Security, Backup)
 - The sidebar and main content scroll independently; the top bar stays sticky
 - All metric cards remain in the DOM so Prometheus-backed updates continue across pages
+- Key metric cards and active alerts include drill-down links to Prometheus/Alertmanager/Grafana (and alert `generatorURL` when provided) for faster investigation
 
 ### Real-time Metrics
 - **CPU Usage**: Live CPU utilization with status indicators

@@ -152,7 +152,7 @@
                     <div class="stat-card cpu card" id="cpuCard">
                         <div class="stat-icon"><i class="fas fa-microchip" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">CPU Usage</div>
+                            <div class="stat-label">CPU Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20avg(rate(node_cpu_seconds_total%7Bmode%3D%22idle%22%7D%5B5m%5D)))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open CPU query in Prometheus" aria-label="Open CPU query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="cpuUsage">--%</div>
                             <div class="stat-change" id="cpuChange">--</div>
                         </div>
@@ -160,7 +160,7 @@
                     <div class="stat-card memory card" id="memoryCard">
                         <div class="stat-icon"><i class="fas fa-memory" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">Memory Usage</div>
+                            <div class="stat-label">Memory Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_memory_MemAvailable_bytes%20%2F%20node_memory_MemTotal_bytes))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open memory query in Prometheus" aria-label="Open memory query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="memoryUsage">--%</div>
                             <div class="stat-change" id="memoryChange">--</div>
                         </div>
@@ -168,7 +168,7 @@
                     <div class="stat-card disk card" id="diskCard">
                         <div class="stat-icon"><i class="fas fa-hdd" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">Disk Usage</div>
+                            <div class="stat-label">Disk Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_filesystem_avail_bytes%7Bmountpoint%3D%22%2F%22%7D%20%2F%20node_filesystem_size_bytes%7Bmountpoint%3D%22%2F%22%7D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open disk usage query in Prometheus" aria-label="Open disk usage query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="diskUsage">--%</div>
                             <div class="stat-change" id="diskChange">--</div>
                         </div>
@@ -176,7 +176,7 @@
                     <div class="stat-card network card" id="networkCard">
                         <div class="stat-icon"><i class="fas fa-network-wired" aria-hidden="true"></i></div>
                         <div class="stat-content">
-                            <div class="stat-label">Network I/O</div>
+                            <div class="stat-label">Network I/O <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=sum(rate(node_network_receive_bytes_total%7Bdevice!~%22lo%7Cveth.*%7Cdocker.*%7Cbr-.*%7Ccni.*%7Cflannel.*%7Ccali.*%22%7D%5B5m%5D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open network RX query in Prometheus" aria-label="Open network RX query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
                             <div class="stat-value" id="networkIO">--</div>
                             <div class="stat-change" id="networkChange">--</div>
                         </div>

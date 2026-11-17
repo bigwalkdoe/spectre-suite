@@ -458,16 +458,28 @@ function renderAlerts() {
         const ageStr = formatAlertAge(startMs);
         const promBase = extBase('prometheus');
         const amBase = extBase('alertmanager');
+        const grafanaBase = extBase('grafana');
         const alertname = alert.labels?.alertname ? String(alert.labels.alertname) : '';
+        const instance = alert.labels?.instance ? String(alert.labels.instance) : '';
+        const job = alert.labels?.job ? String(alert.labels.job) : '';
+        const contextParts = [instance ? `instance=${instance}` : '', job ? `job=${job}` : ''].filter(Boolean);
         const promqlName = alertname.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ');
         const amFilter = alertname ? encodeURIComponent(`{alertname="${alertname.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ')}"}`) : '';
-        const promGraphHref = (promBase && alertname) ? `${promBase}/graph?g0.expr=${encodeURIComponent(`ALERTS{alertname="${promqlName}"}`)}&g0.tab=1` : (promBase ? `${promBase}/alerts` : '');
+        const promExpr = alertname ? `ALERTS{alertname="${promqlName}",alertstate="firing"}` : '';
+        const promGraphHref = promBase ? (promExpr ? `${promBase}/graph?g0.expr=${encodeURIComponent(promExpr)}&g0.tab=1` : `${promBase}/alerts`) : '';
         const amHref = amBase ? `${amBase}/#/alerts${amFilter ? `?receiver=&silenced=false&inhibited=false&active=true&filter=${amFilter}` : ''}` : '';
-        const links = [promGraphHref ? `<a href="${escapeHtml(promGraphHref)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(alertname ? 'Open in Prometheus with pre-filled ALERTS query' : 'Open Prometheus alerts')}" aria-label="Open in Prometheus">Prometheus</a>` : '', amHref ? `<a href="${escapeHtml(amHref)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(alertname ? 'Open in Alertmanager (filter pre-filled where supported)' : 'Open Alertmanager')}" aria-label="Open in Alertmanager">Alertmanager</a>` : ''].filter(Boolean).join('');
+        const grafanaHref = grafanaBase ? `${grafanaBase}/explore` : '';
+        const genUrl = typeof alert.generatorURL === 'string' ? alert.generatorURL : '';
+        const linkItems = [];
+        if (promGraphHref) linkItems.push(`<a href="${escapeHtml(promGraphHref)}" target="_blank" rel="noopener noreferrer" title="Open firing alert series in Prometheus" aria-label="Open in Prometheus">Prometheus</a>`);
+        if (amHref) linkItems.push(`<a href="${escapeHtml(amHref)}" target="_blank" rel="noopener noreferrer" title="Open matching alerts in Alertmanager" aria-label="Open in Alertmanager">Alertmanager</a>`);
+        if (grafanaHref) linkItems.push(`<a href="${escapeHtml(grafanaHref)}" target="_blank" rel="noopener noreferrer" title="Open Grafana Explore for drill-down" aria-label="Open in Grafana">Grafana</a>`);
+        if (genUrl && /^https?:\/\//i.test(genUrl)) linkItems.push(`<a href="${escapeHtml(genUrl)}" target="_blank" rel="noopener noreferrer" title="Open alert generator URL" aria-label="Open generator URL">Rule source</a>`);
+        const links = linkItems.join('');
         return `
         <div class="alert-item ${escapeHtml(severity)}">
             <div class="alert-title">${safeName.innerHTML}</div>
-            <div class="alert-description">${safeDesc.innerHTML}</div>
+            <div class="alert-description">${safeDesc.innerHTML}${contextParts.length ? `<div class="alert-context muted">${escapeHtml(contextParts.join(' · '))}</div>` : ''}</div>
             <div class="alert-meta">
                 <span class="alert-severity-tag">${escapeHtml(severity)}</span>
                 <span class="alert-age">${escapeHtml(ageStr)}</span>
