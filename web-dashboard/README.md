@@ -61,7 +61,7 @@ A custom web-based monitoring dashboard that provides real-time system metrics a
    ```
 
 2. **Access the Dashboard**:
-   - Open http://localhost:8081 in your browser
+   - Open http://localhost:20160 in your browser
 
 ### Manual Deployment
 
@@ -209,7 +209,7 @@ For production use:
 
 ### Metrics Not Updating
 1. Verify Prometheus connection:
-   - Check Prometheus status at http://localhost:9090
+   - Check Prometheus status at http://localhost:20161/prometheus/
    - Verify network connectivity
 
 2. Check browser console for JavaScript errors
