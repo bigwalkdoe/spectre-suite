@@ -476,6 +476,7 @@ function renderAlerts() {
         if (amHref) linkItems.push(`<a href="${escapeHtml(amHref)}" target="_blank" rel="noopener noreferrer" title="Open matching alerts in Alertmanager" aria-label="Open in Alertmanager">Alertmanager</a>`);
         if (grafanaHref) linkItems.push(`<a href="${escapeHtml(grafanaHref)}" target="_blank" rel="noopener noreferrer" title="Open Grafana Explore for drill-down" aria-label="Open in Grafana">Grafana</a>`);
         if (genUrl && /^https?:\/\//i.test(genUrl)) linkItems.push(`<a href="${escapeHtml(genUrl)}" target="_blank" rel="noopener noreferrer" title="Open alert generator URL" aria-label="Open generator URL">Rule source</a>`);
+        if (alertname) linkItems.push(`<button type="button" class="btn-link runbook-btn" data-alert-runbook="${escapeHtml(alertname)}" aria-label="Open runbook for ${escapeHtml(alertname)}">Runbook</button>`);
         const links = linkItems.join('');
         return `
         <div class="alert-item ${escapeHtml(severity)}">
@@ -895,6 +896,41 @@ async function exportSnapshot() {
     }
 }
 
+async function openAlertRunbook(alertname) {
+    const panel = document.getElementById('alertRunbookPanel');
+    const title = document.getElementById('alertRunbookTitle');
+    const content = document.getElementById('alertRunbookContent');
+    if (!panel || !title || !content) return;
+    const safeName = String(alertname || '').replace(/[^A-Za-z0-9_-]/g, '');
+    title.textContent = safeName ? `Runbook: ${safeName}` : 'Runbook';
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    content.textContent = 'Loading runbook…';
+    if (!safeName) {
+        content.textContent = 'No runbook available: invalid alert name.';
+        return;
+    }
+    try {
+        const res = await fetchWithTimeout(`/runbooks/${encodeURIComponent(safeName)}.md`, {}, 12000);
+        if (res.status === 404) {
+            content.textContent = `No runbook found for "${safeName}". Use Prometheus/Alertmanager drill-down links above and add web-dashboard/runbooks/${safeName}.md if needed.`;
+            return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        content.textContent = text || '(Runbook is empty)';
+    } catch (e) {
+        content.textContent = `Failed to load runbook for "${safeName}". ${e && e.message ? e.message : ''}`.trim();
+    }
+}
+
+function closeAlertRunbook() {
+    const panel = document.getElementById('alertRunbookPanel');
+    if (!panel) return;
+    panel.hidden = true;
+    panel.setAttribute('aria-hidden', 'true');
+}
+
 function initDashboardShell() {
     const links = Array.from(document.querySelectorAll('.nav-item[data-page]'));
     if (!links.length) return;
@@ -1097,6 +1133,13 @@ export function initDashboard() {
             renderAlerts();
         });
     });
+    document.getElementById('alertsList')?.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('[data-alert-runbook]') : null;
+        if (!btn) return;
+        const name = btn.getAttribute('data-alert-runbook') || '';
+        openAlertRunbook(name).catch(() => {});
+    });
+    document.getElementById('alertRunbookClose')?.addEventListener('click', closeAlertRunbook);
     document.getElementById('containerFilter')?.addEventListener('input', () => renderContainers());
     document.querySelectorAll('[data-help-close]').forEach((el) => el.addEventListener('click', hideHelpDialog));
 

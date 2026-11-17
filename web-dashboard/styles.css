@@ -490,3 +490,11 @@ body.read-only-mode .action-btn[disabled] { opacity: 0.55; cursor: not-allowed; 
 .activity-title { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .activity-meta, .activity-message { margin-top: 0.2rem; font-size: 0.9em; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; }
+
+/* Alert runbooks */
+.runbook-panel { margin-top: 0.75rem; border: 1px solid var(--border, #e5e7eb); border-radius: 0.5rem; padding: 0.75rem; }
+.runbook-panel[hidden] { display: none; }
+.runbook-panel-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.runbook-content { margin: 0; white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; font-size: 0.9em; line-height: 1.4; }
+.btn-link { background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+.btn-link:hover, .btn-link:focus { opacity: 0.85; }
