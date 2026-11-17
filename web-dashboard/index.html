@@ -295,6 +295,19 @@
                         </div>
                     </section>
 
+                    <section class="card full-width" id="actionActivityCard" data-show-pages="overview">
+                        <div class="card-header">
+                            <h2><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Action Activity</h2>
+                            <div>
+                                <span class="badge" id="actionRunsStatus">--</span>
+                                <button id="actionRunsRefreshBtn" class="btn btn-sm" type="button" aria-label="Refresh action activity"><i class="fas fa-sync-alt" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+                        <div class="card-body" aria-live="polite">
+                            <div id="actionRunsList" class="activity-list"><div class="no-alerts"><span>Loading action activity…</span></div></div>
+                        </div>
+                    </section>
+
                     <section class="card" id="diagnosticsCard" data-show-pages="overview security">
                         <div class="card-header">
                             <h2><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnostics</h2>

@@ -111,6 +111,7 @@ Quick actions (`Run Backup`, `Run Maintenance`, `Security Scan`) post to `/actio
 - Trigger actions with the dashboard; when prompted, enter the token (stored in `sessionStorage` for the browser session).
 - The host trigger handler records bounded, redacted run status/result artifacts under `dashboard-actions/triggers/runs/<trigger-id>.json` (queued/running/succeeded/failed/rejected with timestamps, exit code, and safe message) for audit/status consumption.
 - Read-only, token-protected run status endpoints are proxied via nginx: `GET /actions/runs?limit=&status=` and `GET /actions/runs/<id>` (same `X-Dashboard-Action-Token` auth requirements as action requests). `GET /actions/healthz` is available for service health. Queueing remains `POST /actions/<action>` only.
+- The dashboard includes an **Action Activity** panel (Overview) showing recent queued/running/completed runs, trigger IDs, timestamps, and safe outcomes/messages returned by the runs API. Use the refresh button or wait for periodic updates; provide the action token in-session if required.
 
 To disable actions in the UI: open the dashboard with `?actionsBase=off`.
 For safe sharing/view-only access, open with `?readOnly=1` (or `true`): the UI shows a read-only banner and blocks operator actions. `readOnly` takes precedence for UI/action behavior (actions disabled), while `actionsBase=off` also disables action endpoints in the UI. UI read-only mode is not a substitute for server-side auth/restrictions when exposing the dashboard.

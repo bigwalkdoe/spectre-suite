@@ -483,3 +483,10 @@ body.read-only-mode .action-btn[disabled] { opacity: 0.55; cursor: not-allowed; 
 .alert-context { margin-top: 0.2rem; font-size: 0.85em; }
 .alert-actions { display: inline-flex; gap: 0.5rem; flex-wrap: wrap; }
 .alert-actions a { text-decoration: underline; }
+
+/* Action activity */
+.activity-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.activity-item { border: 1px solid var(--border, #e5e7eb); border-radius: 0.5rem; padding: 0.6rem 0.75rem; }
+.activity-title { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.activity-meta, .activity-message { margin-top: 0.2rem; font-size: 0.9em; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; }

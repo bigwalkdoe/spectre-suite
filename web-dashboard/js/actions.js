@@ -66,7 +66,8 @@ export async function triggerAction(action, label, retry = true) {
         }
 
         if (response.ok) {
-            const msg = payload?.message || `${label} accepted.`;
+            const tid = payload?.triggerId ? ` (trigger ${payload.triggerId})` : '';
+            const msg = (payload?.message || `${label} accepted.`) + tid;
             showToast(msg, 'success');
         } else {
             const detail = payload?.message || payload?.error || `HTTP ${response.status}`;

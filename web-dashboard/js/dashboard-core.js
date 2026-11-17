@@ -3,6 +3,7 @@ import { fetchWithTimeout, escapeHtml, setText, setCardLoading, setCardError, cl
 import { state } from './state.js';
 import { queryPrometheus, queryPrometheusFirst, queryPrometheusSeries, checkTargetUp } from './prometheus.js';
 import { triggerAction, initActionsApi } from './actions.js';
+import { initActionActivity } from './activity.js';
 import { initializeChart, updateChart, applyChartTheme, exportChartCSV } from './chart.js';
 
 export function initExternalLinks() {
@@ -1036,6 +1037,7 @@ export function initDashboard() {
     initActionsApi();
     initializeChart();
     applyReadOnlyMode();
+    initActionActivity({ intervalMs: 30000 });
     fetchAllMetrics({ refreshChart: true });
     checkPrometheusConnection();
     updateTimestamp();
