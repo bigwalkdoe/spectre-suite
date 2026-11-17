@@ -117,8 +117,8 @@ path = sys.argv[1]
 text = open(path).read()
 before = text
 text = text.replace(
-    "    user: root\n    ports:\n      - \"127.0.0.1:9093:9093\"",
-    "    ports:\n      - \"127.0.0.1:9093:9093\"",
+    "    user: root\n    ports:\n      - \"127.0.0.1:20162:9093\"",
+    "    ports:\n      - \"127.0.0.1:20162:9093\"",
 )
 assert text != before, "fixture did not match: alertmanager user: line not found"
 open(path, "w").write(text)
