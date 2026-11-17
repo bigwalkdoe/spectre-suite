@@ -32,15 +32,15 @@ export function reportDefinition(reportType) {
         security: {
             label: "Security Findings",
             series: [
-                { query: "security_findings_unresolved", label: "Unresolved findings" },
-                { query: 'security_findings_unresolved_by_severity{severity="critical"}', label: "Critical findings" },
-                { query: "security_last_scan_timestamp", label: "Last scan (ts)" },
-                { query: "spectre_agent_up", label: "Agent up" },
+                { query: "max(security_findings_unresolved)", label: "Unresolved findings" },
+                { query: 'max(security_findings_unresolved_by_severity{severity="critical"})', label: "Critical findings" },
+                { query: "max(security_last_scan_timestamp)", label: "Last scan (ts)" },
+                { query: "max(spectre_agent_up)", label: "Agent up" },
             ],
         },
         alerts: {
             label: "Alert History",
-            series: [{ query: 'ALERTS{alertname!=""}', label: "Firing alerts" }],
+            series: [{ query: 'sum(ALERTS{alertstate="firing"}) or on() vector(0)', label: "Firing alerts (count)" }],
         },
         system: { label: "System Health", series: core },
     };
@@ -253,6 +253,17 @@ async function generateReport(reportType, range) {
         const timestamps = labelSeries ? labelSeries.data.result[0].values.map((v) => new Date(v[0] * 1000).toISOString()) : [];
         if (timestamps.length === 0) {
             currentReport = null; clearReportChart();
+            const hintByType = {
+                backup: "No backup/restic metrics found for this range. Ensure backup exporters/textfile metrics are running and publishing.",
+                security: "No security metrics found for this range. Ensure the security agent and/or baseline exporters are publishing metrics.",
+                alerts: "No alert history samples found for this range. Ensure Prometheus alert evaluation is active.",
+                system: "No system metrics found for this range. Check Prometheus/node-exporter targets and metric coverage."
+            };
+            const empty = document.getElementById("reportEmpty");
+            if (empty) {
+                const span = empty.querySelector('span');
+                if (span) span.textContent = hintByType[reportType] || "No data for this range.";
+            }
             showReportEmpty();
             return;
         }
