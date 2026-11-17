@@ -552,11 +552,20 @@ function renderContainers() {
         groups.get(key).push(c);
     }
     const sortedGroups = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    const renderItem = (container) => `
+    const renderItem = (container) => {
+        const promBase = extBase('prometheus');
+        const name = container.name || '';
+        const q = encodeURIComponent(`rate(container_cpu_usage_seconds_total{name="${name.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}",image!=""}[5m])`);
+        const href = promBase ? `${promBase}/graph?g0.expr=${q}&g0.tab=0` : '';
+        const nameHtml = href
+            ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Drill down to container CPU in Prometheus">${escapeHtml(name)}</a>`
+            : escapeHtml(name);
+        return `
         <div class="container-item">
-            <div class="container-name">${escapeHtml(container.name)}</div>
+            <div class="container-name">${nameHtml}</div>
             <span class="container-status ${escapeHtml(container.status)}">${escapeHtml(container.status)}</span>
         </div>`;
+    };
     grid.innerHTML = sortedGroups.map(([key, items]) => `
         <section class="container-group" aria-label="${escapeHtml(key)} containers">
             <div class="container-group-header">
