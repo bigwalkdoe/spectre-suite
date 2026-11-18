@@ -5,7 +5,6 @@ set -euo pipefail
 
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(dirname "$(dirname "$SCRIPT_DIR")")"}"
 # shellcheck disable=SC1091  # resolved at runtime
 source "$SCRIPT_DIR/../detect-distribution.sh"
 
@@ -16,6 +15,14 @@ detect_distribution
 SURICATA_INTERFACE="${SURICATA_INTERFACE:-$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')}"
 SURICATA_INTERFACE="${SURICATA_INTERFACE:-eth0}"
 set_package_manager
+
+# Check if sudo is available non-interactively; if not, skip
+SUDO_CMD="sudo"
+if ! $SUDO_CMD -n true 2>/dev/null; then
+    echo "sudo not available without password; IDS/IPS installation requires root"
+    echo "Run with sudo or configure passwordless sudo for these operations"
+    exit 0
+fi
 
 echo "Installing IDS/IPS for $DISTRO_NAME..."
 

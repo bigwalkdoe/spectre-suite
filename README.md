@@ -75,7 +75,7 @@ Instead of calling legacy scripts directly, scheduled and manual jobs run throug
 
 | Area | What it covers |
 |---|---|
-| **Web dashboard** | Operator view at `http://localhost:8081` — Overview, System Health, Active Alerts, Containers, Resource Trends, Security, Backup, and a **Reports** page for historical trends over 24h/7d/30d/90d ranges with JSON/CSV export. Auto-refresh with countdown, keyboard shortcuts (`R`/`?`/`Esc`), chart CSV export, and dark/light themes. |
+| **Web dashboard** | Operator view at `http://localhost:20160` — Overview, System Health, Active Alerts, Containers, Resource Trends, Security, Backup, and a **Reports** page for historical trends over 24h/7d/30d/90d ranges with JSON/CSV export. Auto-refresh with countdown, keyboard shortcuts (`R`/`?`/`Esc`), chart CSV export, and dark/light themes. |
 | **Dispatch** | `spectre run <job>`, `spectre actions list/show/verify`; registry metadata (`sudo`, `mutates`, `timeout`, `schedule_hint`, `concurrency`) and run provenance. |
 | **Backups** | Database, Docker volume, config, and project backups; replication, encryption/verification helpers; missed-backup catch-up; adopted **restic** engine with tag-scoped retention and degraded-offsite behavior. |
 | **Monitoring** | Prometheus + Grafana + Alertmanager, Blackbox exporter, business/security textfile exporters, restic marker metrics, dashboards/provisioning. |
@@ -252,11 +252,11 @@ docker compose -f docker-compose.monitoring.yml up -d
 
 ```text
 Default local access points (verify compose bindings on your host):
-  Grafana      → http://localhost:3002
-  Prometheus   → http://localhost:9090
-  Alertmanager → http://localhost:9093
-  Blackbox     → http://localhost:9115
-  Dashboard    → http://localhost:8081
+  Grafana      → http://localhost:20163
+  Prometheus   → http://localhost:20161
+  Alertmanager → http://localhost:20162
+  Blackbox     → http://localhost:20168
+  Dashboard    → http://localhost:20160
 ```
 
 > **Upgrading an existing deployment:** `POSTGRES_PASSWORD` initializes a new `postgres-data` volume only. To rotate an existing volume, use `ALTER USER ... PASSWORD ...` or recreate the volume (data loss).
@@ -274,7 +274,7 @@ SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' \
 
 ### Web dashboard
 
-The static operator view is served at `http://localhost:8081` (bind-mounted read-only
+The static operator view is served at `http://localhost:20160` (bind-mounted read-only
 from `web-dashboard/` and served by nginx). It provides a lightweight way to monitor
 and operate the stack without opening Grafana/Prometheus directly.
 

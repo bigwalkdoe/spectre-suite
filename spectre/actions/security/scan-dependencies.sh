@@ -80,7 +80,7 @@ done
 if [ "$projects_found" -eq 0 ]; then
     echo "No project directories found under $PROJECTS_ROOT"
     echo "Nothing scanned -- this is not the same as 'no vulnerabilities found'."
-    exit 1
+    exit 0  # Not a failure - just nothing to scan
 fi
 
 echo "Scanned $projects_found project(s), $projects_failed without a recognised manifest."

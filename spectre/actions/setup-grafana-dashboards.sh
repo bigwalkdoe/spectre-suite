@@ -5,7 +5,7 @@ REPO_ROOT="${SPECTRE_REPO_ROOT:-"$(cd "$SCRIPT_DIR/.." && pwd)"}"
 PROJECTS_ROOT="${PROJECTS_ROOT:-$HOME/projects}"
 # Grafana Dashboard Setup Script
 
-GRAFANA_URL="${GRAFANA_URL:-http://localhost:3002}"
+GRAFANA_URL="${GRAFANA_URL:-http://localhost:20163}"
 GRAFANA_USER="${GRAFANA_USER:-admin}"
 
 # Password comes from the environment, matching GF_SECURITY_ADMIN_PASSWORD in

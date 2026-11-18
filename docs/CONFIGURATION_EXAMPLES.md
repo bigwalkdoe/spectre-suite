@@ -188,7 +188,7 @@ scrape_configs:
 ```
 
 ### Grafana Dashboard Import
-1. Access Grafana at http://localhost:3002 (loopback-only; over SSH use
+1. Access Grafana at http://localhost:20163 (loopback-only; default via dashboard proxy at http://localhost:20160/grafana/; over SSH use
    `ssh -L 3002:127.0.0.1:3002 <host>`)
 2. Go to Dashboards -> Import
 3. Upload the dashboard JSON from docs/grafana/

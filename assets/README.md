@@ -64,12 +64,12 @@ Chrome/Chromium can capture local pages without a full desktop workflow:
 # Grafana (adjust port/path; authenticate first if needed, or capture a safe public view)
 google-chrome --headless=new --disable-gpu --window-size=1600,1000 \
   --screenshot=assets/grafana-overview.png \
-  "http://localhost:3002/"
+  "http://localhost:20163/"
 
 # Alertmanager
 google-chrome --headless=new --disable-gpu --window-size=1600,1000 \
   --screenshot=assets/alertmanager-routes.png \
-  "http://localhost:9093/"
+  "http://localhost:20162/"
 ```
 
 Notes:

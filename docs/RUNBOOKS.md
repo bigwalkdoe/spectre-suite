@@ -257,7 +257,7 @@ explicit version, so there is no `:latest` to pull for the monitoring stack.
 ```bash
 spectre/actions/network/monitor-network.sh
 ping -c 3 8.8.8.8
-curl -sf http://localhost:9090/-/healthy
+curl -sf http://localhost:20161/prometheus/-/healthy
 docker network ls
 ```
 
@@ -321,7 +321,7 @@ sudo sed -i '/ignoreip/s/$/ <trusted_ip>/' /etc/fail2ban/jail.local
 ```bash
 docker logs prometheus | tail -50
 docker exec prometheus tsdb list
-curl -s http://localhost:9090/prometheus/api/v1/label/__name__/values | head
+curl -s http://localhost:20161/prometheus/api/v1/label/__name__/values | head
 ```
 
 **Resolution:**
@@ -429,7 +429,7 @@ spectre/actions/systemd/install-security-posture-maintenance-timer.sh --uninstal
 ```bash
 spectre run monitoring/check-monitoring-stack
 # or: ./spectre/actions/monitoring/check-monitoring-stack.sh
-curl -sS http://localhost:9090/prometheus/-/ready   # host-published, respects route-prefix
+curl -sS http://localhost:20161/prometheus/-/ready   # host-published, respects route-prefix
 docker exec grafana wget -qO- --timeout=3 http://prometheus:9090/prometheus/-/healthy
 ```
 

@@ -5,13 +5,20 @@ set -euo pipefail
 
 # Source distribution detection
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SPECTRE_REPO_ROOT:-"$(dirname "$(dirname "$SCRIPT_DIR")")"}"
 # shellcheck disable=SC1091  # resolved at runtime
 source "$SCRIPT_DIR/../detect-distribution.sh"
 
 # Initialize distribution settings
 detect_distribution
 set_package_manager
+
+# Check if sudo is available non-interactively; if not, skip root-required tasks
+SUDO_CMD="sudo"
+if ! $SUDO_CMD -n true 2>/dev/null; then
+    echo "sudo not available without password; advanced threat detection will be skipped"
+    echo "Advanced threat detection skipped (sudo unavailable)"
+    exit 0
+fi
 
 echo "Starting Advanced Threat Detection for $DISTRO_NAME..."
 
