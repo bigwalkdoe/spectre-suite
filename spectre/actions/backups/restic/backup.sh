@@ -151,11 +151,14 @@ fi
 # Add backup artifact directories (created by backup-databases.sh, backup-docker-volumes.sh,
 # backup-configurations.sh, backup-projects.sh) so they're included in local backup.
 # These contain the actual backup data that check-backup-health.sh verifies.
-for artifact_dir in /backups/databases /backups/docker-volumes /backups/configurations /backups/projects; do
-  if [ -d "$artifact_dir" ] && [ "$(ls -A "$artifact_dir" 2>/dev/null)" ]; then
-    BACKUP_TARGETS+=("$artifact_dir")
-  fi
-done
+# Override with RESTIC_SKIP_ARTIFACTS=1 to skip (used by tests).
+if [ "${RESTIC_SKIP_ARTIFACTS:-0}" != "1" ]; then
+  for artifact_dir in /backups/databases /backups/docker-volumes /backups/configurations /backups/projects; do
+    if [ -d "$artifact_dir" ] && [ "$(ls -A "$artifact_dir" 2>/dev/null)" ]; then
+      BACKUP_TARGETS+=("$artifact_dir")
+    fi
+  done
+fi
 
 # Remote targets (for offsite leg) - only databases dir and dumps dir
 REMOTE_TARGETS=()
