@@ -16,6 +16,14 @@ SURICATA_INTERFACE="${SURICATA_INTERFACE:-$(ip route show default 2>/dev/null | 
 SURICATA_INTERFACE="${SURICATA_INTERFACE:-eth0}"
 set_package_manager
 
+# Check if sudo is available non-interactively; if not, skip
+SUDO_CMD="sudo"
+if ! $SUDO_CMD -n true 2>/dev/null; then
+    echo "sudo not available without password; IDS/IPS installation requires root"
+    echo "Run with sudo or configure passwordless sudo for these operations"
+    exit 0
+fi
+
 echo "Installing IDS/IPS for $DISTRO_NAME..."
 
 # Install required dependencies

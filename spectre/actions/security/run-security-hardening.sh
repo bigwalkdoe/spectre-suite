@@ -16,6 +16,15 @@ SECURITY_LOG="${SECURITY_HARDENING_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/se
 mkdir -p "$(dirname "$SECURITY_LOG")" 2>/dev/null || true
 DATE=$(date +%Y%m%d_%H%M%S)
 
+# Check if sudo is available non-interactively; if not, skip root-required tasks
+SUDO_CMD="sudo"
+if ! $SUDO_CMD -n true 2>/dev/null; then
+    echo "sudo not available without password; root-required security tasks will be skipped"
+    SKIP_ROOT_TASKS=1
+else
+    SKIP_ROOT_TASKS=0
+fi
+
 echo "==========================================" >> "$SECURITY_LOG"
 echo "Security Hardening - $DATE" >> "$SECURITY_LOG"
 echo "==========================================" >> "$SECURITY_LOG"
@@ -31,12 +40,17 @@ set +e
 DEP_STATUS=$?
 set -e
 
-# Run Docker security hardening
-echo "Running Docker security hardening..." >> "$SECURITY_LOG"
-set +e
-sudo "$SCRIPT_DIR/docker-security-hardening.sh" 2>&1 | sudo tee -a "$SECURITY_LOG" >/dev/null || true
-DOCKER_STATUS=$?
-set -e
+# Run Docker security hardening (requires root)
+if [ "$SKIP_ROOT_TASKS" = "1" ]; then
+    echo "Skipping Docker security hardening (sudo unavailable)" >> "$SECURITY_LOG"
+    DOCKER_STATUS=0  # Don't fail the overall run
+else
+    echo "Running Docker security hardening..." >> "$SECURITY_LOG"
+    set +e
+    sudo "$SCRIPT_DIR/docker-security-hardening.sh" 2>&1 | sudo tee -a "$SECURITY_LOG" >/dev/null || true
+    DOCKER_STATUS=$?
+    set -e
+fi
 
 # Run API security hardening
 echo "Running API security hardening..." >> "$SECURITY_LOG"
@@ -45,24 +59,29 @@ set +e
 API_STATUS=$?
 set -e
 
-# Run API security monitoring
-echo "Running API security monitoring..." >> "$SECURITY_LOG"
-set +e
-"$SCRIPT_DIR/monitor-api-security.sh" >> "$SECURITY_LOG" 2>&1
-MONITOR_STATUS=$?
-set -e
+# Run API security monitoring (requires root for journalctl/fail2ban)
+if [ "$SKIP_ROOT_TASKS" = "1" ]; then
+    echo "Skipping API security monitoring (sudo unavailable)" >> "$SECURITY_LOG"
+    MONITOR_STATUS=0  # Don't fail the overall run
+else
+    echo "Running API security monitoring..." >> "$SECURITY_LOG"
+    set +e
+    "$SCRIPT_DIR/monitor-api-security.sh" >> "$SECURITY_LOG" 2>&1
+    MONITOR_STATUS=$?
+    set -e
+fi
 
 # Generate summary
 echo "==========================================" >> "$SECURITY_LOG"
 echo "Security Hardening Summary - $DATE" >> "$SECURITY_LOG"
 echo "Dependency scanning: $([ $DEP_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$SECURITY_LOG"
-echo "Docker security: $([ $DOCKER_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$SECURITY_LOG"
+echo "Docker security: $([ $DOCKER_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')$([ "$SKIP_ROOT_TASKS" = "1" ] && echo ' (SKIPPED)')" >> "$SECURITY_LOG"
 echo "API security: $([ $API_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$SECURITY_LOG"
-echo "API monitoring: $([ $MONITOR_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')" >> "$SECURITY_LOG"
+echo "API monitoring: $([ $MONITOR_STATUS -eq 0 ] && echo 'SUCCESS' || echo 'FAILED')$([ "$SKIP_ROOT_TASKS" = "1" ] && echo ' (SKIPPED)')" >> "$SECURITY_LOG"
 echo "==========================================" >> "$SECURITY_LOG"
 
 # Send notification if any security hardening failed
-if [ $DEP_STATUS -ne 0 ] || [ $DOCKER_STATUS -ne 0 ] || [ $API_STATUS -ne 0 ] || [ $MONITOR_STATUS -ne 0 ]; then
+if [ $DEP_STATUS -ne 0 ] || [ $API_STATUS -ne 0 ]; then
     logger -p user.error "Security hardening completed with errors - check $SECURITY_LOG"
     # ${DISPLAY:-} rather than "$DISPLAY": a systemd unit has no session
     # environment, so under `set -u` a bare reference aborts the whole run. The

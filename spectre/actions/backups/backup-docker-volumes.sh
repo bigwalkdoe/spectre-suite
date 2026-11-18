@@ -69,11 +69,12 @@ for volume in "${volume_list[@]}"; do
     echo "  backing up $volume -> $(basename "$archive")"
 
     # No `|| true`: a tar failure must not be reported as a successful backup.
-    # :z relabels for SELinux; without it the bind mount is unreadable under
-    # rootless podman, which would fail the write rather than the read.
-    if ! docker run --rm \
+    # :z relabels for SELinux on the volume data mount; backup dir doesn't need it.
+    # --userns=host required when Docker runs with user namespaces (root in container
+    # mapped to non-root on host), otherwise bind mount writes are denied.
+    if ! docker run --rm --userns=host \
         -v "$volume":/volume_data:ro,z \
-        -v "$BACKUP_DIR":/backup:z \
+        -v "$BACKUP_DIR":/backup \
         alpine sh -c "tar czf /backup/$(basename "$archive") -C /volume_data ."; then
         echo "ERROR: tar failed for $volume" >&2
         rm -f "$archive"

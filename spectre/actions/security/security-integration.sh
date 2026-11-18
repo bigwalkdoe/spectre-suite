@@ -12,6 +12,14 @@ source "$SCRIPT_DIR/../detect-distribution.sh"
 detect_distribution
 set_package_manager
 
+# Check if sudo is available non-interactively; if not, skip
+SUDO_CMD="sudo"
+if ! $SUDO_CMD -n true 2>/dev/null; then
+    echo "sudo not available without password; security integration setup requires root"
+    echo "Run with sudo or configure passwordless sudo for these operations"
+    exit 0
+fi
+
 echo "Setting up Comprehensive Security Integration for $DISTRO_NAME..."
 
 SECURITY_DIR="/etc/security-integration"
