@@ -35,7 +35,7 @@ jobs:
           while IFS= read -r author; do
             [ -z "$author" ] && continue
             case "$author" in
-              "owner <owner@example.com>"|"bigwalkdoe <132009230+bigwalkdoe@users.noreply.github.com>"|"bigwalkdoe <bigwalkdoe@gmail.com>")
+              "owner <owner@example.com>"|"bigwalkdoe <132009230+bigwalkdoe@users.noreply.github.com>"|"bigwalkdoe <bigwalkdoe@gmail.com>"|"BWD <132009230+bigwalkdoe@users.noreply.github.com>")
                 ;;
               *)
                 echo "Forbidden author: $author"
