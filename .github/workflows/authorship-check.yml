@@ -31,13 +31,17 @@ jobs:
           fi
 
           bad=0
-          # Authors must all be the repository owner
+          # Authors must all be the repository owner (allow both historical and current identity)
           while IFS= read -r author; do
             [ -z "$author" ] && continue
-            if [ "$author" != "owner <owner@example.com>" ]; then
-              echo "Forbidden author: $author"
-              bad=1
-            fi
+            case "$author" in
+              "owner <owner@example.com>"|"bigwalkdoe <132009230+bigwalkdoe@users.noreply.github.com>"|"bigwalkdoe <bigwalkdoe@gmail.com>")
+                ;;
+              *)
+                echo "Forbidden author: $author"
+                bad=1
+                ;;
+            esac
           done < <(git log --format='%an <%ae>' "$range")
 
           # No co-author or AI attribution trailers in messages
