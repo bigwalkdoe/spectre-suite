@@ -33,6 +33,8 @@
                     <a href="#page-trends" class="nav-item" data-page="trends" data-page-title="Resource Trends" data-page-icon="fa-chart-line"><i class="fas fa-chart-line fa-fw" aria-hidden="true"></i><span>Trends</span></a>
                     <a href="#page-security" class="nav-item" data-page="security" data-page-title="Security" data-page-icon="fa-shield-alt"><i class="fas fa-shield-alt fa-fw" aria-hidden="true"></i><span>Security</span></a>
                     <a href="#page-backup" class="nav-item" data-page="backup" data-page-title="Backup" data-page-icon="fa-database"><i class="fas fa-database fa-fw" aria-hidden="true"></i><span>Backup</span></a>
+                    <a href="#page-diagnostics" class="nav-item" data-page="diagnostics" data-page-title="Diagnostics" data-page-icon="fa-stethoscope"><i class="fas fa-stethoscope fa-fw" aria-hidden="true"></i><span>Diagnostics</span></a>
+                    <a href="#page-action-activity" class="nav-item" data-page="action-activity" data-page-title="Action Activity" data-page-icon="fa-clock-rotate-left"><i class="fas fa-clock-rotate-left fa-fw" aria-hidden="true"></i><span>Action Activity</span></a>
                     <a href="#page-reports" class="nav-item" data-page="reports" data-page-title="Reports" data-page-icon="fa-chart-bar"><i class="fas fa-chart-bar fa-fw" aria-hidden="true"></i><span>Reports</span></a>
                 </div>
             </nav>
@@ -97,8 +99,47 @@
                 <div id="page-containers" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-trends" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-security" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-diagnostics" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-backup" class="page-anchor" aria-hidden="true"></div>
                 <div id="page-reports" class="page-anchor" aria-hidden="true"></div>
+                <div id="page-action-activity" class="page-anchor" aria-hidden="true"></div>
+                <!-- Quick Stats -->
+                <section class="quick-stats" aria-label="Key metrics" data-show-pages="overview health trends">
+                    <div class="stat-card cpu card" id="cpuCard">
+                        <div class="stat-icon"><i class="fas fa-microchip" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-label">CPU Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20avg(rate(node_cpu_seconds_total%7Bmode%3D%22idle%22%7D%5B5m%5D)))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open CPU query in Prometheus" aria-label="Open CPU query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
+                            <div class="stat-value" id="cpuUsage">--%</div>
+                            <div class="stat-change" id="cpuChange">--</div>
+                        </div>
+                    </div>
+                    <div class="stat-card memory card" id="memoryCard">
+                        <div class="stat-icon"><i class="fas fa-memory" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-label">Memory Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_memory_MemAvailable_bytes%20%2F%20node_memory_MemTotal_bytes))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open memory query in Prometheus" aria-label="Open memory query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
+                            <div class="stat-value" id="memoryUsage">--%</div>
+                            <div class="stat-change" id="memoryChange">--</div>
+                        </div>
+                    </div>
+                    <div class="stat-card disk card" id="diskCard">
+                        <div class="stat-icon"><i class="fas fa-hdd" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-label">Disk Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_filesystem_avail_bytes%7Bmountpoint%3D%22%2F%22%7D%20%2F%20node_filesystem_size_bytes%7Bmountpoint%3D%22%2F%22%7D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open disk usage query in Prometheus" aria-label="Open disk usage query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
+                            <div class="stat-value" id="diskUsage">--%</div>
+                            <div class="stat-change" id="diskChange">--</div>
+                        </div>
+                    </div>
+                    <div class="stat-card network card" id="networkCard">
+                        <div class="stat-icon"><i class="fas fa-network-wired" aria-hidden="true"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-label">Network I/O <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=sum(rate(node_network_receive_bytes_total%7Bdevice!~%22lo%7Cveth.*%7Cdocker.*%7Cbr-.*%7Ccni.*%7Cflannel.*%7Ccali.*%22%7D%5B5m%5D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open network RX query in Prometheus" aria-label="Open network RX query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
+                            <div class="stat-value" id="networkIO">--</div>
+                            <div class="stat-change" id="networkChange">--</div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dashboard-grid">
                     <section class="card" id="reportsCard" data-show-pages="reports">
                         <div class="card-header">
                             <h2><i class="fas fa-chart-bar" aria-hidden="true"></i> Reports</h2>
@@ -147,44 +188,7 @@
                             <span id="reportExportStatus" class="muted"></span>
                         </div>
                     </section>
-                <!-- Quick Stats -->
-                <section class="quick-stats" aria-label="Key metrics" data-show-pages="overview health trends">
-                    <div class="stat-card cpu card" id="cpuCard">
-                        <div class="stat-icon"><i class="fas fa-microchip" aria-hidden="true"></i></div>
-                        <div class="stat-content">
-                            <div class="stat-label">CPU Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20avg(rate(node_cpu_seconds_total%7Bmode%3D%22idle%22%7D%5B5m%5D)))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open CPU query in Prometheus" aria-label="Open CPU query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
-                            <div class="stat-value" id="cpuUsage">--%</div>
-                            <div class="stat-change" id="cpuChange">--</div>
-                        </div>
-                    </div>
-                    <div class="stat-card memory card" id="memoryCard">
-                        <div class="stat-icon"><i class="fas fa-memory" aria-hidden="true"></i></div>
-                        <div class="stat-content">
-                            <div class="stat-label">Memory Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_memory_MemAvailable_bytes%20%2F%20node_memory_MemTotal_bytes))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open memory query in Prometheus" aria-label="Open memory query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
-                            <div class="stat-value" id="memoryUsage">--%</div>
-                            <div class="stat-change" id="memoryChange">--</div>
-                        </div>
-                    </div>
-                    <div class="stat-card disk card" id="diskCard">
-                        <div class="stat-icon"><i class="fas fa-hdd" aria-hidden="true"></i></div>
-                        <div class="stat-content">
-                            <div class="stat-label">Disk Usage <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=100%20*%20(1%20-%20(node_filesystem_avail_bytes%7Bmountpoint%3D%22%2F%22%7D%20%2F%20node_filesystem_size_bytes%7Bmountpoint%3D%22%2F%22%7D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open disk usage query in Prometheus" aria-label="Open disk usage query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
-                            <div class="stat-value" id="diskUsage">--%</div>
-                            <div class="stat-change" id="diskChange">--</div>
-                        </div>
-                    </div>
-                    <div class="stat-card network card" id="networkCard">
-                        <div class="stat-icon"><i class="fas fa-network-wired" aria-hidden="true"></i></div>
-                        <div class="stat-content">
-                            <div class="stat-label">Network I/O <a href="#" data-ext="prometheus" data-ext-path="/graph?g0.expr=sum(rate(node_network_receive_bytes_total%7Bdevice!~%22lo%7Cveth.*%7Cdocker.*%7Cbr-.*%7Ccni.*%7Cflannel.*%7Ccali.*%22%7D%5B5m%5D))&g0.tab=0" target="_blank" rel="noopener noreferrer" class="inline-drilldown" title="Open network RX query in Prometheus" aria-label="Open network RX query in Prometheus"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></div>
-                            <div class="stat-value" id="networkIO">--</div>
-                            <div class="stat-change" id="networkChange">--</div>
-                        </div>
-                    </div>
-                </section>
-
-                <div class="dashboard-grid">
-                    <section class="card" id="alertsCard" data-show-pages="overview alerts">
+                    <section class="card" id="alertsCard" data-show-pages="alerts">
                         <div class="card-header">
                             <h2><i class="fas fa-bell" aria-hidden="true"></i> Active Alerts <a href="#" data-ext="alertmanager" data-ext-path="/" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Alertmanager" aria-label="Open Alertmanager"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <span class="badge badge-warning" id="alertCount">0</span>
@@ -209,7 +213,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="securityCard" data-show-pages="overview security">
+                    <section class="card" id="securityCard" data-show-pages="security">
                         <div class="card-header">
                             <h2><i class="fas fa-shield-alt" aria-hidden="true"></i> Security Status</h2>
                             <span class="badge" id="securityStatus">Checking...</span>
@@ -224,7 +228,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="healthCard" data-show-pages="overview health">
+                    <section class="card" id="healthCard" data-show-pages="health">
                         <div class="card-header">
                             <h2><i class="fas fa-heartbeat" aria-hidden="true"></i> System Health</h2>
                             <span class="badge" id="healthStatus">Checking...</span>
@@ -239,7 +243,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="backupCard" data-show-pages="overview backup">
+                    <section class="card" id="backupCard" data-show-pages="backup">
                         <div class="card-header">
                             <h2><i class="fas fa-database" aria-hidden="true"></i> Backup Status</h2>
                             <span class="badge" id="backupStatus">Checking...</span>
@@ -256,7 +260,7 @@
                         </div>
                     </section>
 
-                    <section class="card full-width" id="containersCard" data-show-pages="overview containers">
+                    <section class="card full-width" id="containersCard" data-show-pages="containers">
                         <div class="card-header">
                             <h2><i class="fas fa-cubes" aria-hidden="true"></i> Container Status <a href="#" data-ext="prometheus" data-ext-path="/targets" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus targets" aria-label="Open Prometheus targets"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <span class="badge" id="containerStatus">Checking...</span>
@@ -271,7 +275,7 @@
                         </div>
                     </section>
 
-                    <section class="card full-width" id="chartCard" data-show-pages="overview trends">
+                    <section class="card full-width" id="chartCard" data-show-pages="trends">
                         <div class="card-header">
                             <h2><i class="fas fa-chart-line" aria-hidden="true"></i> Resource Trends <a href="#" data-ext="prometheus" data-ext-path="/graph" target="_blank" rel="noopener noreferrer" class="card-link" title="Open Prometheus graph" aria-label="Open Prometheus graph"><i class="fas fa-external-link-alt" aria-hidden="true"></i></a></h2>
                             <div class="chart-controls" role="group" aria-label="Chart time range">
@@ -302,7 +306,7 @@
                         </div>
                     </section>
 
-                    <section class="card full-width" id="actionActivityCard" data-show-pages="overview">
+                    <section class="card full-width" id="actionActivityCard" data-show-pages="action-activity">
                         <div class="card-header">
                             <h2><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Action Activity</h2>
                             <div>
@@ -315,7 +319,7 @@
                         </div>
                     </section>
 
-                    <section class="card" id="diagnosticsCard" data-show-pages="overview security">
+                    <section class="card" id="diagnosticsCard" data-show-pages="diagnostics">
                         <div class="card-header">
                             <h2><i class="fas fa-stethoscope" aria-hidden="true"></i> Diagnostics</h2>
                             <span class="badge" id="diagnosticsStatus">--</span>

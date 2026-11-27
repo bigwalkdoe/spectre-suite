@@ -3,8 +3,11 @@ set -euo pipefail
 # System Health Check Script
 # Performs comprehensive system health analysis
 
-HEALTH_LOG="/var/log/system-health.log"
+# Writable default: spectre.service runs ProtectSystem=strict + ReadWritePaths=~/.config/spectre,
+# so /var/log is not writable. Override with SPECTRE_HEALTH_LOG.
+HEALTH_LOG="${SPECTRE_HEALTH_LOG:-${SPECTRE_CONFIG_DIR:-$HOME/.config/spectre}/logs/system-health.log}"
 DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p "$(dirname "$HEALTH_LOG")" 2>/dev/null || true
 
 echo "==========================================" >> "$HEALTH_LOG"
 echo "System Health Check - $DATE" >> "$HEALTH_LOG"

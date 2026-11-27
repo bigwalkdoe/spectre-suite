@@ -18,7 +18,7 @@ fi
 
 # Test 2: dashboard.js contains exportChartCSV function
 echo "Test 2: dashboard.js contains exportChartCSV function"
-JS_FILE="$PROJECT_ROOT/web-dashboard/dashboard.js"
+JS_FILE="$PROJECT_ROOT/web-dashboard/js/chart.js"
 if grep -q "function exportChartCSV" "$JS_FILE"; then
     pass "dashboard.js contains exportChartCSV()"
 else

@@ -995,7 +995,7 @@ wheels = [
 
 [[package]]
 name = "spectre"
-version = "0.3.0"
+version = "1.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

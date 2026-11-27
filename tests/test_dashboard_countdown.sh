@@ -18,7 +18,7 @@ fi
 
 # Test 2: dashboard.js contains countdown functions
 echo "Test 2: dashboard.js contains countdown functions"
-JS_FILE="$PROJECT_ROOT/web-dashboard/dashboard.js"
+JS_FILE="$PROJECT_ROOT/web-dashboard/js/dashboard-core.js"
 if grep -q "function startRefreshCountdown" "$JS_FILE"; then
     pass "dashboard.js contains startRefreshCountdown()"
 else

@@ -1,0 +1,10 @@
+import "./web-dashboard/js/dashboard-core.js";
+console.log("Module loaded successfully");
+console.log("initExternalLinks:", typeof globalThis.initExternalLinks);
+console.log("toggleDarkMode:", typeof globalThis.toggleDarkMode);
+console.log("checkAlerts:", typeof globalThis.checkAlerts);
+console.log("checkPrometheusConnection:", typeof globalThis.checkPrometheusConnection);
+console.log("exportSnapshot:", typeof globalThis.exportSnapshot);
+console.log("exportChartCSV:", typeof globalThis.exportChartCSV);
+console.log("initializeTheme:", typeof globalThis.initializeTheme);
+console.log("updateTimestamp:", typeof globalThis.updateTimestamp);

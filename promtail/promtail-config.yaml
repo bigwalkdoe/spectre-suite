@@ -1,0 +1,19 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 9081
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Test file for verification
+  - job_name: test-file
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: test
+          __path__: /host-tmp/test.log

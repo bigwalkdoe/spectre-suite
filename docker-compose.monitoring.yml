@@ -113,8 +113,9 @@ services:
       - /:/rootfs:ro
       - ./prometheus/business-metrics:/textfile:ro,z
     command:
-      - '--path.procfs=/host/proc'
+      - '--path.procfs=/proc'
       - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|textfile)($$|/)'
       - '--collector.textfile.directory=/textfile'
     restart: unless-stopped
@@ -144,8 +145,7 @@ services:
       - --docker=unix:///var/run/docker.sock
     volumes:
       - /:/rootfs:ro
-      - /var_run:/var_run:ro
-      - /var/run/docker.sock:/var_run/docker.sock:rw
+      - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
