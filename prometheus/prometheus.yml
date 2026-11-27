@@ -32,14 +32,13 @@ scrape_configs:
       - targets: ['node-exporter:9100']
     scrape_interval: 15s
 
-  - job_name: "cadvisor"
+  - job_name: cadvisor
     static_configs:
-      - targets: ["cadvisor:8080"]
+      - targets: [cadvisor:8080]
     scrape_interval: 30s            # reduce scrape pressure vs 15s
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis-exporter:9121']
-    scrape_interval: 15s
+    # Consider cAdvisor flags (docker-compose.monitoring.yml): --housekeeping_interval=30s,
+    # # --docker_only=true (already set), and resource limits appropriate for the host.
+    # # Re-evaluate CPU impact after enabling.
 
   # PostgreSQL Exporter
   - job_name: 'postgres'
@@ -50,7 +49,7 @@ scrape_configs:
   # Alertmanager (route-prefix=/alertmanager/)
   - job_name: 'alertmanager'
     static_configs:
-      - targets: ['alertmanager:9093']
+      - targets: [alertmanager:9093]
     metrics_path: '/alertmanager/metrics'
     scrape_interval: 15s
 
