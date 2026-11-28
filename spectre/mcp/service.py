@@ -7,10 +7,11 @@ engine rather than reimplementing them.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import platform
-from datetime import datetime
+import threading
 from typing import Any
 
 from spectre.config import settings as _settings
@@ -19,17 +20,20 @@ from spectre.core.service_bus import ServiceBus
 from spectre.dispatch import registry as _registry
 from spectre.dispatch import verify as _verify
 from spectre.dispatch.envelope import truncate_output
-from spectre.dispatch.resolve import DispatchError, resolve as _resolve, actions_root as _actions_root
+from spectre.dispatch.resolve import DispatchError
+from spectre.dispatch.resolve import actions_root as _actions_root
+from spectre.dispatch.resolve import resolve as _resolve
 from spectre.dispatch.retention import record_growth as _record_growth
-from spectre.memory import db as _db
-from spectre.mcp.policy import evaluate as _evaluate_policy
 from spectre.mcp.policy import allow_mutations, allow_sudo, is_root
+from spectre.mcp.policy import evaluate as _evaluate_policy
 from spectre.mcp.redact import redact as _redact_value
+from spectre.memory import db as _db
 from spectre.workflow_engine import engine as _engine_mod
 
 try:
-    from importlib.metadata import PackageNotFoundError, version as _get_version
-except Exception:  # pragma: no cover
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _get_version
+except Exception:  # pragma: no cover  # noqa: BLE001
     PackageNotFoundError = Exception  # type: ignore[misc, assignment]
     _get_version = None  # type: ignore[assignment]
 
@@ -45,7 +49,7 @@ def _iso(value: Any) -> str | None:
     if hasattr(value, "isoformat"):
         try:
             return value.isoformat()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return str(value)
     return str(value)
 
@@ -60,10 +64,8 @@ def _clamp_limit(limit: Any, default: int = 20, maximum: int | None = None) -> i
         value = int(limit)
     except (TypeError, ValueError):
         value = default
-    if value < 1:
-        value = 1
-    if value > maximum:
-        value = maximum
+    value = max(value, 1)
+    value = min(value, maximum)
     return value
 
 
@@ -74,15 +76,15 @@ def _make_agent(name: str) -> Any:
         raise KeyError(name)
     context = AgentContext(service_bus=ServiceBus())
     agent = cls(config={}, context=context)
-    try:
+    with contextlib.suppress(Exception):
         agent.initialize()
-    except Exception:
-        pass
     return agent
 
 
 class SpectreService:
     """Data access and dispatch orchestration for the MCP server."""
+
+    _act_lock: threading.Lock | None = None
 
     # ------------------------------------------------------------------ read
     def status(self, agent: str | None = None) -> dict[str, Any]:
@@ -95,7 +97,7 @@ class SpectreService:
             try:
                 inst = _make_agent(name)
                 agents[name] = inst.observe()
-            except Exception as exc:  # pragma: no cover - defensive
+            except Exception as exc:  # pragma: no cover - defensive  # noqa: BLE001
                 agents[name] = {"error": str(exc)}
         return {"ok": True, "agents": agents}
 
@@ -106,7 +108,7 @@ class SpectreService:
             return {"ok": False, "status": "unknown_agent", "agent": "monitoring"}
         try:
             results = inst.execute(["collect-metrics", "check-thresholds"])
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return {"ok": False, "status": "error", "reason": str(exc)}
         return {
             "ok": True,
@@ -123,7 +125,7 @@ class SpectreService:
         if include_runs:
             try:
                 growth = _record_growth()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 growth = None
         serialized = [self._serialize_job(j, growth) for j in jobs]
         return {"ok": True, "count": len(serialized), "jobs": serialized}
@@ -302,9 +304,9 @@ class SpectreService:
         }
 
     def report_get(self, report_id: int) -> dict[str, Any]:
-        from sqlmodel import select
 
-        from spectre.memory.db import Report, engine as db_engine
+        from spectre.memory.db import Report
+        from spectre.memory.db import engine as db_engine
 
         with Session(db_engine) as session:
             report = session.get(Report, report_id)
@@ -387,7 +389,7 @@ class SpectreService:
                                 "source": "database",
                             }
                         )
-        except Exception:
+        except Exception:  # noqa: BLE001
             db_tasks = []
         settings = _settings.load_settings()
         settings_tasks: list[dict[str, Any]] = []
@@ -408,7 +410,7 @@ class SpectreService:
     def version(self) -> dict[str, Any]:
         try:
             v = _get_version("spectre")
-        except Exception:
+        except Exception:  # noqa: BLE001
             v = "0.2.0-dev"
         return self._finalize(
             {
@@ -507,7 +509,7 @@ class SpectreService:
                     return {"ok": False, "status": "locked", "reason": str(exc), "job": j.name}
                 init_db()
                 save_run(outcome.envelope, agent="mcp")
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover - defensive  # noqa: BLE001
             return {"ok": False, "status": "error", "reason": str(exc), "job": j.name}
 
         env = outcome.envelope
@@ -561,7 +563,7 @@ class SpectreService:
             return {"ok": False, "status": "refused", "reason": decision.reason, "workflow": name}
         try:
             result = engine.run_workflow(name)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return {"ok": False, "status": "error", "reason": str(exc), "workflow": name}
         return self._finalize(
             {
@@ -640,7 +642,8 @@ class SpectreService:
             return {"ok": False, "status": "unknown_workflow", "workflow": workflow}
         from sqlmodel import select
 
-        from spectre.memory.db import Configuration, engine as db_engine
+        from spectre.memory.db import Configuration
+        from spectre.memory.db import engine as db_engine
 
         with Session(db_engine) as session:
             config = session.exec(
@@ -668,7 +671,8 @@ class SpectreService:
     def schedule_remove(self, name: str, confirm: bool = False) -> dict[str, Any]:
         from sqlmodel import select
 
-        from spectre.memory.db import Configuration, engine as db_engine
+        from spectre.memory.db import Configuration
+        from spectre.memory.db import engine as db_engine
 
         with Session(db_engine) as session:
             config = session.exec(

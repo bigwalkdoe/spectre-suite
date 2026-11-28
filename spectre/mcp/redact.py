@@ -31,7 +31,7 @@ def redact_text(text: str) -> tuple[str, bool]:
     """Redact secrets from one string. Returns (new_text, changed)."""
     changed = False
     out = text
-    subs: list[tuple[re.Pattern[str], object]] = [
+    subs: list[tuple[re.Pattern[str], Any]] = [
         (_PRIVATE_KEY, lambda m: REDACTED),
         (_BEARER, lambda m: f"{m.group(1)}[REDACTED]"),
         (_ASSIGNMENT, _redact_assignment),

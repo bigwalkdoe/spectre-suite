@@ -25,10 +25,10 @@ def _get_service() -> SpectreService:
     return _service
 
 
-_READ_ONLY = ToolAnnotations(readOnlyHint=True)
-_NOT_READ_ONLY = ToolAnnotations(readOnlyHint=False)
-_DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
-_DESTRUCTIVE_IDEMPOTENT = ToolAnnotations(destructiveHint=True, idempotentHint=True)
+_READ_ONLY = ToolAnnotations(read_only_hint=True)
+_NOT_READ_ONLY = ToolAnnotations(read_only_hint=False)
+_DESTRUCTIVE = ToolAnnotations(destructive_hint=True)
+_DESTRUCTIVE_IDEMPOTENT = ToolAnnotations(destructive_hint=True, idempotent_hint=True)
 
 
 # ------------------------------- read tools -------------------------------

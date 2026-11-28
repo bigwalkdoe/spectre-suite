@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
 mcp = pytest.importorskip("mcp")
 
-from spectre.mcp import service as svc_mod  # noqa: E402
-from spectre.mcp.service import SpectreService  # noqa: E402
+from spectre.mcp import service as svc_mod
+from spectre.mcp.service import SpectreService
 
 
 class FakeAgent:
@@ -134,7 +133,7 @@ def test_health_returns_metrics_and_thresholds(monkeypatch):
 def test_runs_serializes_records(monkeypatch):
     rec = SimpleNamespace(
         id=1,
-        timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 1, 1, tzinfo=UTC),
         agent="linux",
         action="system-health-check",
         status="success",
@@ -161,7 +160,7 @@ def test_runs_serializes_records(monkeypatch):
 
 
 def test_reports_list_and_get(monkeypatch):
-    rep = SimpleNamespace(id=7, timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc), report_type="daily", content="hello", format="markdown")
+    rep = SimpleNamespace(id=7, timestamp=datetime(2026, 1, 1, tzinfo=UTC), report_type="daily", content="hello", format="markdown")
     monkeypatch.setattr(svc_mod._db, "get_reports", lambda report_type=None, limit=50: [rep])
     # report_get uses session.get; monkeypatch _db.Report and _db.engine indirectly is hard.
     # Patch SpectreService.report_get by monkeypatching the module-level Report/engine.
@@ -196,7 +195,7 @@ def test_reports_list_and_get(monkeypatch):
 
 
 def test_events_serializes(monkeypatch):
-    ev = SimpleNamespace(id=1, timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc), event_type="x", source="s", severity="info", data_json='{"a": 1}')
+    ev = SimpleNamespace(id=1, timestamp=datetime(2026, 1, 1, tzinfo=UTC), event_type="x", source="s", severity="info", data_json='{"a": 1}')
     monkeypatch.setattr(svc_mod._db, "get_events", lambda event_type=None, limit=100: [ev])
     service = SpectreService()
     result = service.events(event_type="x", limit=5)
@@ -242,7 +241,9 @@ def test_schedule_list_combines_sources(monkeypatch):
     from spectre.config.settings import WorkflowSchedule
 
     class S:
-        schedules = [WorkflowSchedule(name="s1", schedule="every 5m", enabled=True)]
+        from typing import ClassVar
+
+        schedules: ClassVar[list] = [WorkflowSchedule(name="s1", schedule="every 5m", enabled=True)]
 
     monkeypatch.setattr(settings_mod, "load_settings", lambda: S())
     import spectre.memory.db as db_mod
@@ -302,7 +303,7 @@ def test_actions_verify_returns_counts(monkeypatch):
 
 
 def test_workflows_list(monkeypatch):
-    from spectre.workflow_engine.engine import WorkflowDefinition, Step
+    from spectre.workflow_engine.engine import Step, WorkflowDefinition
 
     wf = WorkflowDefinition(name="w1", description="d", steps=[Step(agent="linux", action="system-health-check")], continue_on_failure=False)
     engine = SimpleNamespace(get_workflow_definitions=lambda: {"w1": wf})
@@ -315,7 +316,7 @@ def test_workflows_list(monkeypatch):
 
 
 def test_workflow_history_serializes(monkeypatch):
-    run = SimpleNamespace(id=1, timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc), workflow="w1", status="success", duration_ms=5, details='{"a": 1}')
+    run = SimpleNamespace(id=1, timestamp=datetime(2026, 1, 1, tzinfo=UTC), workflow="w1", status="success", duration_ms=5, details='{"a": 1}')
     monkeypatch.setattr(svc_mod._db, "get_workflow_runs", lambda workflow=None, limit=50: [run])
     service = SpectreService()
     result = service.workflow_history(limit=5)
@@ -485,7 +486,7 @@ def test_config_set_refused_when_disabled(monkeypatch):
 
 
 def test_workflow_run_unknown(monkeypatch):
-    engine = SimpleNamespace(get_workflow_definitions=lambda: {})
+    engine = SimpleNamespace(get_workflow_definitions=dict)
     monkeypatch.setattr(svc_mod._engine_mod, "WorkflowEngine", lambda *a, **k: engine)
     service = SpectreService()
     result = service.workflow_run("nope", confirm=True)
@@ -494,7 +495,7 @@ def test_workflow_run_unknown(monkeypatch):
 
 
 def test_workflow_run_refused_when_disabled(monkeypatch):
-    from spectre.workflow_engine.engine import WorkflowDefinition, Step
+    from spectre.workflow_engine.engine import Step, WorkflowDefinition
 
     wf = WorkflowDefinition(name="w1", description="d", steps=[Step(agent="linux", action="system-health-check")], continue_on_failure=False)
     engine = SimpleNamespace(get_workflow_definitions=lambda: {"w1": wf}, run_workflow=lambda name: {"workflow": name, "status": "success", "duration_ms": 1, "failed_steps": [], "details": {}})
@@ -509,7 +510,7 @@ def test_workflow_run_refused_when_disabled(monkeypatch):
 
 
 def test_schedule_add_returns_not_scheduled(monkeypatch):
-    from spectre.workflow_engine.engine import WorkflowDefinition, Step
+    from spectre.workflow_engine.engine import WorkflowDefinition
 
     wf = WorkflowDefinition(name="w1", description="d", steps=[], continue_on_failure=False)
     engine = SimpleNamespace(get_workflow_definitions=lambda: {"w1": wf})
@@ -517,8 +518,8 @@ def test_schedule_add_returns_not_scheduled(monkeypatch):
     monkeypatch.setattr(svc_mod, "allow_mutations", lambda: True)
     monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
     monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+
     import spectre.memory.db as db_mod
-    from sqlmodel import Session as RealSession
 
     class FakeSession:
         def __init__(self, engine):

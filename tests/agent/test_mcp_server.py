@@ -7,9 +7,9 @@ import pytest
 
 pytest.importorskip("mcp")
 
-from mcp import Client  # noqa: E402
+from mcp import Client
 
-from spectre.mcp.server import mcp  # noqa: E402
+from spectre.mcp.server import mcp
 
 EXPECTED_TOOLS = {
     "spectre_status",
