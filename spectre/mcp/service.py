@@ -638,7 +638,7 @@ class SpectreService:
             return {"ok": False, "status": "refused", "reason": decision.reason}
         if not workflow_exists:
             return {"ok": False, "status": "unknown_workflow", "workflow": workflow}
-        from sqlmodel import Session, select
+        from sqlmodel import select
 
         from spectre.memory.db import Configuration, engine as db_engine
 
@@ -666,7 +666,7 @@ class SpectreService:
         )
 
     def schedule_remove(self, name: str, confirm: bool = False) -> dict[str, Any]:
-        from sqlmodel import Session, select
+        from sqlmodel import select
 
         from spectre.memory.db import Configuration, engine as db_engine
 

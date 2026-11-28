@@ -321,3 +321,261 @@ def test_workflow_history_serializes(monkeypatch):
     result = service.workflow_history(limit=5)
     assert result["ok"] is True
     assert result["runs"][0]["details"] == {"a": 1}
+
+
+# ---------------- Task 5: act method tests ----------------
+
+
+def _fake_job(name="demo-job", mutates=False, sudo=False):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        name=name,
+        group="maintenance",
+        summary=f"summary for {name}",
+        action=f"{name}.sh",
+        sudo=sudo,
+        mutates=mutates,
+        timeout=1800,
+        concurrency="allow",
+        schedule_hint=None,
+        replaces=[],
+    )
+
+
+def _fake_resolved(name="demo-job"):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(job=_fake_job(name), path="/tmp/demo.sh", git_commit="abc1234", git_dirty=False)
+
+
+def _fake_envelope(name="demo-job", status="success"):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        job=name,
+        status=SimpleNamespace(value=status),
+        exit_code=0,
+        duration_ms=10,
+        resolved_path="/tmp/demo.sh",
+        git_commit="abc1234",
+        git_dirty=False,
+        stdout_tail="out",
+        stderr_tail="err",
+        payload={"x": 1},
+    )
+
+
+def test_action_run_unknown_job(monkeypatch):
+    monkeypatch.setattr(svc_mod._registry, "get_job", lambda name: (_ for _ in ()).throw(KeyError(name)))
+    service = SpectreService()
+    result = service.action_run("nope", confirm=True)
+    assert result["ok"] is False
+    assert result["status"] == "unknown_job"
+
+
+def test_action_run_preview_without_confirm(monkeypatch):
+    job = _fake_job("demo-job")
+    resolved = _fake_resolved("demo-job")
+    monkeypatch.setattr(svc_mod._registry, "get_job", lambda name: job)
+    monkeypatch.setattr(svc_mod, "_resolve", lambda j: resolved)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: False)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    result = service.action_run("demo-job", confirm=False)
+    assert result["status"] == "confirmation_required"
+    assert result["job"] == "demo-job"
+    assert result["resolved"] == "/tmp/demo.sh"
+
+
+def test_action_run_mutating_refused_when_disabled(monkeypatch):
+    job = _fake_job("demo-job", mutates=True)
+    resolved = _fake_resolved("demo-job")
+    monkeypatch.setattr(svc_mod._registry, "get_job", lambda name: job)
+    monkeypatch.setattr(svc_mod, "_resolve", lambda j: resolved)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: False)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    result = service.action_run("demo-job", confirm=True)
+    assert result["ok"] is False
+    assert result["status"] == "refused"
+    assert "SPECTRE_MCP_ALLOW_MUTATIONS" in result["reason"]
+
+
+def test_action_run_sudo_refused_when_not_root(monkeypatch):
+    job = _fake_job("demo-job", sudo=True)
+    resolved = _fake_resolved("demo-job")
+    monkeypatch.setattr(svc_mod._registry, "get_job", lambda name: job)
+    monkeypatch.setattr(svc_mod, "_resolve", lambda j: resolved)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: True)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: True)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    result = service.action_run("demo-job", confirm=True)
+    assert result["ok"] is False
+    assert result["status"] == "refused"
+    assert "needs root" in result["reason"]
+
+
+def test_action_run_runs_via_dispatch(monkeypatch):
+    import spectre.dispatch.lock as lock_mod
+    import spectre.dispatch.runner as runner_mod
+    import spectre.memory.db as db_mod
+
+    job = _fake_job("demo-job")
+    resolved = _fake_resolved("demo-job")
+    env = _fake_envelope("demo-job")
+    outcome = SimpleNamespace(envelope=env) if False else None
+    from types import SimpleNamespace as SN
+
+    outcome = SN(envelope=env)
+
+    class FakeLock:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+    monkeypatch.setattr(svc_mod._registry, "get_job", lambda name: job)
+    monkeypatch.setattr(svc_mod, "_resolve", lambda j: resolved)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: True)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: True)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    monkeypatch.setattr(lock_mod, "JobLock", lambda j: FakeLock())
+    monkeypatch.setattr(lock_mod, "LockUnavailable", Exception)
+    monkeypatch.setattr(runner_mod, "run_action", lambda resolved, args, trigger, timeout: outcome)
+    monkeypatch.setattr(db_mod, "init_db", lambda: None)
+    monkeypatch.setattr(db_mod, "save_run", lambda env, agent="dispatch": 1)
+    service = SpectreService()
+    result = service.action_run("demo-job", args=["--flag"], confirm=True)
+    assert result["ok"] is True
+    assert result["status"] == "success"
+    assert result["job"] == "demo-job"
+    assert result["stdout_tail"] == "out"
+    assert result["payload"] == {"x": 1}
+
+
+def test_action_run_config_set_preview_no_old_value(monkeypatch):
+    monkeypatch.setattr(svc_mod._db, "get_configuration", lambda key, profile="default": "old-secret-value")
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: False)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    result = service.config_set("k", "new", confirm=False)
+    assert result["status"] == "confirmation_required"
+    assert "preview" in result
+    assert result["preview"]["key"] == "k"
+    assert result["preview"]["value"] == "new"
+    assert "old" not in str(result["preview"]).lower() or "old-secret-value" not in str(result)
+    assert "old-secret-value" not in str(result)
+
+
+def test_config_set_refused_when_disabled(monkeypatch):
+    monkeypatch.setattr(svc_mod._db, "get_configuration", lambda key, profile="default": None)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: False)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    result = service.config_set("k", "v", confirm=True)
+    assert result["ok"] is False
+    assert result["status"] == "refused"
+
+
+def test_workflow_run_unknown(monkeypatch):
+    engine = SimpleNamespace(get_workflow_definitions=lambda: {})
+    monkeypatch.setattr(svc_mod._engine_mod, "WorkflowEngine", lambda *a, **k: engine)
+    service = SpectreService()
+    result = service.workflow_run("nope", confirm=True)
+    assert result["ok"] is False
+    assert result["status"] == "unknown_workflow"
+
+
+def test_workflow_run_refused_when_disabled(monkeypatch):
+    from spectre.workflow_engine.engine import WorkflowDefinition, Step
+
+    wf = WorkflowDefinition(name="w1", description="d", steps=[Step(agent="linux", action="system-health-check")], continue_on_failure=False)
+    engine = SimpleNamespace(get_workflow_definitions=lambda: {"w1": wf}, run_workflow=lambda name: {"workflow": name, "status": "success", "duration_ms": 1, "failed_steps": [], "details": {}})
+    monkeypatch.setattr(svc_mod._engine_mod, "WorkflowEngine", lambda *a, **k: engine)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: False)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    result = service.workflow_run("w1", confirm=True)
+    assert result["ok"] is False
+    assert result["status"] == "refused"
+
+
+def test_schedule_add_returns_not_scheduled(monkeypatch):
+    from spectre.workflow_engine.engine import WorkflowDefinition, Step
+
+    wf = WorkflowDefinition(name="w1", description="d", steps=[], continue_on_failure=False)
+    engine = SimpleNamespace(get_workflow_definitions=lambda: {"w1": wf})
+    monkeypatch.setattr(svc_mod._engine_mod, "WorkflowEngine", lambda *a, **k: engine)
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: True)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    import spectre.memory.db as db_mod
+    from sqlmodel import Session as RealSession
+
+    class FakeSession:
+        def __init__(self, engine):
+            self._config = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+        def exec(self, stmt):
+            return self
+
+        def first(self):
+            return None
+
+        def add(self, obj):
+            pass
+
+        def commit(self):
+            pass
+
+    monkeypatch.setattr("spectre.mcp.service.Session", lambda engine: FakeSession(engine))
+    monkeypatch.setattr(db_mod, "engine", object())
+    service = SpectreService()
+    result = service.schedule_add("t1", "0 * * * *", "w1", confirm=True)
+    assert result["ok"] is True
+    assert result["scheduled"] is False
+    assert "daemon" in result["note"]
+
+
+def test_schedule_remove_not_found(monkeypatch):
+    import spectre.memory.db as db_mod
+
+    class FakeSession:
+        def __init__(self, engine):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return None
+
+        def exec(self, stmt):
+            return self
+
+        def first(self):
+            return None
+
+    monkeypatch.setattr("spectre.mcp.service.Session", lambda engine: FakeSession(engine))
+    monkeypatch.setattr(db_mod, "engine", object())
+    monkeypatch.setattr(svc_mod, "allow_mutations", lambda: True)
+    monkeypatch.setattr(svc_mod, "allow_sudo", lambda: False)
+    monkeypatch.setattr(svc_mod, "is_root", lambda: False)
+    service = SpectreService()
+    # preview step: confirm=False returns confirmation_required without touching db
+    result = service.schedule_remove("nope", confirm=False)
+    assert result["status"] == "confirmation_required"
