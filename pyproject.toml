@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spectre"
-version = "1.0.2"
+version = "1.1.0"
 description = "Spectre - Autonomous AI Engineering Operating System for Fedora Linux (unified suite + agent)"
 readme = "README.md"
 license = {text = "MIT"}
@@ -52,9 +52,13 @@ dev = [
     "types-PyYAML>=6.0.0",
     "types-psutil>=5.9.0",
 ]
+mcp = [
+    "mcp>=2.3,<3",
+]
 
 [project.scripts]
 spectre = "spectre.cli.main:main"
+spectre-mcp = "spectre.mcp.server:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
