@@ -16,12 +16,12 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from fastapi import APIRouter, Depends, HTTPException, Security
-import typer
+from fastapi import APIRouter, Depends, HTTPException
 
-from spectre.dispatch import registry
+from spectre.dispatch import registry, verify
 from spectre.dispatch.lock import JobLock
 from spectre.dispatch.resolve import DispatchError, resolve
+from spectre.dispatch.runner import run_action
 from spectre.memory.db import init_db, save_run
 
 router = APIRouter(prefix="/api/control-plane", tags=["control-plane"])
@@ -33,7 +33,7 @@ def _utc_now() -> str:
 
 def _http_json(url: str, timeout: float = 2.5) -> dict[str, Any]:
     req = Request(url, headers={"Accept": "application/json"})
-    with urlopen(req, timeout=timeout) as resp:  # noqa: S310 - operator-configured local URLs
+    with urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8", "replace"))
 
 
@@ -41,7 +41,7 @@ def _component_http(name: str, url: str, kind: str, expect_json: bool = True) ->
     started = time.time()
     try:
         req = Request(url, headers={"Accept": "application/json, text/plain, */*"})
-        with urlopen(req, timeout=2.5) as resp:  # noqa: S310 - operator-configured local URLs
+        with urlopen(req, timeout=2.5) as resp:
             body = resp.read().decode("utf-8", "replace")
         latency_ms = int((time.time() - started) * 1000)
         if expect_json:
@@ -62,6 +62,7 @@ def _recent_runs(limit: int = 25) -> list[dict[str, Any]]:
         rows = recent_runs(limit=limit)
         out = []
         for r in rows:
+            started_at = getattr(r, "started_at", None)
             out.append(
                 {
                     "id": getattr(r, "id", None),
@@ -73,7 +74,7 @@ def _recent_runs(limit: int = 25) -> list[dict[str, Any]]:
                     "exit_code": getattr(r, "exit_code", None),
                     "git_commit": getattr(r, "git_commit", None),
                     "git_dirty": getattr(r, "git_dirty", None),
-                    "started_at": getattr(r, "started_at", None).isoformat() if getattr(r, "started_at", None) else None,
+                    "started_at": (started_at.isoformat() if started_at is not None else None),
                     "stderr_tail": (getattr(r, "stderr_tail", None) or "")[:400] or None,
                 }
             )
@@ -102,12 +103,12 @@ def _backup_health() -> dict[str, Any]:
 
 def _dispatch_summary() -> dict[str, Any]:
     jobs = list(registry.JOBS)
-    groups = {}
+    groups: dict[str, int] = {}
     for j in jobs:
         groups[j.group] = groups.get(j.group, 0) + 1
     findings = []
     try:
-        findings = [f.__dict__ if hasattr(f, "__dict__") else {"code": getattr(f, "code", None), "detail": getattr(f, "detail", None)} for f in verify(read_host_inventory())]
+        findings = [f.__dict__ if hasattr(f, "__dict__") else {"code": getattr(f, "code", None), "detail": getattr(f, "detail", None)} for f in verify.verify(verify.read_host_inventory())]
     except Exception as exc:  # noqa: BLE001
         findings = [{"code": "verify-error", "detail": str(exc)}]
     blocking = [f for f in findings if f.get("code") in {"missing", "not-executable", "syntax", "unlocked-mutation", "duplicate"}]
@@ -201,11 +202,11 @@ def register(app, verify_api_key):
         save_run(outcome.envelope)
         return {
             "job": job_obj.name,
-            "status": outcome.status.value,
-            "exit_code": outcome.exit_code,
-            "duration_ms": outcome.duration_ms,
-            "stdout_tail": outcome.stdout_tail,
-            "stderr_tail": outcome.stderr_tail,
+            "status": outcome.envelope.status.value,
+            "exit_code": outcome.envelope.exit_code,
+            "duration_ms": outcome.envelope.duration_ms,
+            "stdout_tail": outcome.envelope.stdout_tail,
+            "stderr_tail": outcome.envelope.stderr_tail,
         }
 
 
@@ -222,4 +223,4 @@ def register(app, verify_api_key):
         return {"job": job, "status": "unknown"}
 
 
-app.include_router(router)
+    app.include_router(router)

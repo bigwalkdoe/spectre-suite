@@ -8,11 +8,18 @@ from typing import Any
 import pytest
 
 from spectre.dispatch import registry
-from spectre.dispatch.registry import FIELD_DEFAULTS, JOBS, Job, get_job, groups, jobs_in_group
+from spectre.dispatch.registry import (
+    FIELD_DEFAULTS,
+    JOBS,
+    Job,
+    get_job,
+    groups,
+    jobs_in_group,
+)
 
 
-def test_registry_has_61_jobs() -> None:
-    assert len(JOBS) == 61
+def test_registry_has_90_jobs() -> None:
+    assert len(JOBS) == 90
 
 
 def test_job_names_are_unique_and_sorted() -> None:

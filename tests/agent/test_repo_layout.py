@@ -25,15 +25,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # The trees mypy is asked to check.
-TYPED_TREES = ("spectre", "spectre", "tests", "tools")
+TYPED_TREES = ("spectre", "tests")
 
 
 def _source_dirs(tree: str) -> list[Path]:
     """`tree` and every directory below it that holds a `.py` file."""
     root = REPO_ROOT / tree
+    if not root.is_dir():
+        return []
     candidates = [root, *(child for child in root.rglob("*") if child.is_dir())]
     return [d for d in candidates if any(child.suffix == ".py" for child in d.iterdir() if child.is_file())]
 

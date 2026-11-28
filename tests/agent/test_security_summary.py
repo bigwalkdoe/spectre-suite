@@ -85,8 +85,8 @@ def test_last_scan_comes_from_the_record_not_from_now() -> None:
 
 def test_unresolved_counts_by_severity() -> None:
     _clear()
-    for severity in ("low", "medium", "high", "high"):
-        save_security_incident(SecurityIncident(severity=severity, rule_id="R", message="finding"))
+    for i, severity in enumerate(("low", "medium", "high", "high")):
+        save_security_incident(SecurityIncident(severity=severity, rule_id=f"R-{i}", message=f"finding-{i}"))
     summary = get_security_summary()
     assert summary["unresolved_total"] == 4
     assert summary["unresolved_by_severity"] == {"low": 1, "medium": 1, "high": 2}
