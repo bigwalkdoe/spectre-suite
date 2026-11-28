@@ -380,6 +380,52 @@ PY
 
 ---
 
+## ▸ MCP server
+
+Spectre ships a local stdio MCP server (`spectre-mcp`) that exposes the suite's
+observe and act surfaces as MCP tools, so an MCP client (OpenCode, Claude
+Desktop, or another agent) can inspect and operate a host without shelling out
+and parsing Rich output.
+
+Install (into the managed venv):
+
+```bash
+uv pip install -e '.[mcp]' --python /home/deon/.local/share/spectre-venv/bin/python
+```
+
+The server runs over stdio and is launched by the client. OpenCode example:
+
+```json
+{
+  "mcp": {
+    "spectre": {
+      "type": "local",
+      "command": ["/home/deon/.local/share/spectre-venv/bin/spectre-mcp"],
+      "enabled": true,
+      "environment": {
+        "SPECTRE_MCP_ALLOW_MUTATIONS": "1"
+      }
+    }
+  }
+}
+```
+
+Environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SPECTRE_MCP_ALLOW_MUTATIONS` | off | Permit mutating jobs, workflow runs, config writes, and schedule changes. |
+| `SPECTRE_MCP_ALLOW_SUDO` | off | Permit root jobs, but only when the process is already root. |
+| `SPECTRE_MCP_LOG_LEVEL` | `INFO` | Logging threshold (stderr). |
+| `SPECTRE_MCP_MAX_ROWS` | `200` | Upper bound for list tools. |
+
+Mutating capability is authorized once, at launch: with `SPECTRE_MCP_ALLOW_MUTATIONS=1`
+the server may run mutating actions. Each act tool still takes `confirm=true` and
+returns a preview first. See `docs/MCP.md` for the tool table, safety model,
+redaction limits, and the schedule caveat.
+
+---
+
 ## ▸ Documentation
 
 | Document | Purpose |
@@ -389,6 +435,7 @@ PY
 | [`docs/superpowers/specs/2026-11-13-web-dashboard-reports-subsystem-design.md`](docs/superpowers/specs/2026-11-13-web-dashboard-reports-subsystem-design.md) | Reports page design |
 | [`docs/migration/2026-11-06-phase2-3-repointing-runbook.md`](docs/migration/2026-11-06-phase2-3-repointing-runbook.md) | Phase 2/3 repointing status |
 | [`docs/migration/2026-11-06-absorb-spectre-backup.md`](docs/migration/2026-11-06-absorb-spectre-backup.md) | Restic absorption/cutover runbook |
+| [`docs/MCP.md`](docs/MCP.md) | MCP server: tools, safety model, redaction, install |
 | [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) | RTO/RPO and recovery procedures |
 | [`docs/RUNBOOKS.md`](docs/RUNBOOKS.md) | Incident runbooks |
 | [`docs/TESTING_AND_CICD.md`](docs/TESTING_AND_CICD.md) | Test suite and CI/CD |

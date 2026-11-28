@@ -5,6 +5,9 @@ All notable changes to the spectre-suite project will be documented in this file
 ## [Unreleased]
 
 ### Added
+- MCP server (`spectre-mcp`): local stdio server exposing Spectre's observe and act surfaces as MCP tools, with env-gated mutating/root actions, per-call previews, best-effort secret redaction, and subprocess stdio smoke test.
+
+### Changed
 - Web dashboard: data coverage/freshness diagnostics and target/fleet rollups, read-only viewer mode (`?readOnly=1`), alert/metric drill-down links, in-context alert runbooks, action run status persistence/API, and Action Activity UI.
 - Dashboard actions: bounded/redacted run status records, read-only runs endpoints (`GET /actions/runs*`), and basic request content-type hardening.
 
